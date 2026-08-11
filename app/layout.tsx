@@ -22,6 +22,10 @@ export default function RootLayout({
           <small>donor appeal pre-testing · pilot</small>
         </header>
         <main>{children}</main>
+        <footer className="app">
+          Results are simulated donor responses — directional signal for message testing, not a
+          prediction of campaign performance. Message Lab pilot · Allegiance Group + Pursuant.
+        </footer>
       </body>
     </html>
   );

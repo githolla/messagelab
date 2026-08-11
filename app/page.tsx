@@ -28,6 +28,7 @@ export default function Home() {
   const [results, setResults] = useState<PersonaResult[]>([]);
   const [isDemo, setIsDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAllQuotes, setShowAllQuotes] = useState(false);
 
   const givingCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -41,6 +42,7 @@ export default function Home() {
     setResults([]);
     setIsDemo(false);
     setDone(0);
+    setShowAllQuotes(false);
     const out: PersonaResult[] = [];
     const queue = [...PERSONAS];
 
@@ -79,6 +81,7 @@ export default function Home() {
   function runDemo() {
     setError(null);
     setIsDemo(true);
+    setShowAllQuotes(false);
     setResults(PERSONAS.map(demoResult));
     setDone(PERSONAS.length);
   }
@@ -141,7 +144,7 @@ export default function Home() {
           <button className="btn ghost" onClick={runDemo} disabled={running}>
             Load demo results
           </button>
-          {(running || results.length > 0) && (
+          {running && (
             <div className="progress">
               <div style={{ width: `${(done / PERSONAS.length) * 100}%` }} />
             </div>
@@ -164,6 +167,14 @@ export default function Home() {
           <section className="statrow">
             <div className="stat">
               <div className="v">
+                {winners.a !== winners.b && (
+                  <span
+                    className="sw"
+                    style={{
+                      background: winners.a > winners.b ? "var(--series-a)" : "var(--series-b)",
+                    }}
+                  />
+                )}
                 {winners.a > winners.b ? "A" : winners.b > winners.a ? "B" : "Tie"}
               </div>
               <div className="k">Winning version</div>
@@ -172,12 +183,18 @@ export default function Home() {
               </div>
             </div>
             <div className="stat">
-              <div className="v" style={{ color: "var(--series-a)" }}>{givers("intentA")}</div>
+              <div className="v">
+                <span className="sw" style={{ background: "var(--series-a)" }} />
+                {givers("intentA")}
+              </div>
               <div className="k">Would give — Version A</div>
               <div className="d">of {results.length} personas</div>
             </div>
             <div className="stat">
-              <div className="v" style={{ color: "var(--series-b)" }}>{givers("intentB")}</div>
+              <div className="v">
+                <span className="sw" style={{ background: "var(--series-b)" }} />
+                {givers("intentB")}
+              </div>
               <div className="k">Would give — Version B</div>
               <div className="d">of {results.length} personas</div>
             </div>
@@ -206,7 +223,7 @@ export default function Home() {
           <section className="card">
             <h2>What moved them</h2>
             <p className="sub">Each persona&apos;s stated reason, tagged by their winner vote.</p>
-            {results.slice(0, 12).map((r) => (
+            {results.slice(0, showAllQuotes ? results.length : 12).map((r) => (
               <div
                 key={r.personaId}
                 className={`quote ${r.winner === "send_a" ? "a" : r.winner === "send_b" ? "b" : ""}`}
@@ -222,6 +239,15 @@ export default function Home() {
                 </div>
               </div>
             ))}
+            {results.length > 12 && (
+              <button
+                className="btn ghost"
+                style={{ marginTop: 8 }}
+                onClick={() => setShowAllQuotes((s) => !s)}
+              >
+                {showAllQuotes ? "Show fewer" : `Show all ${results.length}`}
+              </button>
+            )}
           </section>
 
           <section className="card">
