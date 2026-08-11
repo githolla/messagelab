@@ -24,6 +24,16 @@ a segment-level results dashboard. "Message Lab" is a working title.
   6 each of Regular donor / Occasional / Rare / Never. Seeded sample (seed 4242).
 - `lib/demo.ts`: deterministic demo results (no API calls) — powers the
   "Load demo results" button for zero-cost demos. No Math.random anywhere.
+- `lib/refine.ts` + `app/api/refine/route.ts`: auto-refinement loop (email /
+  direct mail only). Claude diagnoses a round's results and drafts a challenger
+  to replace the losing version; client re-runs the panel up to 3 rounds/click,
+  stopping when the champion holds. Carries the shared-backbone caveat in the UI.
+- `lib/stats.ts`: Wilson score intervals — headline give-rates show a 95% CI so
+  n≈24 counts aren't read as precise. Methodology grounded in the MatrAIx paper
+  (arXiv 2608.04205): persona-agent results are model-dependent and
+  hypothesis-generating, so the run route alternates A/B presentation order per
+  persona (FNV hash of id), echoes the model + order into each result, and the
+  export embeds a run manifest. Caveats on the dashboard state this honestly.
 - Charts in `components/Charts.tsx` are hand-rolled SVG. Series colors are
   validated for colorblind safety: Version A = #3b6ea5 (blue), Version B =
   #65a30d (green). Don't swap them for brand colors without re-validating.

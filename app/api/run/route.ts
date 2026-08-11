@@ -43,6 +43,18 @@ const CHANNELS: Record<
   },
 };
 
+// Deterministic per-persona presentation order (FNV-1a on the id). Half the
+// panel sees B first, countering primacy/position bias in this within-subject
+// head-to-head. Deterministic so demos and reruns are reproducible.
+function presentationOrder(id: string): "ab" | "ba" {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % 2 === 0 ? "ab" : "ba";
+}
+
 function personaBlock(p: Persona): string {
   const dims = Object.entries(p.dimensions)
     .map(([k, v]) => `${k}: ${v}`)
@@ -91,39 +103,45 @@ export async function POST(req: NextRequest) {
   };
 
   const ch = CHANNELS[variants.assetType] ?? CHANNELS.email;
-  const preamble = `${ch.intro} React to both, then answer the questionnaire honestly as yourself. "I would ignore this" and low ratings are valid answers.`;
+  const preamble = `${ch.intro} React to both, then answer the questionnaire honestly as yourself. "I would ignore this" and low ratings are valid answers. Judge each version on its own merits — there is no expected "right" answer, and preferring neither is fine.`;
+  const order = presentationOrder(persona.id);
+
+  const blockA = { label: `## Version A — "${variants.labelA}"`, copy: variants.copyA, img: variants.imageA };
+  const blockB = { label: `## Version B — "${variants.labelB}"`, copy: variants.copyB, img: variants.imageB };
+  const [first, second] = order === "ab" ? [blockA, blockB] : [blockB, blockA];
 
   let content: string | ContentBlock[];
   if (variants.assetType === "website") {
-    const imgA = variants.imageA && imageBlock(variants.imageA);
-    const imgB = variants.imageB && imageBlock(variants.imageB);
-    if (!imgA || !imgB) {
+    const imgFirst = first.img && imageBlock(first.img);
+    const imgSecond = second.img && imageBlock(second.img);
+    if (!imgFirst || !imgSecond) {
       return NextResponse.json(
         { error: "Website tests need a screenshot for both versions." },
         { status: 400 }
       );
     }
     content = [
-      { type: "text", text: `${preamble}\n\n## Version A — "${variants.labelA}"` },
-      imgA,
-      { type: "text", text: `## Version B — "${variants.labelB}"` },
-      imgB,
+      { type: "text", text: `${preamble}\n\n${first.label}` },
+      imgFirst,
+      { type: "text", text: second.label },
+      imgSecond,
       { type: "text", text: questionnaire(ch) },
     ];
   } else {
     content = `${preamble}
 
-## Version A — "${variants.labelA}"
+${first.label}
 
-${variants.copyA}
+${first.copy}
 
-## Version B — "${variants.labelB}"
+${second.label}
 
-${variants.copyB}
+${second.copy}
 
 ${questionnaire(ch)}`;
   }
 
+  const model = process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6";
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -132,7 +150,7 @@ ${questionnaire(ch)}`;
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6",
+      model,
       max_tokens: 1024,
       system: personaBlock(persona),
       messages: [{ role: "user", content }],
@@ -164,6 +182,8 @@ ${questionnaire(ch)}`;
       personaName: persona.name,
       giving: persona.giving,
       ...parsed,
+      model,
+      order,
     });
   } catch {
     return NextResponse.json(

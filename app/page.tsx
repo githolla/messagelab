@@ -6,6 +6,7 @@ import type { AssetType, Persona, PersonaResult, Variants } from "@/lib/types";
 import { ASSET_LABELS, GIVING_ORDER, INTENT_LABELS } from "@/lib/types";
 import { demoResult } from "@/lib/demo";
 import { tally, type RoundSummary } from "@/lib/refine";
+import { shareWithCI } from "@/lib/stats";
 import {
   DEFAULT_COPY_A,
   DEFAULT_COPY_B,
@@ -343,7 +344,7 @@ export default function Home() {
                 {givers("intentA")}
               </div>
               <div className="k">Would give — Version A</div>
-              <div className="d">of {results.length} personas</div>
+              <div className="d">{shareWithCI(givers("intentA"), results.length)}</div>
             </div>
             <div className="stat">
               <div className="v">
@@ -351,7 +352,7 @@ export default function Home() {
                 {givers("intentB")}
               </div>
               <div className="k">Would give — Version B</div>
-              <div className="d">of {results.length} personas</div>
+              <div className="d">{shareWithCI(givers("intentB"), results.length)}</div>
             </div>
             <div className="stat">
               <div className="v">{results.filter((r) => r.winner === "neither").length}</div>
@@ -359,6 +360,14 @@ export default function Home() {
               <div className="d">signal to rework the appeal</div>
             </div>
           </section>
+
+          <p className="caveat">
+            Directional signal from {results.length} simulated donors — persona-agent estimates, not
+            statistically significant at this panel size, and not a prediction of real donor
+            behavior. Segment splits (n≈6) are descriptive only. Results depend on the persona
+            model{results[0]?.model ? ` (${results[0].model})` : ""}; confirm important calls with a
+            second model and a human read before you send.
+          </p>
 
           <section className="card">
             <h2>3 · Refine</h2>
@@ -391,6 +400,12 @@ export default function Home() {
                       `Up to ${MAX_REFINE_ROUNDS} rounds · stops when the champion defends its lead`)}
               </span>
             </div>
+            <p className="caveat" style={{ marginTop: 10 }}>
+              Same-model caveat: Claude drafts the challenger and Claude-simulated personas score it,
+              so a win can reflect the model preferring its own copy as much as a genuinely better
+              appeal. Treat refined drafts as strong candidates to test with people, not finished
+              winners.
+            </p>
             {rounds.length > 0 && (
               <ol className="rounds">
                 {rounds.map((r, i) => (
@@ -496,7 +511,18 @@ export default function Home() {
               className="btn ghost"
               style={{ marginTop: 12 }}
               onClick={() => {
-                const blob = new Blob([JSON.stringify({ variants, rounds, results }, null, 2)], {
+                const manifest = {
+                  app: "message-lab",
+                  exportedAt: new Date().toISOString(),
+                  assetType: resultsAsset,
+                  model: results[0]?.model ?? "unknown",
+                  panelSize: results.length,
+                  personaIds: results.map((r) => r.personaId),
+                  isDemo,
+                };
+                const blob = new Blob(
+                  [JSON.stringify({ manifest, variants, rounds, results }, null, 2)],
+                  {
                   type: "application/json",
                 });
                 const url = URL.createObjectURL(blob);
