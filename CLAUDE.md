@@ -28,6 +28,14 @@ a segment-level results dashboard. "Message Lab" is a working title.
   direct mail only). Claude diagnoses a round's results and drafts a challenger
   to replace the losing version; client re-runs the panel up to 3 rounds/click,
   stopping when the champion holds. Carries the shared-backbone caveat in the UI.
+- `app/review` + `app/api/review/route.ts`: standalone "Review a page" tool
+  (linked from the header nav). Paste a URL → the route screenshots it headless
+  (puppeteer-core + @sparticuz/chromium on Vercel; a local Chromium via
+  CHROME_PATH / `/opt/pw-browsers/chromium` in dev) → Claude returns a structured
+  expert UI/UX critique (scores, strengths, severity-ranked fixes). Screenshot
+  upload is the fallback when a site blocks headless capture. Distinct from the
+  A/B panel — a single-page design crit, not a persona simulation.
+  `next.config.mjs` marks the chromium packages `serverExternalPackages`.
 - `lib/stats.ts`: Wilson score intervals — headline give-rates show a 95% CI so
   n≈24 counts aren't read as precise. Methodology grounded in the MatrAIx paper
   (arXiv 2608.04205): persona-agent results are model-dependent and

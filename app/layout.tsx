@@ -20,6 +20,10 @@ export default function RootLayout({
             Message<span>Lab</span>
           </h1>
           <small>donor appeal pre-testing · pilot</small>
+          <nav className="topnav">
+            <a href="/">A/B pre-test</a>
+            <a href="/review">Review a page</a>
+          </nav>
         </header>
         <main>{children}</main>
         <footer className="app">
