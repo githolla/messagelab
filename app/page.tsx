@@ -9,12 +9,7 @@ import { shareWithCI } from "@/lib/stats";
 import { INDUSTRIES } from "@/lib/industries";
 import { ANALYSTS, panelFor, instancesPer } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
-import {
-  DEFAULT_COPY_A,
-  DEFAULT_COPY_B,
-  DEFAULT_LABEL_A,
-  DEFAULT_LABEL_B,
-} from "@/lib/defaults";
+import { sampleFor, isPristineCopy, MESSAGE_TYPES } from "@/lib/samples";
 import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/Charts";
 import { DiffView } from "@/components/Diff";
 
@@ -83,13 +78,52 @@ type Tab = "summary" | "segments" | "analysts" | "reactions" | "data";
 
 export default function Home() {
   const [industry, setIndustry] = useState("general");
-  const [variants, setVariants] = useState<Variants>({
-    assetType: "email",
-    labelA: DEFAULT_LABEL_A,
-    labelB: DEFAULT_LABEL_B,
-    copyA: DEFAULT_COPY_A,
-    copyB: DEFAULT_COPY_B,
+  const [variants, setVariants] = useState<Variants>(() => {
+    const s = sampleFor("general");
+    return { assetType: "email", labelA: s.labelA, labelB: s.labelB, copyA: s.copyA, copyB: s.copyB };
   });
+  const [messageType, setMessageType] = useState(MESSAGE_TYPES[0]);
+  const [drafting, setDrafting] = useState(false);
+
+  // Switch industries: refill the sample copy only if the user hasn't edited it.
+  function changeIndustry(key: string) {
+    setIndustry(key);
+    setVariants((v) => {
+      if (isPristineCopy(v.copyA) && isPristineCopy(v.copyB)) {
+        const s = sampleFor(key);
+        return { ...v, labelA: s.labelA, labelB: s.labelB, copyA: s.copyA, copyB: s.copyB };
+      }
+      return v;
+    });
+  }
+
+  async function autoCraft() {
+    setDrafting(true);
+    setError(null);
+    try {
+      const resp = await fetch("/api/draft", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ industry, assetType: variants.assetType, messageType }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      setVariants((v) => ({
+        ...v,
+        labelA: data.labelA || v.labelA,
+        copyA: data.copyA,
+        labelB: data.labelB || v.labelB,
+        copyB: data.copyB,
+      }));
+    } catch (e) {
+      setError(
+        (e instanceof Error ? e.message : "Auto-craft failed") +
+          " — you can edit the sample copy or paste your own instead."
+      );
+    } finally {
+      setDrafting(false);
+    }
+  }
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(0);
   const [panelSize, setPanelSize] = useState(0);
@@ -320,7 +354,7 @@ export default function Home() {
             <label className="fld">Industry</label>
             <select
               value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
+              onChange={(e) => changeIndustry(e.target.value)}
               disabled={running || refining}
             >
               {INDUSTRIES.map((i) => (
@@ -383,6 +417,35 @@ export default function Home() {
       <section className="card">
         <h2>2 · Message variants</h2>
         <p className="sub">{ASSET_HINTS[variants.assetType]}</p>
+        {variants.assetType !== "website" && (
+          <div className="craftbar">
+            <div className="craftfield">
+              <label className="fld">Auto-craft a…</label>
+              <select
+                value={messageType}
+                onChange={(e) => setMessageType(e.target.value)}
+                disabled={drafting || running || refining}
+              >
+                {MESSAGE_TYPES.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              className="btn primary"
+              onClick={autoCraft}
+              disabled={drafting || running || refining}
+            >
+              {drafting ? "Crafting…" : "✨ Auto-craft variants"}
+            </button>
+            <span className="note">
+              Claude drafts two A/B versions for {INDUSTRIES.find((i) => i.key === industry)?.label},
+              or edit the sample / paste your own below.
+            </span>
+          </div>
+        )}
         <div className="grid2">
           {(["A", "B"] as const).map((v) => {
             const labelKey = v === "A" ? "labelA" : "labelB";

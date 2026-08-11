@@ -266,6 +266,14 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 }
 
 /* ---------- Bot cards (audience archetypes + analysts) ---------- */
+.craftbar {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 16px;
+}
+.craftfield { min-width: 220px; }
+.craftbar .note { flex: 1; min-width: 200px; }
+
 .botgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .botcard { border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; background: var(--card); }
 .botcard .bt { font-size: 13px; font-weight: 650; display: flex; align-items: center; gap: 7px; }
