@@ -1,10 +1,15 @@
 # Message Lab
 
-Pre-test fundraising appeal variants against simulated donor personas before you send.
-Test two versions of an email, a direct mail letter, or a donation page UI (screenshots),
-run them against a 24-persona panel (MatrAIx persona dataset, stratified by giving
-behavior), and get a segment-level readout: winner votes, response intent, emotional
-resonance, and each persona's stated rationale.
+Test messages and experiences against a simulated audience before you ship — for any industry.
+
+Two tools:
+
+- **A/B Message Test** — test two versions of an email, direct mail letter, or web page
+  (screenshots) against a 24-persona audience panel (MatrAIx persona dataset), and get a
+  segment-level readout: winner votes, response intent, emotional resonance, and each
+  persona's rationale. Claude then auto-refines the weaker version until results plateau.
+- **UX Page Review** — paste any URL; the app screenshots it and Claude returns an expert
+  UI/UX and usability review (scores, strengths, severity-ranked fixes), tunable per industry.
 
 ## Stack
 

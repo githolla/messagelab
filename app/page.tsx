@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import personasJson from "@/lib/personas.json";
 import type { AssetType, Persona, PersonaResult, Variants } from "@/lib/types";
-import { ASSET_LABELS, GIVING_ORDER, INTENT_LABELS } from "@/lib/types";
+import { ASSET_LABELS, GIVING_ORDER, INTENT_LABELS, segmentLabel } from "@/lib/types";
 import { demoResult } from "@/lib/demo";
 import { tally, type RoundSummary } from "@/lib/refine";
 import { shareWithCI } from "@/lib/stats";
@@ -22,11 +22,11 @@ const MAX_REFINE_ROUNDS = 10;
 
 const ASSET_HINTS: Record<AssetType, string> = {
   email:
-    "Paste the two versions you want to test. The prefilled copy is the pilot's sample appeal — replace it with real campaign copy.",
+    "Paste the two versions you want to test. Replace the sample copy with your own — subject line and body.",
   direct_mail:
     "Paste the two letter versions. Include everything the recipient would read — headline, body, PS, reply-device copy.",
   website:
-    "Upload a screenshot of each page version. A focused capture (hero, gift array, button) reads better than a very tall full-page one.",
+    "Upload a screenshot of each page version. A focused capture (hero, primary CTA, key section) reads better than a very tall full-page one.",
 };
 
 // Downscale to Claude's vision sweet spot (long edge ≤ 1568px) and re-encode
@@ -76,7 +76,7 @@ export default function Home() {
   const givingCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of PERSONAS) m.set(p.giving, (m.get(p.giving) ?? 0) + 1);
-    return GIVING_ORDER.map((g) => `${m.get(g) ?? 0} ${g.toLowerCase()}`).join(" · ");
+    return GIVING_ORDER.map((g) => `${m.get(g) ?? 0} ${segmentLabel(g).toLowerCase()}`).join(" · ");
   }, []);
 
   async function runPanel(v: Variants): Promise<PersonaResult[]> {
@@ -151,7 +151,7 @@ export default function Home() {
 
     for (let i = 0; i < MAX_REFINE_ROUNDS; i++) {
       if (stopRef.current) {
-        outcome = `Stopped after ${i} round${i === 1 ? "" : "s"}. Best so far: "${bestLabel}" at ${bestGive}/${res.length} would-give.`;
+        outcome = `Stopped after ${i} round${i === 1 ? "" : "s"}. Best so far: "${bestLabel}" at ${bestGive}/${res.length} would-convert.`;
         break;
       }
       setRefineNote("Analyzing results and drafting a challenger…");
@@ -167,7 +167,7 @@ export default function Home() {
         draft = data;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Refinement failed.");
-        outcome = `Refinement stopped on an error. Best so far: "${bestLabel}" at ${bestGive}/${res.length} would-give.`;
+        outcome = `Refinement stopped on an error. Best so far: "${bestLabel}" at ${bestGive}/${res.length} would-convert.`;
         break;
       }
       setRounds((rs) =>
@@ -212,16 +212,16 @@ export default function Home() {
         bestGive = roundGive;
         bestLabel = roundLabel;
         setRefineNote(
-          `"${roundLabel}" lifted would-give to ${roundGive}/${newRes.length} — new best, refining again…`
+          `"${roundLabel}" lifted would-convert to ${roundGive}/${newRes.length} — new best, refining again…`
         );
         if (i === MAX_REFINE_ROUNDS - 1) {
-          outcome = `Round budget reached (${MAX_REFINE_ROUNDS} rounds). Still improving — best is "${bestLabel}" at ${bestGive}/${newRes.length} would-give. Run auto-refine again to keep going.`;
+          outcome = `Round budget reached (${MAX_REFINE_ROUNDS} rounds). Still improving — best is "${bestLabel}" at ${bestGive}/${newRes.length} would-convert. Run auto-refine again to keep going.`;
         }
         continue;
       }
 
       // No improvement over the best so far → plateau, this is as good as it gets.
-      outcome = `Plateau reached: round ${i + 2} (${roundGive}/${newRes.length}) did not beat the best would-give score (${bestGive}/${newRes.length}). Ready version: "${bestLabel}".`;
+      outcome = `Plateau reached: round ${i + 2} (${roundGive}/${newRes.length}) did not beat the best would-convert score (${bestGive}/${newRes.length}). Ready version: "${bestLabel}".`;
       break;
     }
 
@@ -256,8 +256,17 @@ export default function Home() {
 
   return (
     <>
+      <div className="pagehead">
+        <h1>A/B message test</h1>
+        <p>
+          Test two versions of a message — email, direct mail, or a web page — against a simulated
+          audience panel, then let Claude refine the weaker version until results plateau. Works for
+          any industry.
+        </p>
+      </div>
+
       <section className="card">
-        <h2>1 · Appeal variants</h2>
+        <h2>1 · Message variants</h2>
         <div className="seg" role="tablist" aria-label="Asset type">
           {(Object.keys(ASSET_LABELS) as AssetType[]).map((t) => (
             <button
@@ -329,10 +338,10 @@ export default function Home() {
       </section>
 
       <section className="card">
-        <h2>2 · Persona panel</h2>
+        <h2>2 · Audience panel</h2>
         <p className="sub">
-          {PERSONAS.length} simulated donors from the MatrAIx persona dataset, stratified by giving
-          behavior: {givingCounts}.
+          {PERSONAS.length} simulated people from the MatrAIx persona dataset, spanning a range of
+          prior-engagement levels: {givingCounts}.
         </p>
         <div className="runbar">
           <button className="btn primary" onClick={runLive} disabled={running || refining}>
@@ -384,7 +393,7 @@ export default function Home() {
                 <span className="sw" style={{ background: "var(--series-a)" }} />
                 {givers("intentA")}
               </div>
-              <div className="k">Would give — Version A</div>
+              <div className="k">Would convert — Version A</div>
               <div className="d">{shareWithCI(givers("intentA"), results.length)}</div>
             </div>
             <div className="stat">
@@ -392,22 +401,22 @@ export default function Home() {
                 <span className="sw" style={{ background: "var(--series-b)" }} />
                 {givers("intentB")}
               </div>
-              <div className="k">Would give — Version B</div>
+              <div className="k">Would convert — Version B</div>
               <div className="d">{shareWithCI(givers("intentB"), results.length)}</div>
             </div>
             <div className="stat">
               <div className="v">{results.filter((r) => r.winner === "neither").length}</div>
               <div className="k">Rejected both</div>
-              <div className="d">signal to rework the appeal</div>
+              <div className="d">signal to rework the message</div>
             </div>
           </section>
 
           <p className="caveat">
-            Directional signal from {results.length} simulated donors — persona-agent estimates, not
-            statistically significant at this panel size, and not a prediction of real donor
+            Directional signal from {results.length} simulated people — persona-agent estimates, not
+            statistically significant at this panel size, and not a prediction of real-world
             behavior. Segment splits (n≈6) are descriptive only. Results depend on the persona
             model{results[0]?.model ? ` (${results[0].model})` : ""}; confirm important calls with a
-            second model and a human read before you send.
+            second model and a human read before you ship.
           </p>
 
           <section className="card">
@@ -415,7 +424,7 @@ export default function Home() {
             <p className="sub">
               Claude diagnoses the panel&apos;s reactions, drafts a stronger challenger to replace
               the weaker version, and re-runs the {PERSONAS.length}-persona panel — repeating while
-              each round lifts the would-give rate and stopping when it plateaus (a round no longer
+              each round lifts the conversion rate and stopping when it plateaus (a round no longer
               beats the best score). Runs unattended up to {MAX_REFINE_ROUNDS} rounds, then pauses
               so you can review before spending more. Each round is another full panel run.
             </p>
@@ -439,7 +448,7 @@ export default function Home() {
                   : resultsAsset === "website"
                     ? "Email and direct mail only — refinement drafts new copy, not new page designs."
                     : (refineNote ??
-                      `Up to ${MAX_REFINE_ROUNDS} rounds · stops when the would-give rate plateaus`)}
+                      `Up to ${MAX_REFINE_ROUNDS} rounds · stops when the conversion rate plateaus`)}
               </span>
             </div>
             <p className="caveat" style={{ marginTop: 10 }}>
@@ -460,7 +469,7 @@ export default function Home() {
                       {r.labelB}
                       <span className="note">
                         {" "}
-                        · would give: {r.givesA} vs {r.givesB} · rejected both: {r.neither}
+                        · would convert: {r.givesA} vs {r.givesB} · rejected both: {r.neither}
                       </span>
                     </div>
                     {r.diagnosis && <div className="diag">{r.diagnosis}</div>}
@@ -504,7 +513,7 @@ export default function Home() {
               >
                 {r.rationale}
                 <div className="who">
-                  {r.personaName} · {r.giving} · voted{" "}
+                  {r.personaName} · {segmentLabel(r.giving)} · voted{" "}
                   {r.winner === "send_a"
                     ? "Version A"
                     : r.winner === "send_b"
@@ -544,7 +553,7 @@ export default function Home() {
                   {results.map((r) => (
                     <tr key={r.personaId}>
                       <td>{r.personaName}</td>
-                      <td>{r.giving}</td>
+                      <td>{segmentLabel(r.giving)}</td>
                       <td>{INTENT_LABELS[resultsAsset][r.intentA]}</td>
                       <td>{INTENT_LABELS[resultsAsset][r.intentB]}</td>
                       <td>{r.resonanceA}</td>

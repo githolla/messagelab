@@ -86,3 +86,16 @@ export const INTENT_ORDER: IntentChoice[] = [
 ];
 
 export const GIVING_ORDER = ["Regular donor", "Occasional", "Rare", "Never"];
+
+// Neutral display labels for the panel's engagement segments (the underlying
+// persona attribute is prior giving/engagement frequency).
+export const SEGMENT_LABELS: Record<string, string> = {
+  "Regular donor": "Regular",
+  Occasional: "Occasional",
+  Rare: "Rare",
+  Never: "Never",
+};
+
+export function segmentLabel(g: string): string {
+  return SEGMENT_LABELS[g] ?? g;
+}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { IntentChoice, PersonaResult } from "@/lib/types";
-import { GIVING_ORDER, INTENT_ORDER } from "@/lib/types";
+import { GIVING_ORDER, INTENT_ORDER, segmentLabel } from "@/lib/types";
 
 const A = "var(--series-a)";
 const B = "var(--series-b)";
@@ -146,7 +146,7 @@ export function ResonanceChart({ results }: { results: PersonaResult[] }) {
   return (
     <figure className="chart">
       <figcaption>
-        Emotional resonance by donor segment <span className="capsub">mean rating, 1–5</span>
+        Emotional resonance by segment <span className="capsub">mean rating, 1–5</span>
       </figcaption>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Resonance by segment">
         {[1, 2, 3, 4, 5].map((v) => (
@@ -162,16 +162,16 @@ export function ResonanceChart({ results }: { results: PersonaResult[] }) {
           const y = i * ROW + ROW / 2;
           return (
             <g key={g}>
-              <text x={LBL - 10} y={y + 4} textAnchor="end" fontSize="12" fill="var(--ink-2)">{g}</text>
+              <text x={LBL - 10} y={y + 4} textAnchor="end" fontSize="12" fill="var(--ink-2)">{segmentLabel(g)}</text>
               <line x1={x(Math.min(mA, mB))} y1={y} x2={x(Math.max(mA, mB))} y2={y} stroke="var(--line)" strokeWidth="2" />
               <circle
-                cx={x(mA)} cy={y} r="6" fill={A} stroke="var(--surface)" strokeWidth="2"
-                onMouseMove={(e) => t.show(e, `Version A · ${g}: ${mA.toFixed(1)} (n=${rs.length})`)}
+                cx={x(mA)} cy={y} r="6" fill={A} stroke="var(--card)" strokeWidth="2"
+                onMouseMove={(e) => t.show(e, `Version A · ${segmentLabel(g)}: ${mA.toFixed(1)} (n=${rs.length})`)}
                 onMouseLeave={t.hide}
               />
               <circle
-                cx={x(mB)} cy={y} r="6" fill={B} stroke="var(--surface)" strokeWidth="2"
-                onMouseMove={(e) => t.show(e, `Version B · ${g}: ${mB.toFixed(1)} (n=${rs.length})`)}
+                cx={x(mB)} cy={y} r="6" fill={B} stroke="var(--card)" strokeWidth="2"
+                onMouseMove={(e) => t.show(e, `Version B · ${segmentLabel(g)}: ${mB.toFixed(1)} (n=${rs.length})`)}
                 onMouseLeave={t.hide}
               />
             </g>

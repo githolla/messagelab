@@ -1,10 +1,11 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Nav } from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "Message Lab — donor appeal pre-testing",
+  title: "Message Lab — test messages & experiences with simulated audiences",
   description:
-    "Pre-test fundraising appeal variants against simulated donor personas before you send.",
+    "Pre-test two versions of a message against a simulated audience panel, and get an expert UI/UX review of any web page — for any industry.",
 };
 
 export default function RootLayout({
@@ -16,19 +17,19 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <header className="app">
-          <h1>
-            Message<span>Lab</span>
-          </h1>
-          <small>donor appeal pre-testing · pilot</small>
-          <nav className="topnav">
-            <a href="/">A/B pre-test</a>
-            <a href="/review">Review a page</a>
-          </nav>
+          <a className="brand" href="/">
+            <span className="logo">
+              Message<span>Lab</span>
+            </span>
+            <small>audience testing &amp; UX review</small>
+          </a>
+          <Nav />
         </header>
         <main>{children}</main>
         <footer className="app">
-          Results are simulated donor responses — directional signal for message testing, not a
-          prediction of campaign performance. Message Lab pilot · Allegiance Group + Pursuant.
+          Panel results are simulated audience responses — directional signal for testing, not a
+          prediction of real-world performance. Page reviews are one model&apos;s expert read of a
+          screenshot, not a usability test.
         </footer>
       </body>
     </html>
