@@ -5,20 +5,21 @@ export const maxDuration = 60;
 
 const REVIEW_SCHEMA = `Respond with ONLY a JSON object, no markdown fences:
 {
-  "summary": "2-3 sentence overall read of the page for a nonprofit donation context",
+  "summary": "2-3 sentence overall read of the page's UI/UX and usability",
   "scores": {
-    "hierarchy": 1-5, "clarity_of_ask": 1-5, "cta_and_gift_array": 1-5,
-    "trust_and_credibility": 1-5, "accessibility": 1-5
+    "hierarchy": 1-5, "clarity": 1-5, "navigation": 1-5,
+    "cta": 1-5, "trust": 1-5, "accessibility": 1-5
   },
   "strengths": ["..."],
   "issues": [
-    {"severity": "high" | "medium" | "low", "area": "e.g. CTA, hierarchy, trust, accessibility, copy", "finding": "what's wrong and why it costs gifts", "fix": "the concrete change to make"}
+    {"severity": "high" | "medium" | "low", "area": "e.g. hierarchy, navigation, CTA, content, trust, accessibility, layout", "finding": "what's wrong and why it hurts usability or conversion", "fix": "the concrete change to make"}
   ]
 }
+Score keys: hierarchy = visual hierarchy & layout; clarity = clarity of purpose & content; navigation = navigation & information architecture; cta = primary call-to-action & user flow; trust = trust & credibility; accessibility = contrast, target sizes, legibility.
 Order issues most severe first. Be specific to what is visible in the screenshot — no generic advice.`;
 
 const SYSTEM =
-  "You are a senior UI/UX designer and conversion specialist for nonprofit fundraising pages. You review donation and campaign landing pages the way a design lead would in a crit: visual hierarchy, clarity of the ask, the gift array and primary CTA, trust and credibility cues, and accessibility (contrast, tap targets, legibility). Evidence-driven, blunt, and practical.";
+  "You are a senior UI/UX designer and usability expert. You review web pages the way a design lead and usability specialist would in a crit: visual hierarchy and layout, clarity of purpose and content, navigation and information architecture, the primary call-to-action and user flow, trust and credibility, and accessibility (contrast, target sizes, legibility, and any focus/state cues that are visible). Evidence-driven, blunt, and practical — ground every point in what is actually visible in the screenshot.";
 
 type Shot = { dataUrl: string; note: string };
 
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest) {
           content: [
             {
               type: "text",
-              text: `Review this nonprofit donation/campaign page for UI/UX and conversion. ${REVIEW_SCHEMA}`,
+              text: `Review this web page for UI/UX and usability. ${REVIEW_SCHEMA}`,
             },
             { type: "image", source: { type: "base64", media_type: m[1], data: m[2] } },
           ],

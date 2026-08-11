@@ -41,8 +41,7 @@ header.app small { color: #94a3b8; font-weight: 400; }
 
 .linklike { color: var(--series-a); cursor: pointer; text-decoration: underline; }
 
-.scorerow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
-@media (max-width: 700px) { .scorerow { grid-template-columns: repeat(2, 1fr); } }
+.scorerow { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
 .score { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
 .score .v { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
 .score .v .of { font-size: 13px; font-weight: 600; color: var(--ink-3); }

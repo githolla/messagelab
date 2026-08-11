@@ -17,9 +17,10 @@ interface Review {
 
 const SCORE_LABELS: Record<string, string> = {
   hierarchy: "Visual hierarchy",
-  clarity_of_ask: "Clarity of the ask",
-  cta_and_gift_array: "CTA & gift array",
-  trust_and_credibility: "Trust & credibility",
+  clarity: "Clarity & content",
+  navigation: "Navigation & IA",
+  cta: "Primary action / CTA",
+  trust: "Trust & credibility",
   accessibility: "Accessibility",
 };
 
@@ -80,14 +81,14 @@ export default function ReviewPage() {
       <section className="card">
         <h2>Review a page</h2>
         <p className="sub">
-          Paste a live donation or campaign page URL — the app captures a screenshot and Claude
-          returns an expert UI/UX review: hierarchy, the ask, gift array and CTA, trust cues, and
-          accessibility, with prioritized fixes.
+          Paste any web page URL — the app captures a screenshot and Claude returns an expert UI/UX
+          and usability review: visual hierarchy, clarity, navigation, the primary call-to-action,
+          trust cues, and accessibility, with prioritized fixes.
         </p>
         <div className="runbar">
           <input
             type="text"
-            placeholder="https://example.org/donate"
+            placeholder="https://example.com"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && url.trim() && !busy && submit({ url: url.trim() })}
