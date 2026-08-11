@@ -1,0 +1,17 @@
+{
+  "name": "lead-response-message-engine",
+  "version": "1.0.0",
+  "description": "Email-only A/B message-test engine (simulated lead panel) — drop-in ESM module for the Lead Response tool.",
+  "type": "module",
+  "private": true,
+  "main": "engine/index.js",
+  "exports": {
+    ".": "./engine/index.js"
+  },
+  "scripts": {
+    "demo": "node example/run-cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
