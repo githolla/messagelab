@@ -19,8 +19,8 @@ const GIVING_BASE: Record<string, number> = {
 };
 
 function intentFrom(score: number): IntentChoice {
-  if (score < 0.18) return "delete_unread";
-  if (score < 0.42) return "read_no_action";
+  if (score < 0.18) return "dismiss";
+  if (score < 0.42) return "engage_no_gift";
   if (score < 0.55) return "save_for_later";
   if (score < 0.7) return "give_small";
   if (score < 0.9) return "give_suggested";

@@ -1,25 +1,79 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Persona, Variants } from "@/lib/types";
+import type { AssetType, Persona, Variants } from "@/lib/types";
 
 export const maxDuration = 60;
 
 const SCHEMA_HINT = `Respond with ONLY a JSON object, no markdown fences, matching:
 {
-  "intentA": "delete_unread" | "read_no_action" | "save_for_later" | "give_small" | "give_suggested" | "give_more",
+  "intentA": "dismiss" | "engage_no_gift" | "save_for_later" | "give_small" | "give_suggested" | "give_more",
   "intentB": same options as intentA,
   "resonanceA": 1-5,
   "resonanceB": 1-5,
   "trust": "version_a" | "version_b" | "both_equal" | "neither",
   "winner": "send_a" | "send_b" | "either" | "neither",
-  "rationale": "1-2 sentences quoting the specific line that moved you or put you off",
+  "rationale": "1-2 sentences quoting or describing the specific line or element that moved you or put you off",
   "baselineIntent": 1-5
 }`;
+
+const CHANNELS: Record<
+  AssetType,
+  { intro: string; intentQ: string; intentDefs: string; winnerQ: string }
+> = {
+  email: {
+    intro: "Two versions of a fundraising email are being tested.",
+    intentQ: "If Version A arrived in your inbox, what would you most likely do?",
+    intentDefs:
+      '"dismiss" = delete it unread; "engage_no_gift" = read it but take no action; "save_for_later" = keep it to maybe act on later',
+    winnerQ: "If only one email could be sent, which should it be?",
+  },
+  direct_mail: {
+    intro: "Two versions of a fundraising letter (postal direct mail) are being tested.",
+    intentQ: "If Version A arrived in your mailbox, what would you most likely do?",
+    intentDefs:
+      '"dismiss" = toss it unopened; "engage_no_gift" = read it but take no action; "save_for_later" = set it aside to maybe act on later',
+    winnerQ: "If only one letter could be mailed, which should it be?",
+  },
+  website: {
+    intro:
+      "Two versions of a nonprofit donation web page are being tested. A screenshot of each version follows.",
+    intentQ: "If you landed on Version A, what would you most likely do?",
+    intentDefs:
+      '"dismiss" = leave the page within seconds; "engage_no_gift" = look around but not give; "save_for_later" = bookmark it or plan to come back',
+    winnerQ: "If only one page could go live, which should it be?",
+  },
+};
 
 function personaBlock(p: Persona): string {
   const dims = Object.entries(p.dimensions)
     .map(([k, v]) => `${k}: ${v}`)
     .join("\n");
   return `You are answering as this person. Stay fully in character — react the way THIS person would, not the way an average or agreeable person would.\n\nname: ${p.name}\n${dims}`;
+}
+
+function questionnaire(ch: (typeof CHANNELS)[AssetType]): string {
+  return `## Questionnaire
+
+1. intentA — ${ch.intentQ}
+   Options: ${ch.intentDefs}; "give_small" = give under $25; "give_suggested" = give $25–$100; "give_more" = give $100+.
+2. intentB — Same question for Version B.
+3. resonanceA — How emotionally compelling was Version A? (1 = not at all, 5 = extremely)
+4. resonanceB — Same for Version B.
+5. trust — Which version made the organization feel more trustworthy with your money?
+6. winner — ${ch.winnerQ}
+7. rationale — What most drove your winner choice? Quote or describe the specific line or element.
+8. baselineIntent — How likely are you to give to this kind of cause at all this season, regardless of these appeals? (1-5)
+
+${SCHEMA_HINT}`;
+}
+
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+
+function imageBlock(dataUrl: string): ContentBlock | null {
+  const m = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) return null;
+  return { type: "image", source: { type: "base64", media_type: m[1], data: m[2] } };
 }
 
 export async function POST(req: NextRequest) {
@@ -36,7 +90,28 @@ export async function POST(req: NextRequest) {
     variants: Variants;
   };
 
-  const user = `Two versions of a fundraising email are being tested. Read both, then answer the questionnaire honestly as yourself. "I would delete this" and low ratings are valid answers.
+  const ch = CHANNELS[variants.assetType] ?? CHANNELS.email;
+  const preamble = `${ch.intro} React to both, then answer the questionnaire honestly as yourself. "I would ignore this" and low ratings are valid answers.`;
+
+  let content: string | ContentBlock[];
+  if (variants.assetType === "website") {
+    const imgA = variants.imageA && imageBlock(variants.imageA);
+    const imgB = variants.imageB && imageBlock(variants.imageB);
+    if (!imgA || !imgB) {
+      return NextResponse.json(
+        { error: "Website tests need a screenshot for both versions." },
+        { status: 400 }
+      );
+    }
+    content = [
+      { type: "text", text: `${preamble}\n\n## Version A — "${variants.labelA}"` },
+      imgA,
+      { type: "text", text: `## Version B — "${variants.labelB}"` },
+      imgB,
+      { type: "text", text: questionnaire(ch) },
+    ];
+  } else {
+    content = `${preamble}
 
 ## Version A — "${variants.labelA}"
 
@@ -46,18 +121,8 @@ ${variants.copyA}
 
 ${variants.copyB}
 
-## Questionnaire
-
-1. intentA — If Version A arrived in your inbox, what would you most likely do?
-2. intentB — Same question for Version B.
-3. resonanceA — How emotionally compelling was Version A? (1 = not at all, 5 = extremely)
-4. resonanceB — Same for Version B.
-5. trust — Which version made the organization feel more trustworthy with your money?
-6. winner — If only one email could be sent, which should it be?
-7. rationale — What most drove your winner choice? Quote the specific line or element.
-8. baselineIntent — How likely are you to give to this kind of cause at all this season, regardless of these emails? (1-5)
-
-${SCHEMA_HINT}`;
+${questionnaire(ch)}`;
+  }
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -70,7 +135,7 @@ ${SCHEMA_HINT}`;
       model: process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6",
       max_tokens: 1024,
       system: personaBlock(persona),
-      messages: [{ role: "user", content: user }],
+      messages: [{ role: "user", content }],
     }),
   });
 

@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import personasJson from "@/lib/personas.json";
-import type { Persona, PersonaResult, Variants } from "@/lib/types";
-import { GIVING_ORDER, INTENT_LABELS } from "@/lib/types";
+import type { AssetType, Persona, PersonaResult, Variants } from "@/lib/types";
+import { ASSET_LABELS, GIVING_ORDER, INTENT_LABELS } from "@/lib/types";
 import { demoResult } from "@/lib/demo";
 import {
   DEFAULT_COPY_A,
@@ -16,8 +16,40 @@ import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/C
 const PERSONAS = personasJson as Persona[];
 const CONCURRENCY = 4;
 
+const ASSET_HINTS: Record<AssetType, string> = {
+  email:
+    "Paste the two versions you want to test. The prefilled copy is the pilot's sample appeal — replace it with real campaign copy.",
+  direct_mail:
+    "Paste the two letter versions. Include everything the recipient would read — headline, body, PS, reply-device copy.",
+  website:
+    "Upload a screenshot of each page version. A focused capture (hero, gift array, button) reads better than a very tall full-page one.",
+};
+
+// Downscale to Claude's vision sweet spot (long edge ≤ 1568px) and re-encode
+// as JPEG so 24 fan-out requests stay well under serverless body limits.
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1568 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      reject(new Error("Could not read that image file."));
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export default function Home() {
   const [variants, setVariants] = useState<Variants>({
+    assetType: "email",
     labelA: DEFAULT_LABEL_A,
     labelB: DEFAULT_LABEL_B,
     copyA: DEFAULT_COPY_A,
@@ -29,6 +61,9 @@ export default function Home() {
   const [isDemo, setIsDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllQuotes, setShowAllQuotes] = useState(false);
+  // Asset type the current results were run under — labels must not shift if
+  // the selector changes after a run.
+  const [resultsAsset, setResultsAsset] = useState<AssetType>("email");
 
   const givingCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -37,7 +72,12 @@ export default function Home() {
   }, []);
 
   async function runLive() {
+    if (variants.assetType === "website" && (!variants.imageA || !variants.imageB)) {
+      setError("Upload a screenshot for both versions before running.");
+      return;
+    }
     setRunning(true);
+    setResultsAsset(variants.assetType);
     setError(null);
     setResults([]);
     setIsDemo(false);
@@ -82,6 +122,9 @@ export default function Home() {
     setError(null);
     setIsDemo(true);
     setShowAllQuotes(false);
+    // Demo data is the email sample scenario — keep the selector honest.
+    setVariants((v) => ({ ...v, assetType: "email" }));
+    setResultsAsset("email");
     setResults(PERSONAS.map(demoResult));
     setDone(PERSONAS.length);
   }
@@ -97,37 +140,73 @@ export default function Home() {
     <>
       <section className="card">
         <h2>1 · Appeal variants</h2>
-        <p className="sub">
-          Paste the two versions you want to test. The prefilled copy is the pilot&apos;s sample
-          appeal — replace it with real campaign copy.
-        </p>
+        <div className="seg" role="tablist" aria-label="Asset type">
+          {(Object.keys(ASSET_LABELS) as AssetType[]).map((t) => (
+            <button
+              key={t}
+              className={variants.assetType === t ? "on" : ""}
+              onClick={() => setVariants({ ...variants, assetType: t })}
+              disabled={running}
+            >
+              {ASSET_LABELS[t]}
+            </button>
+          ))}
+        </div>
+        <p className="sub">{ASSET_HINTS[variants.assetType]}</p>
         <div className="grid2">
-          <div>
-            <label className="fld">Version A label</label>
-            <input
-              type="text"
-              value={variants.labelA}
-              onChange={(e) => setVariants({ ...variants, labelA: e.target.value })}
-            />
-            <label className="fld" style={{ marginTop: 10 }}>Version A copy</label>
-            <textarea
-              value={variants.copyA}
-              onChange={(e) => setVariants({ ...variants, copyA: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="fld">Version B label</label>
-            <input
-              type="text"
-              value={variants.labelB}
-              onChange={(e) => setVariants({ ...variants, labelB: e.target.value })}
-            />
-            <label className="fld" style={{ marginTop: 10 }}>Version B copy</label>
-            <textarea
-              value={variants.copyB}
-              onChange={(e) => setVariants({ ...variants, copyB: e.target.value })}
-            />
-          </div>
+          {(["A", "B"] as const).map((v) => {
+            const labelKey = v === "A" ? "labelA" : "labelB";
+            const copyKey = v === "A" ? "copyA" : "copyB";
+            const imageKey = v === "A" ? "imageA" : "imageB";
+            return (
+              <div key={v}>
+                <label className="fld">Version {v} label</label>
+                <input
+                  type="text"
+                  value={variants[labelKey]}
+                  onChange={(e) => setVariants({ ...variants, [labelKey]: e.target.value })}
+                />
+                {variants.assetType === "website" ? (
+                  <>
+                    <label className="fld" style={{ marginTop: 10 }}>
+                      Version {v} screenshot
+                    </label>
+                    <div className="shot">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const url = await fileToDataUrl(file);
+                            setVariants((prev) => ({ ...prev, [imageKey]: url }));
+                            setError(null);
+                          } catch {
+                            setError(`Could not read the Version ${v} image file.`);
+                          }
+                        }}
+                      />
+                      {variants[imageKey] && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={variants[imageKey]} alt={`Version ${v} screenshot preview`} />
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label className="fld" style={{ marginTop: 10 }}>
+                      Version {v} copy
+                    </label>
+                    <textarea
+                      value={variants[copyKey]}
+                      onChange={(e) => setVariants({ ...variants, [copyKey]: e.target.value })}
+                    />
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -212,7 +291,7 @@ export default function Home() {
 
           <section className="card">
             <Legend labelA={variants.labelA} labelB={variants.labelB} />
-            <IntentChart results={results} />
+            <IntentChart results={results} labels={INTENT_LABELS[resultsAsset]} />
           </section>
 
           <section className="card">
@@ -271,8 +350,8 @@ export default function Home() {
                     <tr key={r.personaId}>
                       <td>{r.personaName}</td>
                       <td>{r.giving}</td>
-                      <td>{INTENT_LABELS[r.intentA]}</td>
-                      <td>{INTENT_LABELS[r.intentB]}</td>
+                      <td>{INTENT_LABELS[resultsAsset][r.intentA]}</td>
+                      <td>{INTENT_LABELS[resultsAsset][r.intentB]}</td>
                       <td>{r.resonanceA}</td>
                       <td>{r.resonanceB}</td>
                       <td>

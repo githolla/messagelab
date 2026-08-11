@@ -1,9 +1,9 @@
 # Message Lab — project context
 
 Donor appeal pre-testing app for AGP (Allegiance Group + Pursuant), built by Barry
-Medley with Nine-67. Paste two fundraising appeal variants, run them against a
-simulated donor persona panel, view a segment-level results dashboard. "Message Lab"
-is a working title.
+Medley with Nine-67. Test two variants of a donor-facing asset — email, direct mail
+letter, or website UI (screenshots) — against a simulated donor persona panel, view
+a segment-level results dashboard. "Message Lab" is a working title.
 
 ## Architecture
 
@@ -12,6 +12,11 @@ is a working title.
 - Persona simulation: `app/api/run/route.ts` is a serverless route called once per
   persona (client fans out, concurrency 4). It conditions Claude on a persona's
   dimensions (system prompt) and returns questionnaire answers as strict JSON.
+- Asset types (`lib/types.ts`): email / direct_mail / website. Intent keys are
+  channel-neutral (dismiss, engage_no_gift, save_for_later, give_*) with per-channel
+  display labels and per-channel questionnaire wording in the route. Website tests
+  send two screenshots as vision inputs; the client downscales uploads to ≤1568px
+  long edge JPEG before the fan-out so payloads stay small.
 - Requires `ANTHROPIC_API_KEY` env var (Vercel project settings). Optional
   `MESSAGE_LAB_MODEL` override; defaults to claude-sonnet-4-6.
 - `lib/personas.json`: 24 personas exported from the MatrAIx dev sample

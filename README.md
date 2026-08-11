@@ -1,9 +1,10 @@
 # Message Lab
 
 Pre-test fundraising appeal variants against simulated donor personas before you send.
-Paste two versions of an appeal, run them against a 24-persona panel (MatrAIx persona
-dataset, stratified by giving behavior), and get a segment-level readout: winner votes,
-response intent, emotional resonance, and each persona's stated rationale.
+Test two versions of an email, a direct mail letter, or a donation page UI (screenshots),
+run them against a 24-persona panel (MatrAIx persona dataset, stratified by giving
+behavior), and get a segment-level readout: winner votes, response intent, emotional
+resonance, and each persona's stated rationale.
 
 ## Stack
 

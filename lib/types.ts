@@ -6,16 +6,21 @@ export interface Persona {
   dimensions: Record<string, string>;
 }
 
+export type AssetType = "email" | "direct_mail" | "website";
+
 export interface Variants {
+  assetType: AssetType;
   labelA: string;
   labelB: string;
   copyA: string;
   copyB: string;
+  imageA?: string; // data URL — website asset type only
+  imageB?: string;
 }
 
 export type IntentChoice =
-  | "delete_unread"
-  | "read_no_action"
+  | "dismiss"
+  | "engage_no_gift"
   | "save_for_later"
   | "give_small"
   | "give_suggested"
@@ -36,18 +41,42 @@ export interface PersonaResult {
   error?: string;
 }
 
-export const INTENT_LABELS: Record<IntentChoice, string> = {
-  delete_unread: "Delete unread",
-  read_no_action: "Read, no action",
-  save_for_later: "Save for later",
-  give_small: "Give under $25",
-  give_suggested: "Give $25–$100",
-  give_more: "Give $100+",
+export const ASSET_LABELS: Record<AssetType, string> = {
+  email: "Email",
+  direct_mail: "Direct mail",
+  website: "Website UI",
+};
+
+export const INTENT_LABELS: Record<AssetType, Record<IntentChoice, string>> = {
+  email: {
+    dismiss: "Delete unread",
+    engage_no_gift: "Read, no action",
+    save_for_later: "Save for later",
+    give_small: "Give under $25",
+    give_suggested: "Give $25–$100",
+    give_more: "Give $100+",
+  },
+  direct_mail: {
+    dismiss: "Toss unopened",
+    engage_no_gift: "Read, no action",
+    save_for_later: "Set aside",
+    give_small: "Give under $25",
+    give_suggested: "Give $25–$100",
+    give_more: "Give $100+",
+  },
+  website: {
+    dismiss: "Leave the page",
+    engage_no_gift: "Browse, no gift",
+    save_for_later: "Come back later",
+    give_small: "Give under $25",
+    give_suggested: "Give $25–$100",
+    give_more: "Give $100+",
+  },
 };
 
 export const INTENT_ORDER: IntentChoice[] = [
-  "delete_unread",
-  "read_no_action",
+  "dismiss",
+  "engage_no_gift",
   "save_for_later",
   "give_small",
   "give_suggested",

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { PersonaResult } from "@/lib/types";
-import { GIVING_ORDER, INTENT_LABELS, INTENT_ORDER } from "@/lib/types";
+import type { IntentChoice, PersonaResult } from "@/lib/types";
+import { GIVING_ORDER, INTENT_ORDER } from "@/lib/types";
 
 const A = "var(--series-a)";
 const B = "var(--series-b)";
@@ -81,8 +81,14 @@ export function WinnerChart({ results }: { results: PersonaResult[] }) {
   );
 }
 
-/** Grouped bars: intent distribution, series = variant. */
-export function IntentChart({ results }: { results: PersonaResult[] }) {
+/** Grouped bars: intent distribution, series = variant. Labels vary by asset type. */
+export function IntentChart({
+  results,
+  labels,
+}: {
+  results: PersonaResult[];
+  labels: Record<IntentChoice, string>;
+}) {
   const t = useTooltip();
   const countsA = INTENT_ORDER.map((k) => results.filter((r) => r.intentA === k).length);
   const countsB = INTENT_ORDER.map((k) => results.filter((r) => r.intentB === k).length);
@@ -106,15 +112,15 @@ export function IntentChart({ results }: { results: PersonaResult[] }) {
             <g key={k}>
               <rect
                 x={cx - barW - gap / 2} y={PLOT_H - hA} width={barW} height={Math.max(hA, 2)} rx="4" fill={A}
-                onMouseMove={(e) => t.show(e, `Version A · ${INTENT_LABELS[k]}: ${countsA[i]}`)}
+                onMouseMove={(e) => t.show(e, `Version A · ${labels[k]}: ${countsA[i]}`)}
                 onMouseLeave={t.hide}
               />
               <rect
                 x={cx + gap / 2} y={PLOT_H - hB} width={barW} height={Math.max(hB, 2)} rx="4" fill={B}
-                onMouseMove={(e) => t.show(e, `Version B · ${INTENT_LABELS[k]}: ${countsB[i]}`)}
+                onMouseMove={(e) => t.show(e, `Version B · ${labels[k]}: ${countsB[i]}`)}
                 onMouseLeave={t.hide}
               />
-              {INTENT_LABELS[k].split(", ").map((line, li) => (
+              {labels[k].split(", ").map((line, li) => (
                 <text key={li} x={cx} y={PLOT_H + 16 + li * 13} textAnchor="middle" fontSize="10.5" fill="var(--ink-2)">
                   {line}
                 </text>
