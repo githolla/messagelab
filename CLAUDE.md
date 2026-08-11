@@ -8,6 +8,12 @@ a segment-level results dashboard. "Message Lab" is a working title.
 ## Architecture
 
 - Next.js 15 App Router, TypeScript, no CSS framework (hand-rolled `app/globals.css`).
+- Routes: `/` is a landing page explaining the product + linking the two tools;
+  `/test` is the A/B message test; `/review` is the UX page review. `components/Nav.tsx`
+  is the primary nav (A/B Message Test | UX Page Review) with active states.
+- The run route retries transient failures (429/529/5xx) with backoff; the client
+  surfaces the real error (not a canned "check your key") and distinguishes auth
+  vs rate-limit causes.
 - Deployed on Vercel. No database in v1 — results live in client state with JSON export.
 - Persona simulation: `app/api/run/route.ts` is a serverless route called once per
   reaction (client fans out, concurrency 4). It conditions Claude on a persona/

@@ -142,25 +142,40 @@ ${questionnaire(ch)}`;
   }
 
   const model = process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6";
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1024,
-      system: personaBlock(persona),
-      messages: [{ role: "user", content }],
-    }),
+  const body = JSON.stringify({
+    model,
+    max_tokens: 1024,
+    system: personaBlock(persona),
+    messages: [{ role: "user", content }],
   });
 
-  if (!resp.ok) {
-    const detail = await resp.text();
+  // Retry transient failures (rate limits / overload / 5xx) with backoff —
+  // the panel fans out ~20 requests at once and can trip rate limits.
+  let resp: Response | null = null;
+  let lastDetail = "";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body,
+    });
+    if (resp.ok) break;
+    lastDetail = await resp.text();
+    const transient = resp.status === 429 || resp.status === 529 || resp.status >= 500;
+    if (!transient || attempt === 3) break;
+    const retryAfter = Number(resp.headers.get("retry-after")) || 0;
+    const wait = retryAfter ? retryAfter * 1000 : 800 * Math.pow(2, attempt);
+    await new Promise((r) => setTimeout(r, wait));
+  }
+
+  if (!resp || !resp.ok) {
+    const status = resp?.status ?? 0;
     return NextResponse.json(
-      { error: `Model call failed (${resp.status}): ${detail.slice(0, 300)}` },
+      { error: `Model call failed (${status}): ${lastDetail.slice(0, 300)}` },
       { status: 502 }
     );
   }

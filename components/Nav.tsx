@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/", label: "A/B Message Test" },
+  { href: "/test", label: "A/B Message Test" },
   { href: "/review", label: "UX Page Review" },
 ];
 

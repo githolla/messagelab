@@ -82,6 +82,45 @@ footer.app {
   color: var(--ink-3);
 }
 
+/* ---------- Home / landing ---------- */
+.hero { text-align: center; max-width: 760px; margin: 40px auto 36px; }
+.hero .badge {
+  display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--primary); background: var(--primary-tint); border-radius: 999px;
+  padding: 5px 13px; margin-bottom: 18px;
+}
+.hero h1 { font-size: 40px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 750; margin: 0 0 16px; }
+.hero h1 span { color: var(--primary); }
+@media (max-width: 640px) { .hero h1 { font-size: 30px; } }
+.hero p { font-size: 16px; color: var(--ink-2); line-height: 1.6; margin: 0 auto 26px; max-width: 620px; }
+.herocta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.herocta .btn { text-decoration: none; padding: 12px 22px; }
+
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 40px; }
+@media (max-width: 760px) { .tools { grid-template-columns: 1fr; } }
+.toolcard {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 26px; box-shadow: var(--shadow-sm); transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+}
+.toolcard:hover { box-shadow: var(--shadow-md); border-color: #d7dae0; transform: translateY(-2px); }
+.toolcard .ti { font-size: 30px; margin-bottom: 12px; }
+.toolcard h2 { font-size: 19px; letter-spacing: -0.02em; margin: 0 0 8px; }
+.toolcard p { font-size: 14px; color: var(--ink-2); line-height: 1.6; margin: 0 0 14px; }
+.toolcard .tlink { font-size: 14px; font-weight: 650; color: var(--primary); }
+
+.how { margin-bottom: 32px; }
+.howh { font-size: 18px; text-align: center; margin: 0 0 22px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+.steps li { display: flex; gap: 12px; font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+.steps li strong { color: var(--ink); }
+.steps .sn {
+  flex-shrink: 0; width: 28px; height: 28px; border-radius: 999px; background: var(--primary);
+  color: #fff; font-weight: 700; font-size: 14px; display: grid; place-items: center;
+}
+.homecaveat { max-width: 760px; margin: 0 auto; }
+
 /* ---------- Page intro ---------- */
 .pagehead { margin: 28px 2px 22px; }
 .pagehead h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.025em; margin: 0 0 6px; }
@@ -282,6 +321,9 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 
 /* ---------- Verdict hero ---------- */
 .card.verdict { border-left: 4px solid var(--primary); }
+.vlabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-3); margin-bottom: 8px; }
+.vmeta { font-size: 12px; color: var(--ink-3); margin-top: 12px; }
+.statnote { font-size: 12px; color: var(--ink-3); margin: 0 0 16px; line-height: 1.5; }
 .vhead { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .vbadge {
   font-size: 12px; font-weight: 700; letter-spacing: 0.2px; padding: 6px 12px; border-radius: 8px;
