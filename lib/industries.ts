@@ -130,6 +130,12 @@ export const INDUSTRIES: Industry[] = [
       "Prioritize a clear value proposition and outcomes, credibility (case studies, clients, results), and a low-friction path to a call or proposal.",
   },
   {
+    key: "recruiting",
+    label: "Recruiting / talent outreach",
+    guidance:
+      "Prioritize personalization and genuine relevance to the candidate, an honest and specific role (level, comp, remote/location), respect for their time, company credibility, and a low-pressure, concrete ask. Generic mass outreach is the enemy — reward messages that feel written for one person.",
+  },
+  {
     key: "government",
     label: "Government / public sector",
     guidance:

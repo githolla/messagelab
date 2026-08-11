@@ -175,6 +175,13 @@ export const INDUSTRY_ARCHETYPES: Record<string, Archetype[]> = {
     { name: "Skeptic", icon: "🛡️", how: "Wary of agency promises", base: 0.35 },
     { name: "Referral-led", icon: "🤝", how: "Came on a recommendation", base: 0.6 },
   ],
+  recruiting: [
+    { name: "Passive Candidate", icon: "😐", how: "Happy where they are — needs a real reason to reply", base: 0.35 },
+    { name: "Active Job Seeker", icon: "🔍", how: "Open to moves, scanning for fit and comp", base: 0.6 },
+    { name: "Recruiter-skeptic", icon: "🙄", how: "Assumes it's spam or a mismatch", base: 0.3 },
+    { name: "Comp-driven", icon: "💰", how: "Reply hinges on clear salary and level", base: 0.45 },
+    { name: "Mission-driven", icon: "🌟", how: "Cares about the work, team, and impact", base: 0.5 },
+  ],
   government: [
     { name: "Task-focused Citizen", icon: "📋", how: "Needs to complete one thing", base: 0.55 },
     { name: "Confused Navigator", icon: "😕", how: "Lost in jargon and options", base: 0.35 },

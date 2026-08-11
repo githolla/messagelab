@@ -226,6 +226,32 @@ Prices have moved. Get a free, no-obligation valuation of your home in 60 second
 
 Get my valuation →`,
   },
+  recruiting: {
+    labelA: "Personalized (relevance-led)",
+    copyA: `Subject: Your work on distributed systems caught my eye
+
+Hi there,
+
+I came across your recent work and the way you've scaled things without a big team stood out — that's exactly the problem we're wrestling with right now.
+
+I'm not going to pretend to know if this is the right moment for you. But if you're even a little curious, I'd love 15 minutes to tell you what we're building and hear what would make a move worth it for you.
+
+No pressure either way — open to a quick chat?`,
+    labelB: "The opportunity (role/comp-led)",
+    copyB: `Subject: Senior Engineer · $180–210k · fully remote
+
+Hi there,
+
+Quick and direct — we're hiring a Senior Engineer and your background looks like a strong match:
+
+- $180–210k + meaningful equity
+- Fully remote (US time zones)
+- Small team, real ownership, shipping weekly
+
+If the numbers and setup work for you, I can share the full details and team in a 20-minute call.
+
+Worth a conversation?`,
+  },
   nonprofit: {
     labelA: "Maria's shelf (story-led)",
     copyA: `Subject: The shelf was empty when Maria got there
