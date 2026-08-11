@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { INDUSTRIES } from "@/lib/industries";
 
 interface ReviewIssue {
   severity: "high" | "medium" | "low";
@@ -52,6 +53,9 @@ export default function ReviewPage() {
   const [review, setReview] = useState<Review | null>(null);
   const [shot, setShot] = useState<string | null>(null);
   const [model, setModel] = useState<string | null>(null);
+  const [industry, setIndustry] = useState("general");
+  const [context, setContext] = useState("");
+  const [reviewedFor, setReviewedFor] = useState<string | null>(null);
 
   async function submit(body: { url?: string; image?: string }) {
     setBusy(true);
@@ -62,13 +66,14 @@ export default function ReviewPage() {
       const resp = await fetch("/api/review", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, industry, context }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
       setReview(data.review);
       setShot(data.screenshot);
       setModel(data.model);
+      setReviewedFor(data.industry);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Review failed.");
     } finally {
@@ -85,6 +90,33 @@ export default function ReviewPage() {
           and usability review: visual hierarchy, clarity, navigation, the primary call-to-action,
           trust cues, and accessibility, with prioritized fixes.
         </p>
+        <div className="grid2" style={{ marginBottom: 12 }}>
+          <div>
+            <label className="fld">Industry</label>
+            <select
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              disabled={busy}
+            >
+              {INDUSTRIES.map((i) => (
+                <option key={i.key} value={i.key}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="fld">Context (optional)</label>
+            <input
+              type="text"
+              placeholder="Audience, page goal, brand voice…"
+              value={context}
+              onChange={(e) => setContext(e.target.value)}
+              disabled={busy}
+              maxLength={600}
+            />
+          </div>
+        </div>
         <div className="runbar">
           <input
             type="text"
@@ -129,6 +161,9 @@ export default function ReviewPage() {
       {review && (
         <>
           <section className="card">
+            {reviewedFor && reviewedFor !== "General / other" && (
+              <div className="lens">Reviewed through a {reviewedFor} lens</div>
+            )}
             <p className="sub" style={{ marginBottom: 12 }}>{review.summary}</p>
             <div className="scorerow">
               {Object.entries(review.scores).map(([k, v]) => (

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { industry } from "@/lib/industries";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -82,7 +83,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { url, image } = (await req.json()) as { url?: string; image?: string };
+  const { url, image, industry: industryKey, context } = (await req.json()) as {
+    url?: string;
+    image?: string;
+    industry?: string;
+    context?: string;
+  };
+
+  const ind = industry(industryKey);
+  const focusParts: string[] = [];
+  if (ind && ind.key !== "general") focusParts.push(`This is a ${ind.label} page. ${ind.guidance}`);
+  if (context && context.trim())
+    focusParts.push(`Additional context from the reviewer: ${context.trim().slice(0, 600)}`);
+  const focus = focusParts.length
+    ? `\n\n## Focus for this review\n${focusParts.join("\n")}`
+    : "";
 
   let shot: Shot;
   if (image) {
@@ -127,7 +142,7 @@ export async function POST(req: NextRequest) {
           content: [
             {
               type: "text",
-              text: `Review this web page for UI/UX and usability. ${REVIEW_SCHEMA}`,
+              text: `Review this web page for UI/UX and usability.${focus}\n\n${REVIEW_SCHEMA}`,
             },
             { type: "image", source: { type: "base64", media_type: m[1], data: m[2] } },
           ],
@@ -152,7 +167,13 @@ export async function POST(req: NextRequest) {
   }
   try {
     const review = JSON.parse(match[0]);
-    return NextResponse.json({ review, screenshot: shot.dataUrl, note: shot.note, model });
+    return NextResponse.json({
+      review,
+      screenshot: shot.dataUrl,
+      note: shot.note,
+      model,
+      industry: ind?.label ?? "General / other",
+    });
   } catch {
     return NextResponse.json({ error: "Review JSON failed to parse." }, { status: 502 });
   }
