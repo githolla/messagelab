@@ -72,7 +72,10 @@ export async function POST(req: NextRequest) {
   }
 
   const t = tally(results);
-  const champion = t.votesA >= t.votesB ? "a" : "b";
+  // Objective is the would-give rate: keep whichever version more personas said
+  // they'd give to, and replace the weaker one with a fresh challenger.
+  const champion = t.givesA >= t.givesB ? "a" : "b";
+  const champGives = champion === "a" ? t.givesA : t.givesB;
   const champLabel = champion === "a" ? variants.labelA : variants.labelB;
   const noun = CHANNEL_NOUN[variants.assetType];
   const formatNote =
@@ -80,7 +83,7 @@ export async function POST(req: NextRequest) {
       ? "Include a subject line. Same rough length as the tested versions."
       : "Letter format (salutation, body, signature, PS). Same rough length as the tested versions.";
 
-  const user = `Two versions of a ${noun} were tested on a simulated donor persona panel. Version ${champion.toUpperCase()} ("${champLabel}") won the round.
+  const user = `Two versions of a ${noun} were tested on a simulated donor persona panel. The goal is to maximize the number of personas who would give. Version ${champion.toUpperCase()} ("${champLabel}") is the current best, with ${champGives} of ${results.length} personas willing to give.
 
 ## Version A — "${variants.labelA}"
 
@@ -96,8 +99,8 @@ ${summarize(variants, results)}
 
 ## Your task
 
-1. diagnosis — 2 to 4 sentences: why the winner won, and where it is still weak (which segments, the rejected-both personas, low-resonance groups). Ground every claim in the numbers or rationales above.
-2. One new challenger ${noun} to test against the winner next round. Keep the winner's strengths, fix the diagnosed weaknesses, and fold in any elements of the loser that personas specifically responded to. ${formatNote} Do not simply merge the two versions — make deliberate choices.
+1. diagnosis — 2 to 4 sentences: why the current best draws the giving it does, and where it is leaving gifts on the table (which segments hesitate, who rejected both, low-resonance groups). Ground every claim in the numbers or rationales above.
+2. One new challenger ${noun}, designed to lift the would-give rate above ${champGives}/${results.length}. Keep what is working, fix the diagnosed weaknesses, and fold in any elements of the other version that personas specifically responded to. ${formatNote} Do not simply merge the two versions — make deliberate choices aimed at converting the hesitant and rejecting segments.
 
 Respond with ONLY a JSON object, no markdown fences:
 {"diagnosis": "...", "label": "short name for the new draft, e.g. \\"R2 — story + concrete math\\"", "copy": "the full draft"}`;

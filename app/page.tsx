@@ -17,7 +17,7 @@ import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/C
 
 const PERSONAS = personasJson as Persona[];
 const CONCURRENCY = 4;
-const MAX_REFINE_ROUNDS = 3;
+const MAX_REFINE_ROUNDS = 10;
 
 const ASSET_HINTS: Record<AssetType, string> = {
   email:
@@ -140,9 +140,17 @@ export default function Home() {
     let res = results;
     let outcome: string | null = null;
 
+    // Objective = would-give share. Track the best give-count reached so far and
+    // the winning variant that achieved it; stop when a round fails to beat it
+    // (improvement plateau) or the round budget is spent.
+    const startTally = tally(res);
+    let bestGive = Math.max(startTally.givesA, startTally.givesB);
+    let bestLabel = startTally.givesA >= startTally.givesB ? v.labelA : v.labelB;
+    let ranAny = false;
+
     for (let i = 0; i < MAX_REFINE_ROUNDS; i++) {
       if (stopRef.current) {
-        outcome = "Refinement stopped.";
+        outcome = `Stopped after ${i} round${i === 1 ? "" : "s"}. Best so far: "${bestLabel}" at ${bestGive}/${res.length} would-give.`;
         break;
       }
       setRefineNote("Analyzing results and drafting a challenger…");
@@ -158,6 +166,7 @@ export default function Home() {
         draft = data;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Refinement failed.");
+        outcome = `Refinement stopped on an error. Best so far: "${bestLabel}" at ${bestGive}/${res.length} would-give.`;
         break;
       }
       setRounds((rs) =>
@@ -165,29 +174,48 @@ export default function Home() {
       );
 
       const champLabel = draft.champion === "a" ? v.labelA : v.labelB;
+      // Replace the weaker version with the fresh challenger; the champion carries forward.
       const next: Variants =
         draft.champion === "a"
           ? { ...v, labelB: draft.label, copyB: draft.copy }
           : { ...v, labelA: draft.label, copyA: draft.copy };
       setVariants(next);
-      setRefineNote(`Round ${i + 2}: testing "${draft.label}" against "${champLabel}"…`);
+      setRefineNote(
+        `Round ${i + 2} of up to ${MAX_REFINE_ROUNDS + 1}: testing "${draft.label}" against "${champLabel}"…`
+      );
 
       const newRes = await runPanel(next);
+      ranAny = true;
       const t = tally(newRes);
       setRounds((rs) => [...rs, { labelA: next.labelA, labelB: next.labelB, ...t }]);
       v = next;
       res = newRes;
 
-      const champVotes = draft.champion === "a" ? t.votesA : t.votesB;
-      const challengerVotes = draft.champion === "a" ? t.votesB : t.votesA;
-      if (challengerVotes <= champVotes) {
-        outcome = `Champion held: "${champLabel}" beat the challenger ${champVotes}–${challengerVotes}. Ready to ship.`;
-        break;
+      // Round score = the stronger version's would-give count this round.
+      const roundGive = Math.max(t.givesA, t.givesB);
+      const roundLabel = t.givesA >= t.givesB ? next.labelA : next.labelB;
+
+      if (roundGive > bestGive) {
+        bestGive = roundGive;
+        bestLabel = roundLabel;
+        setRefineNote(
+          `"${roundLabel}" lifted would-give to ${roundGive}/${newRes.length} — new best, refining again…`
+        );
+        if (i === MAX_REFINE_ROUNDS - 1) {
+          outcome = `Round budget reached (${MAX_REFINE_ROUNDS} rounds). Still improving — best is "${bestLabel}" at ${bestGive}/${newRes.length} would-give. Run auto-refine again to keep going.`;
+        }
+        continue;
       }
-      outcome = `Round cap reached — "${draft.label}" is the best candidate so far. Run auto-refine again to push further.`;
-      setRefineNote(`Challenger "${draft.label}" won ${challengerVotes}–${champVotes} — refining again…`);
+
+      // No improvement over the best so far → plateau, this is as good as it gets.
+      outcome = `Plateau reached: round ${i + 2} (${roundGive}/${newRes.length}) did not beat the best would-give score (${bestGive}/${newRes.length}). Ready version: "${bestLabel}".`;
+      break;
     }
 
+    if (!outcome && !ranAny) outcome = "Nothing to refine yet — run a pre-test first.";
+    // The best-scoring version always survives in one of the two variant slots
+    // (the champion carries forward each round), so no restore is needed —
+    // bestLabel names which of the two shown variants is the ready one.
     setRefineNote(outcome);
     setRefining(false);
   }
@@ -372,10 +400,11 @@ export default function Home() {
           <section className="card">
             <h2>3 · Refine</h2>
             <p className="sub">
-              Claude diagnoses the panel&apos;s reactions, drafts a challenger to replace the
-              losing version, and re-runs the {PERSONAS.length}-persona panel — up to{" "}
-              {MAX_REFINE_ROUNDS} rounds per click, stopping early once the champion holds off a
-              challenger. Each round is another full panel run.
+              Claude diagnoses the panel&apos;s reactions, drafts a stronger challenger to replace
+              the weaker version, and re-runs the {PERSONAS.length}-persona panel — repeating while
+              each round lifts the would-give rate and stopping when it plateaus (a round no longer
+              beats the best score). Runs unattended up to {MAX_REFINE_ROUNDS} rounds, then pauses
+              so you can review before spending more. Each round is another full panel run.
             </p>
             <div className="runbar">
               {refining ? (
@@ -397,7 +426,7 @@ export default function Home() {
                   : resultsAsset === "website"
                     ? "Email and direct mail only — refinement drafts new copy, not new page designs."
                     : (refineNote ??
-                      `Up to ${MAX_REFINE_ROUNDS} rounds · stops when the champion defends its lead`)}
+                      `Up to ${MAX_REFINE_ROUNDS} rounds · stops when the would-give rate plateaus`)}
               </span>
             </div>
             <p className="caveat" style={{ marginTop: 10 }}>
