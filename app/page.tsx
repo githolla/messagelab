@@ -14,6 +14,7 @@ import {
   DEFAULT_LABEL_B,
 } from "@/lib/defaults";
 import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/Charts";
+import { DiffView } from "@/components/Diff";
 
 const PERSONAS = personasJson as Persona[];
 const CONCURRENCY = 4;
@@ -187,7 +188,19 @@ export default function Home() {
       const newRes = await runPanel(next);
       ranAny = true;
       const t = tally(newRes);
-      setRounds((rs) => [...rs, { labelA: next.labelA, labelB: next.labelB, ...t }]);
+      // The challenger replaced the weaker (loser) slot; record it vs what it replaced.
+      const changed: "A" | "B" = draft.champion === "a" ? "B" : "A";
+      const roundDraft = {
+        version: changed,
+        prevLabel: changed === "A" ? v.labelA : v.labelB,
+        prevCopy: changed === "A" ? v.copyA : v.copyB,
+        newLabel: draft.label,
+        newCopy: draft.copy,
+      };
+      setRounds((rs) => [
+        ...rs,
+        { labelA: next.labelA, labelB: next.labelB, ...t, draft: roundDraft },
+      ]);
       v = next;
       res = newRes;
 
@@ -451,6 +464,15 @@ export default function Home() {
                       </span>
                     </div>
                     {r.diagnosis && <div className="diag">{r.diagnosis}</div>}
+                    {r.draft && (
+                      <details className="draftdiff">
+                        <summary>
+                          What changed → Version {r.draft.version}: &ldquo;{r.draft.newLabel}&rdquo;
+                          replaced &ldquo;{r.draft.prevLabel}&rdquo;
+                        </summary>
+                        <DiffView before={r.draft.prevCopy} after={r.draft.newCopy} />
+                      </details>
+                    )}
                   </li>
                 ))}
               </ol>

@@ -10,6 +10,14 @@ export interface RoundSummary {
   neither: number;
   /** Diagnosis produced from this round's results (feeds the next challenger). */
   diagnosis?: string;
+  /** The challenger that defines this round, vs the version it replaced (rounds 2+). */
+  draft?: {
+    version: "A" | "B";
+    prevLabel: string;
+    prevCopy: string;
+    newLabel: string;
+    newCopy: string;
+  };
 }
 
 export const GIVE_INTENTS = ["give_small", "give_suggested", "give_more"];
