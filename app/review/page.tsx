@@ -16,6 +16,8 @@ interface Review {
   issues: ReviewIssue[];
 }
 
+type ReviewTab = "fixes" | "strengths" | "screenshot";
+
 const SCORE_LABELS: Record<string, string> = {
   hierarchy: "Visual hierarchy",
   clarity: "Clarity & content",
@@ -56,12 +58,14 @@ export default function ReviewPage() {
   const [industry, setIndustry] = useState("general");
   const [context, setContext] = useState("");
   const [reviewedFor, setReviewedFor] = useState<string | null>(null);
+  const [rtab, setRtab] = useState<ReviewTab>("fixes");
 
   async function submit(body: { url?: string; image?: string }) {
     setBusy(true);
     setError(null);
     setReview(null);
     setShot(null);
+    setRtab("fixes");
     try {
       const resp = await fetch("/api/review", {
         method: "POST",
@@ -160,11 +164,12 @@ export default function ReviewPage() {
 
       {review && (
         <>
+          {/* Hero: lens + summary + scores, always visible */}
           <section className="card">
             {reviewedFor && reviewedFor !== "General / other" && (
               <div className="lens">Reviewed through a {reviewedFor} lens</div>
             )}
-            <p className="sub" style={{ marginBottom: 12 }}>{review.summary}</p>
+            <p className="sub" style={{ marginBottom: 14 }}>{review.summary}</p>
             <div className="scorerow">
               {Object.entries(review.scores).map(([k, v]) => (
                 <div className="score" key={k}>
@@ -176,47 +181,70 @@ export default function ReviewPage() {
                 </div>
               ))}
             </div>
-            <p className="caveat" style={{ marginTop: 16, marginBottom: 0 }}>
-              One model&apos;s expert read of a single screenshot{model ? ` (${model})` : ""} — a
-              design crit to act on, not a usability test. Validate high-stakes changes with real
-              users.
-            </p>
           </section>
 
-          {review.strengths?.length > 0 && (
-            <section className="card">
-              <h2>What&apos;s working</h2>
-              <ul className="revlist">
-                {review.strengths.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-            </section>
-          )}
-
+          {/* Tabbed detail — no more one long scroll */}
           <section className="card">
-            <h2>Prioritized fixes</h2>
-            {review.issues.map((iss, i) => (
-              <div className="issue" key={i}>
-                <div className="ihead">
-                  <span className={`sev ${iss.severity}`}>{iss.severity}</span>
-                  <span className="area">{iss.area}</span>
-                </div>
-                <div className="finding">{iss.finding}</div>
-                <div className="fix">
-                  <strong>Fix:</strong> {iss.fix}
-                </div>
+            <div className="tabs">
+              {([
+                ["fixes", `Fixes${review.issues?.length ? ` (${review.issues.length})` : ""}`],
+                ["strengths", `Strengths${review.strengths?.length ? ` (${review.strengths.length})` : ""}`],
+                ["screenshot", "Screenshot"],
+              ] as [ReviewTab, string][]).map(([k, lbl]) => (
+                <button key={k} className={rtab === k ? "on" : ""} onClick={() => setRtab(k)}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+
+            {rtab === "fixes" && (
+              <div className="tabbody">
+                {review.issues.map((iss, i) => (
+                  <div className="issue" key={i}>
+                    <div className="ihead">
+                      <span className={`sev ${iss.severity}`}>{iss.severity}</span>
+                      <span className="area">{iss.area}</span>
+                    </div>
+                    <div className="finding">{iss.finding}</div>
+                    <div className="fix">
+                      <strong>Fix:</strong> {iss.fix}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+
+            {rtab === "strengths" && (
+              <div className="tabbody">
+                {review.strengths?.length ? (
+                  <ul className="revlist">
+                    {review.strengths.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="note">No standout strengths were called out.</p>
+                )}
+              </div>
+            )}
+
+            {rtab === "screenshot" && (
+              <div className="tabbody">
+                {shot ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={shot} alt="Captured page" className="reviewshot" />
+                ) : (
+                  <p className="note">No screenshot was captured.</p>
+                )}
+              </div>
+            )}
           </section>
 
-          {shot && (
-            <section className="card">
-              <h2>What was reviewed</h2>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={shot} alt="Captured page" className="reviewshot" />
-            </section>
-          )}
+          <p className="caveat">
+            One model&apos;s expert read of a single screenshot{model ? ` (${model})` : ""} — a
+            design crit to act on, not a usability test. Validate high-stakes changes with real
+            users.
+          </p>
         </>
       )}
     </>
