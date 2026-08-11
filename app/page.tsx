@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import personasJson from "@/lib/personas.json";
 import type { AssetType, Persona, PersonaResult, Variants } from "@/lib/types";
 import { ASSET_LABELS, GIVING_ORDER, INTENT_LABELS } from "@/lib/types";
 import { demoResult } from "@/lib/demo";
+import { tally, type RoundSummary } from "@/lib/refine";
 import {
   DEFAULT_COPY_A,
   DEFAULT_COPY_B,
@@ -15,6 +16,7 @@ import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/C
 
 const PERSONAS = personasJson as Persona[];
 const CONCURRENCY = 4;
+const MAX_REFINE_ROUNDS = 3;
 
 const ASSET_HINTS: Record<AssetType, string> = {
   email:
@@ -64,6 +66,10 @@ export default function Home() {
   // Asset type the current results were run under — labels must not shift if
   // the selector changes after a run.
   const [resultsAsset, setResultsAsset] = useState<AssetType>("email");
+  const [rounds, setRounds] = useState<RoundSummary[]>([]);
+  const [refining, setRefining] = useState(false);
+  const [refineNote, setRefineNote] = useState<string | null>(null);
+  const stopRef = useRef(false);
 
   const givingCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -71,13 +77,9 @@ export default function Home() {
     return GIVING_ORDER.map((g) => `${m.get(g) ?? 0} ${g.toLowerCase()}`).join(" · ");
   }, []);
 
-  async function runLive() {
-    if (variants.assetType === "website" && (!variants.imageA || !variants.imageB)) {
-      setError("Upload a screenshot for both versions before running.");
-      return;
-    }
+  async function runPanel(v: Variants): Promise<PersonaResult[]> {
     setRunning(true);
-    setResultsAsset(variants.assetType);
+    setResultsAsset(v.assetType);
     setError(null);
     setResults([]);
     setIsDemo(false);
@@ -94,7 +96,7 @@ export default function Home() {
           const resp = await fetch("/api/run", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ persona, variants }),
+            body: JSON.stringify({ persona, variants: v }),
           });
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -116,6 +118,77 @@ export default function Home() {
 
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     setRunning(false);
+    return out.filter((r) => !r.error);
+  }
+
+  async function runLive() {
+    if (variants.assetType === "website" && (!variants.imageA || !variants.imageB)) {
+      setError("Upload a screenshot for both versions before running.");
+      return;
+    }
+    setRounds([]);
+    setRefineNote(null);
+    const res = await runPanel(variants);
+    setRounds([{ labelA: variants.labelA, labelB: variants.labelB, ...tally(res) }]);
+  }
+
+  async function refineLoop() {
+    stopRef.current = false;
+    setRefining(true);
+    let v = variants;
+    let res = results;
+    let outcome: string | null = null;
+
+    for (let i = 0; i < MAX_REFINE_ROUNDS; i++) {
+      if (stopRef.current) {
+        outcome = "Refinement stopped.";
+        break;
+      }
+      setRefineNote("Analyzing results and drafting a challenger…");
+      let draft: { diagnosis: string; label: string; copy: string; champion: "a" | "b" };
+      try {
+        const resp = await fetch("/api/refine", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ variants: v, results: res }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        draft = data;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Refinement failed.");
+        break;
+      }
+      setRounds((rs) =>
+        rs.map((r, idx) => (idx === rs.length - 1 ? { ...r, diagnosis: draft.diagnosis } : r))
+      );
+
+      const champLabel = draft.champion === "a" ? v.labelA : v.labelB;
+      const next: Variants =
+        draft.champion === "a"
+          ? { ...v, labelB: draft.label, copyB: draft.copy }
+          : { ...v, labelA: draft.label, copyA: draft.copy };
+      setVariants(next);
+      setRefineNote(`Round ${i + 2}: testing "${draft.label}" against "${champLabel}"…`);
+
+      const newRes = await runPanel(next);
+      const t = tally(newRes);
+      setRounds((rs) => [...rs, { labelA: next.labelA, labelB: next.labelB, ...t }]);
+      v = next;
+      res = newRes;
+
+      const champVotes = draft.champion === "a" ? t.votesA : t.votesB;
+      const challengerVotes = draft.champion === "a" ? t.votesB : t.votesA;
+      if (challengerVotes <= champVotes) {
+        outcome = `Champion held: "${champLabel}" beat the challenger ${champVotes}–${challengerVotes}. Ready to ship.`;
+        break;
+      }
+      outcome = `Round cap reached — "${draft.label}" is the best candidate so far. Run auto-refine again to push further.`;
+      setRefineNote(`Challenger "${draft.label}" won ${challengerVotes}–${champVotes} — refining again…`);
+    }
+
+    setRefineNote(outcome);
+    setRefining(false);
   }
 
   function runDemo() {
@@ -125,8 +198,11 @@ export default function Home() {
     // Demo data is the email sample scenario — keep the selector honest.
     setVariants((v) => ({ ...v, assetType: "email" }));
     setResultsAsset("email");
-    setResults(PERSONAS.map(demoResult));
+    const res = PERSONAS.map(demoResult);
+    setResults(res);
     setDone(PERSONAS.length);
+    setRefineNote(null);
+    setRounds([{ labelA: variants.labelA, labelB: variants.labelB, ...tally(res) }]);
   }
 
   const winners = {
@@ -146,7 +222,7 @@ export default function Home() {
               key={t}
               className={variants.assetType === t ? "on" : ""}
               onClick={() => setVariants({ ...variants, assetType: t })}
-              disabled={running}
+              disabled={running || refining}
             >
               {ASSET_LABELS[t]}
             </button>
@@ -217,10 +293,10 @@ export default function Home() {
           behavior: {givingCounts}.
         </p>
         <div className="runbar">
-          <button className="btn primary" onClick={runLive} disabled={running}>
+          <button className="btn primary" onClick={runLive} disabled={running || refining}>
             {running ? "Running…" : "Run pre-test"}
           </button>
-          <button className="btn ghost" onClick={runDemo} disabled={running}>
+          <button className="btn ghost" onClick={runDemo} disabled={running || refining}>
             Load demo results
           </button>
           {running && (
@@ -282,6 +358,59 @@ export default function Home() {
               <div className="k">Rejected both</div>
               <div className="d">signal to rework the appeal</div>
             </div>
+          </section>
+
+          <section className="card">
+            <h2>3 · Refine</h2>
+            <p className="sub">
+              Claude diagnoses the panel&apos;s reactions, drafts a challenger to replace the
+              losing version, and re-runs the {PERSONAS.length}-persona panel — up to{" "}
+              {MAX_REFINE_ROUNDS} rounds per click, stopping early once the champion holds off a
+              challenger. Each round is another full panel run.
+            </p>
+            <div className="runbar">
+              {refining ? (
+                <button className="btn ghost" onClick={() => (stopRef.current = true)}>
+                  Stop after this round
+                </button>
+              ) : (
+                <button
+                  className="btn primary"
+                  onClick={refineLoop}
+                  disabled={running || isDemo || resultsAsset === "website"}
+                >
+                  Auto-refine
+                </button>
+              )}
+              <span className="note">
+                {isDemo
+                  ? "Demo data — run a live pre-test to enable refinement."
+                  : resultsAsset === "website"
+                    ? "Email and direct mail only — refinement drafts new copy, not new page designs."
+                    : (refineNote ??
+                      `Up to ${MAX_REFINE_ROUNDS} rounds · stops when the champion defends its lead`)}
+              </span>
+            </div>
+            {rounds.length > 0 && (
+              <ol className="rounds">
+                {rounds.map((r, i) => (
+                  <li key={i}>
+                    <div>
+                      <strong>Round {i + 1}</strong> · {r.labelA}{" "}
+                      <b>
+                        {r.votesA}–{r.votesB}
+                      </b>{" "}
+                      {r.labelB}
+                      <span className="note">
+                        {" "}
+                        · would give: {r.givesA} vs {r.givesB} · rejected both: {r.neither}
+                      </span>
+                    </div>
+                    {r.diagnosis && <div className="diag">{r.diagnosis}</div>}
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
 
           <section className="card">
@@ -367,7 +496,7 @@ export default function Home() {
               className="btn ghost"
               style={{ marginTop: 12 }}
               onClick={() => {
-                const blob = new Blob([JSON.stringify({ variants, results }, null, 2)], {
+                const blob = new Blob([JSON.stringify({ variants, rounds, results }, null, 2)], {
                   type: "application/json",
                 });
                 const url = URL.createObjectURL(blob);
