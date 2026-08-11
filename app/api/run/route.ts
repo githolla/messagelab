@@ -66,14 +66,14 @@ function questionnaire(ch: (typeof CHANNELS)[AssetType]): string {
   return `## Questionnaire
 
 1. intentA — ${ch.intentQ}
-   Options: ${ch.intentDefs}; "give_small" = give under $25; "give_suggested" = give $25–$100; "give_more" = give $100+.
+   Options: ${ch.intentDefs}; "give_small" = would take this asset's primary action (buy, sign up, subscribe, book, donate — whatever it asks) but with low intent; "give_suggested" = would take it with clear intent; "give_more" = would take it enthusiastically, or go further (upgrade, larger commitment, tell others).
 2. intentB — Same question for Version B.
 3. resonanceA — How emotionally compelling was Version A? (1 = not at all, 5 = extremely)
 4. resonanceB — Same for Version B.
-5. trust — Which version made the organization feel more trustworthy with your money?
+5. trust — Which version made the organization feel more trustworthy?
 6. winner — ${ch.winnerQ}
 7. rationale — What most drove your winner choice? Quote or describe the specific line or element.
-8. baselineIntent — How likely are you to give to this kind of cause at all this season, regardless of these appeals? (1-5)
+8. baselineIntent — How likely are you to take this kind of action at all right now, regardless of these versions? (1-5)
 
 ${SCHEMA_HINT}`;
 }

@@ -10,8 +10,21 @@ a segment-level results dashboard. "Message Lab" is a working title.
 - Next.js 15 App Router, TypeScript, no CSS framework (hand-rolled `app/globals.css`).
 - Deployed on Vercel. No database in v1 — results live in client state with JSON export.
 - Persona simulation: `app/api/run/route.ts` is a serverless route called once per
-  persona (client fans out, concurrency 4). It conditions Claude on a persona's
-  dimensions (system prompt) and returns questionnaire answers as strict JSON.
+  reaction (client fans out, concurrency 4). It conditions Claude on a persona/
+  archetype's dimensions (system prompt) and returns questionnaire answers as strict JSON.
+- Industry "bots" (`lib/archetypes.ts`): the A/B test panel is now industry-specific
+  audience archetypes (e.g. e-commerce: Bargain Hunter, Brand Loyalist, …), a few
+  instances each (~20 reactions), plus a shared team of analyst bots (Conversion,
+  Trust, Accessibility, Copy, Brand). Picking an industry (`lib/industries.ts`) swaps
+  the archetype panel and both are previewed as cards before running.
+- Analysis: `app/api/analyze/route.ts` takes the panel results + industry and returns
+  a decision-ready report (verdict, headline, exec summary, per-segment drivers,
+  prioritized actions, per-analyst reads). `lib/analysis.ts` has the type + a
+  deterministic `demoAnalysis` so demo mode renders the full report with no API call.
+  Results are shown as a verdict hero + stat tiles + tabs (Summary / By segment /
+  Analysts / Reactions / Data) to keep them scannable instead of one long scroll.
+- The MatrAIx-donor persona panel (`lib/personas.json`) is legacy for the A/B tool
+  now that it uses industry archetypes; kept for reference/roadmap.
 - Asset types (`lib/types.ts`): email / direct_mail / website. Intent keys are
   channel-neutral (dismiss, engage_no_gift, save_for_later, give_*) with per-channel
   display labels and per-channel questionnaire wording in the route. Website tests

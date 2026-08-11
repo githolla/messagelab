@@ -27,8 +27,8 @@ function intentFrom(score: number): IntentChoice {
   return "give_more";
 }
 
-export function demoResult(p: Persona): PersonaResult {
-  const base = GIVING_BASE[p.giving] ?? 0.3;
+export function demoResult(p: Persona, baseOverride?: number): PersonaResult {
+  const base = baseOverride ?? GIVING_BASE[p.giving] ?? 0.3;
   const empathic =
     p.dimensions["cog_empathy_expression"] === "High" ||
     p.dimensions["cog_empathy_expression"] === "Very high" ||

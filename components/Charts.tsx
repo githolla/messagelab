@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { IntentChoice, PersonaResult } from "@/lib/types";
-import { GIVING_ORDER, INTENT_ORDER, segmentLabel } from "@/lib/types";
+import { INTENT_ORDER, segmentLabel } from "@/lib/types";
 
 const A = "var(--series-a)";
 const B = "var(--series-b)";
@@ -137,9 +137,12 @@ export function IntentChart({
 /** Dot plot: average resonance by giving segment, two series. */
 export function ResonanceChart({ results }: { results: PersonaResult[] }) {
   const t = useTooltip();
-  const segs = GIVING_ORDER.filter((g) => results.some((r) => r.giving === g));
+  const segs = results.reduce<string[]>((acc, r) => {
+    if (!acc.includes(r.giving)) acc.push(r.giving);
+    return acc;
+  }, []);
   const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-  const W = 640, LBL = 130, ROW = 30, PADR = 30;
+  const W = 640, LBL = 160, ROW = 30, PADR = 30;
   const H = segs.length * ROW + 24;
   const x = (v: number) => LBL + ((v - 1) / 4) * (W - LBL - PADR);
 

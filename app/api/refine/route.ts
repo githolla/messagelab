@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { PersonaResult, Variants } from "@/lib/types";
-import { GIVING_ORDER, INTENT_LABELS, INTENT_ORDER } from "@/lib/types";
+import { INTENT_LABELS, INTENT_ORDER } from "@/lib/types";
 import { tally } from "@/lib/refine";
 
 export const maxDuration = 60;
 
-const CHANNEL_NOUN = { email: "fundraising email", direct_mail: "direct mail letter" } as const;
+const CHANNEL_NOUN = { email: "email", direct_mail: "direct mail letter" } as const;
 
 function mean(xs: number[]): string {
   return xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1) : "–";
@@ -18,7 +18,11 @@ function summarize(variants: Variants, results: PersonaResult[]): string {
     INTENT_ORDER.map(
       (i) => `${labels[i]}: ${results.filter((r) => r[k] === i).length}`
     ).join(", ");
-  const segLines = GIVING_ORDER.filter((g) => results.some((r) => r.giving === g))
+  const segs = results.reduce<string[]>((acc, r) => {
+    if (!acc.includes(r.giving)) acc.push(r.giving);
+    return acc;
+  }, []);
+  const segLines = segs
     .map((g) => {
       const rs = results.filter((r) => r.giving === g);
       return `  ${g} (n=${rs.length}): A ${mean(rs.map((r) => r.resonanceA))}, B ${mean(
@@ -34,7 +38,7 @@ function summarize(variants: Variants, results: PersonaResult[]): string {
     .map((r) => `  [${r.giving}, voted ${r.winner}] ${r.rationale}`)
     .join("\n");
 
-  return `Panel: ${results.length} simulated donors stratified by giving behavior.
+  return `Panel: ${results.length} simulated audience reactions across archetypes.
 Head-to-head votes: A ${t.votesA}, B ${t.votesB}, either ${
     results.length - t.votesA - t.votesB - t.neither
   }, neither ${t.neither}.
