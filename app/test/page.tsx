@@ -182,11 +182,13 @@ export default function Home() {
           // Surface the actual reason, not a canned "check your key" message.
           setError(
             `${failCount} of ${members.length} reactions failed. First error: ${firstError}` +
-              (/\b401\b|not configured|authentication/i.test(firstError)
-                ? " — check ANTHROPIC_API_KEY in Vercel settings."
-                : /\b429\b|rate|overload|\b529\b/i.test(firstError)
-                  ? " — the API is rate-limiting; wait a moment and re-run, or lower the panel size."
-                  : "")
+              (/credit balance|billing|quota|insufficient/i.test(firstError)
+                ? " — this Anthropic account is out of credits. Add credits at console.anthropic.com → Plans & Billing. (Demo mode works without credits.)"
+                : /\b401\b|not configured|authentication|invalid.*key/i.test(firstError)
+                  ? " — check ANTHROPIC_API_KEY in Vercel settings."
+                  : /\b429\b|rate|overload|\b529\b/i.test(firstError)
+                    ? " — the API is rate-limiting; wait a moment and re-run, or lower the panel size."
+                    : "")
           );
         }
         setDone((d) => d + 1);
