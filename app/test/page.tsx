@@ -5,12 +5,11 @@ import type { AssetType, Persona, PersonaResult, Variants } from "@/lib/types";
 import { ASSET_LABELS, INTENT_LABELS, segmentLabel } from "@/lib/types";
 import { demoResult } from "@/lib/demo";
 import { tally, type RoundSummary } from "@/lib/refine";
-import { shareWithCI, wilson } from "@/lib/stats";
+import { wilson } from "@/lib/stats";
 import { INDUSTRIES } from "@/lib/industries";
 import { ANALYSTS, panelFor, instancesPer, monogram, messageAudienceKey } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
 import { sampleFor, isPristineCopy, MESSAGE_TYPES, messageTypesFor } from "@/lib/samples";
-import { IntentChart, Legend, ResonanceChart, VoteDonut } from "@/components/Charts";
 import { DiffView } from "@/components/Diff";
 
 const CONCURRENCY = 4;
@@ -76,7 +75,6 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-type Tab = "overview" | "reasoning" | "segments" | "analysts" | "reactions" | "data" | "refine";
 
 export default function Home() {
   const [industry, setIndustry] = useState("general");
@@ -164,7 +162,6 @@ export default function Home() {
   const [refineNote, setRefineNote] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [tab, setTab] = useState<Tab>("overview");
   const [copied, setCopied] = useState(false);
   const [reactVote, setReactVote] = useState<"all" | "send_a" | "send_b" | "either" | "neither">("all");
   const [reactSeg, setReactSeg] = useState<string>("all");
@@ -273,7 +270,6 @@ export default function Home() {
     setRounds([]);
     setRefineNote(null);
     setAnalysis(null);
-    setTab("overview");
     const res = await runPanel(variants);
     setRounds([{ labelA: variants.labelA, labelB: variants.labelB, ...tally(res) }]);
     await analyze(variants, res);
@@ -282,7 +278,6 @@ export default function Home() {
   function runDemo() {
     setError(null);
     setIsDemo(true);
-    setTab("overview");
     const members = buildPanel(industry, messageType);
     const res = members.map((m) => demoResult(m.persona, m.base));
     setResultsAsset(variants.assetType);
@@ -395,50 +390,7 @@ export default function Home() {
   const trustA = results.filter((r) => r.trust === "version_a").length;
   const trustB = results.filter((r) => r.trust === "version_b").length;
   const neitherCount = results.filter((r) => r.winner === "neither").length;
-  const eitherNeither = n - winners.a - winners.b;
-  const pct = (k: number) => Math.round((k / n) * 100);
 
-  const compareRows: {
-    label: string;
-    a: number;
-    b: number;
-    max: number;
-    fmt: (v: number) => string;
-    caption: string;
-  }[] = [
-    {
-      label: "Would act on it",
-      a: gA,
-      b: gB,
-      max: n,
-      fmt: (v) => `${v} · ${pct(v)}%`,
-      caption: `took the action the message asked for (of ${n})`,
-    },
-    {
-      label: "Preferred this version",
-      a: winners.a,
-      b: winners.b,
-      max: n,
-      fmt: (v) => `${v}`,
-      caption: `head-to-head pick · ${eitherNeither} chose either or neither`,
-    },
-    {
-      label: "Felt more trustworthy",
-      a: trustA,
-      b: trustB,
-      max: n,
-      fmt: (v) => `${v}`,
-      caption: `${n - trustA - trustB} found them equal or neither`,
-    },
-    {
-      label: "Emotional pull",
-      a: mean("resonanceA"),
-      b: mean("resonanceB"),
-      max: 5,
-      fmt: (v) => `${v.toFixed(1)} / 5`,
-      caption: "mean resonance rating, 1–5",
-    },
-  ];
 
   // A clean, data-driven verdict line — avoids leaning on the model's (sometimes
   // awkward) auto-generated labels for the headline.
@@ -487,15 +439,6 @@ export default function Home() {
 
   // A representative reaction for a segment: prefer one whose vote matches the
   // verdict (a decisive voice), else the first with a real rationale.
-  function segQuote(segment: string): string | null {
-    const rs = results.filter((r) => r.giving === segment && r.rationale && r.rationale.length > 12);
-    if (!rs.length) return null;
-    const want =
-      analysis?.verdict === "ship_a" ? "send_a" : analysis?.verdict === "ship_b" ? "send_b" : null;
-    const pick = (want && rs.find((r) => r.winner === want)) || rs[0];
-    return pick.rationale;
-  }
-
   // Plain-text summary a rep can paste into an email or doc.
   function summaryText(): string {
     if (!analysis) return "";
@@ -826,370 +769,172 @@ export default function Home() {
             </div>
           </section>
 
-          {/* One tab bar for the whole analysis — recommendation stays pinned above */}
-          <section className="card">
-            <div className="tabs">
-              {([
-                ["overview", "Overview"],
-                ["reasoning", "Why & fixes"],
-                ["segments", "By segment"],
-                ["analysts", "Analysts"],
-                ["reactions", "Reactions"],
-                ["data", "Data"],
-                ...(canRefine ? ([["refine", "Refine"]] as [Tab, string][]) : []),
-              ] as [Tab, string][]).map(([k, lbl]) => (
-                <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
-                  {lbl}
-                </button>
-              ))}
-            </div>
-
-            {tab === "overview" && (
-              <div className="tabbody">
-                <div className="kpirow">
-                  <div className="kpi">
-                    <div className="kpi-h">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5M21 20a6 6 0 0 0-4-5.6"/></svg>
-                      Panel
-                    </div>
-                    <div className="kpi-v"><span className="kpi-num">{results.length}</span><span className="kpi-sub">reactions</span></div>
-                  </div>
-                  <div className="kpi">
-                    <div className="kpi-h">
-                      <span className="dot" style={{ background: "var(--series-a)" }} />Would act · A
-                    </div>
-                    <div className="kpi-v">
-                      <span className="kpi-num">{gA}</span>
-                      <span className={`trend ${gA === gB ? "flat" : gA > gB ? "up" : "down"}`}>
-                        {gA === gB ? "even" : `${gA > gB ? "▲" : "▼"} ${Math.abs(gA - gB)} vs B`}
-                      </span>
-                    </div>
-                    <div className="kpi-foot">{pct(gA)}% of panel</div>
-                  </div>
-                  <div className="kpi">
-                    <div className="kpi-h">
-                      <span className="dot" style={{ background: "var(--series-b)" }} />Would act · B
-                    </div>
-                    <div className="kpi-v">
-                      <span className="kpi-num">{gB}</span>
-                      <span className={`trend ${gA === gB ? "flat" : gB > gA ? "up" : "down"}`}>
-                        {gA === gB ? "even" : `${gB > gA ? "▲" : "▼"} ${Math.abs(gA - gB)} vs A`}
-                      </span>
-                    </div>
-                    <div className="kpi-foot">{pct(gB)}% of panel</div>
-                  </div>
-                  <div className="kpi">
-                    <div className="kpi-h">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                      Rejected both
-                    </div>
-                    <div className="kpi-v"><span className="kpi-num">{neitherCount}</span><span className="kpi-sub">{pct(neitherCount)}%</span></div>
-                    <div className="kpi-foot">would act on neither</div>
-                  </div>
-                </div>
-
-                <h3 className="tabh">How the panel responded</h3>
-                <div className="compare">
-                  {compareRows.map((row) => {
-                    const win = row.a === row.b ? null : row.a > row.b ? "a" : "b";
-                    return (
-                      <div className="cmp" key={row.label}>
-                        <div className="cmp-head">
-                          <span className="cmp-label">{row.label}</span>
-                          {win && <span className={`cmp-win ${win}`}>{win.toUpperCase()} leads</span>}
-                        </div>
-                        {(["a", "b"] as const).map((side) => {
-                          const val = side === "a" ? row.a : row.b;
-                          return (
-                            <div className="cmp-bar" key={side}>
-                              <span className="cmp-k">{side.toUpperCase()}</span>
-                              <div className="cmp-track">
-                                <div
-                                  className={`cmp-fill ${side}${win && win !== side ? " lose" : ""}`}
-                                  style={{ width: `${Math.max(3, (val / row.max) * 100)}%` }}
-                                />
-                              </div>
-                              <span className="cmp-v">{row.fmt(val)}</span>
-                            </div>
-                          );
-                        })}
-                        <div className="cmp-cap">{row.caption}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="statnote" style={{ marginTop: 18 }}>
-                  &ldquo;Would act&rdquo; shares carry a 95% confidence interval — {shareWithCI(gA, results.length)} for A,{" "}
-                  {shareWithCI(gB, results.length)} for B — so read small gaps as directional.
-                </p>
-                <h3 className="tabh">How the panel voted</h3>
-                <VoteDonut results={results} />
-              </div>
-            )}
-
-            {tab === "reasoning" && (
-              <div className="tabbody">
-                {analysis && (
-                  <>
-                    {analysis.keyPoints && analysis.keyPoints.length > 0 && (
-                      <>
-                        <h3 className="tabh" style={{ marginTop: 0 }}>
-                          Why this verdict
-                        </h3>
-                        <ol className="keypoints">
-                          {analysis.keyPoints.map((k, i) => (
-                            <li key={i}>
-                              <div className="kp-point">{k.point}</div>
-                              <div className="kp-why">{k.why}</div>
-                            </li>
-                          ))}
-                        </ol>
-                      </>
-                    )}
-                    <h3 className="tabh" style={analysis.keyPoints?.length ? undefined : { marginTop: 0 }}>
-                      What to do next
-                    </h3>
-                    <ul className="actionlist">
-                      {analysis.actions.map((a, i) => (
-                        <li key={i}>
-                          <span className={`pri ${a.priority}`}>{a.priority}</span>
-                          {a.action}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            )}
-
-            {tab === "segments" && (
-              <div className="tabbody">
-                {analysis && (
-                  <div className="segcards">
-                    {analysis.segments.map((s, i) => {
-                      const q = segQuote(s.segment);
-                      return (
-                        <div className="segcard" key={i}>
-                          <div className="st">{segmentLabel(s.segment)}</div>
-                          <div className="sl"><b>Driver:</b> {s.driver}</div>
-                          <div className="sl"><b>Barrier:</b> {s.barrier}</div>
-                          <div className="sl muted">{s.divergence}</div>
-                          {q && <div className="segquote">&ldquo;{q}&rdquo;</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <Legend labelA={variants.labelA} labelB={variants.labelB} />
-                <ResonanceChart results={results} />
-              </div>
-            )}
-
-            {tab === "analysts" && (
-              <div className="tabbody">
-                {analysis ? (
-                  <div className="analystlist">
-                    {analysis.analysts.map((a, i) => {
-                      const meta = ANALYSTS.find((x) => x.key === a.key);
-                      return (
-                        <div className="analystrow" key={i}>
-                          <div className="al"><span className="ico">{monogram(meta?.label ?? a.key)}</span>{meta?.label ?? a.key}</div>
-                          <div className="ar">{a.read}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="note">Analyst reads appear once analysis completes.</p>
-                )}
-              </div>
-            )}
-
-            {tab === "reactions" && (() => {
-              const voteLabel = (w: string) =>
-                w === "send_a" ? "Prefers A" : w === "send_b" ? "Prefers B" : w === "either" ? "Either" : "Neither";
-              const voteCls = (w: string) => (w === "send_a" ? "a" : w === "send_b" ? "b" : "n");
-              const votes = [
-                { key: "all", label: "All" },
-                { key: "send_a", label: "Prefer A" },
-                { key: "send_b", label: "Prefer B" },
-                { key: "either", label: "Either" },
-                { key: "neither", label: "Neither" },
-              ] as const;
-              const voteCount = (k: string) => (k === "all" ? results.length : results.filter((r) => r.winner === k).length);
-              const segs = results.reduce<string[]>((a, r) => (a.includes(r.giving) ? a : [...a, r.giving]), []);
-              const filtered = results.filter(
-                (r) => (reactVote === "all" || r.winner === reactVote) && (reactSeg === "all" || r.giving === reactSeg)
-              );
-              return (
-                <div className="tabbody">
-                  <p className="sub">
-                    Every persona&apos;s reason for its pick. Filter to talk through a group — say, everyone who
-                    preferred B, or just the skeptics.
-                  </p>
-                  <div className="rfilters">
-                    {votes.map((v) => (
-                      <button
-                        key={v.key}
-                        className={`rfchip ${voteCls(v.key)} ${reactVote === v.key ? "on" : ""}`}
-                        onClick={() => setReactVote(v.key)}
-                        disabled={v.key !== "all" && voteCount(v.key) === 0}
-                      >
-                        {v.key === "send_a" && <span className="sw" style={{ background: "var(--series-a)" }} />}
-                        {v.key === "send_b" && <span className="sw" style={{ background: "var(--series-b)" }} />}
-                        {v.label} <em>{voteCount(v.key)}</em>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="rfilters seg">
-                    <button className={`segchip ${reactSeg === "all" ? "on" : ""}`} onClick={() => setReactSeg("all")}>
-                      All segments
-                    </button>
-                    {segs.map((s) => (
-                      <button
-                        key={s}
-                        className={`segchip ${reactSeg === s ? "on" : ""}`}
-                        onClick={() => setReactSeg((cur) => (cur === s ? "all" : s))}
-                      >
-                        {segmentLabel(s)} <em>{results.filter((r) => r.giving === s).length}</em>
-                      </button>
-                    ))}
-                  </div>
-                  {filtered.length === 0 ? (
-                    <p className="note" style={{ marginTop: 14 }}>No reactions match this filter.</p>
-                  ) : (
-                    filtered.map((r) => (
-                      <div key={r.personaId} className={`quote ${voteCls(r.winner)}`}>
-                        <div className="qtop">
-                          <span className={`votepill ${voteCls(r.winner)}`}>{voteLabel(r.winner)}</span>
-                          <span className="qseg">{segmentLabel(r.giving)}</span>
-                        </div>
-                        {r.rationale}
-                      </div>
-                    ))
-                  )}
-                </div>
-              );
-            })()}
-
-            {tab === "data" && (
-              <div className="tabbody">
-                <Legend labelA={variants.labelA} labelB={variants.labelB} />
-                <IntentChart results={results} labels={INTENT_LABELS[resultsAsset]} />
-                <details className="tbl" style={{ marginTop: 16 }}>
-                  <summary>Full results table ({results.length} reactions)</summary>
-                  <table className="results">
-                    <thead>
-                      <tr>
-                        <th>Bot</th><th>Segment</th><th>Intent A</th><th>Intent B</th>
-                        <th>Res. A</th><th>Res. B</th><th>Winner</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.map((r) => (
-                        <tr key={r.personaId}>
-                          <td>{r.personaName}</td>
-                          <td>{segmentLabel(r.giving)}</td>
-                          <td>{INTENT_LABELS[resultsAsset][r.intentA]}</td>
-                          <td>{INTENT_LABELS[resultsAsset][r.intentB]}</td>
-                          <td>{r.resonanceA}</td>
-                          <td>{r.resonanceB}</td>
-                          <td>{r.winner === "send_a" ? "A" : r.winner === "send_b" ? "B" : r.winner}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </details>
-                <button
-                  className="btn ghost"
-                  style={{ marginTop: 12 }}
-                  onClick={() => {
-                    const manifest = {
-                      app: "message-lab",
-                      exportedAt: new Date().toISOString(),
-                      industry,
-                      assetType: resultsAsset,
-                      model: results[0]?.model ?? "unknown",
-                      panelSize: results.length,
-                      isDemo,
-                    };
-                    const blob = new Blob(
-                      [JSON.stringify({ manifest, variants, analysis, rounds, results }, null, 2)],
-                      { type: "application/json" }
-                    );
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "message-lab-results.json";
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  }}
-                >
-                  Export results JSON
-                </button>
-              </div>
-            )}
-
-            {tab === "refine" && canRefine && (
-              <div className="tabbody">
-                <h3 className="tabh" style={{ marginTop: 0 }}>Refine to a plateau</h3>
+          {/* The focus group — how the room split, then every participant */}
+          {(() => {
+            const eitherCount = results.filter((r) => r.winner === "either").length;
+            const splitSegs = [
+              { k: "send_a", n2: winners.a, label: "Chose A", color: "var(--series-a)" },
+              { k: "send_b", n2: winners.b, label: "Chose B", color: "var(--series-b)" },
+              { k: "either", n2: eitherCount, label: "No preference", color: "var(--neutral-bar)" },
+              { k: "neither", n2: neitherCount, label: "Rejected both", color: "var(--line)" },
+            ];
+            const pickCls = (w: string) =>
+              w === "send_a" ? "a" : w === "send_b" ? "b" : w === "either" ? "either" : "neither";
+            const pickLabel = (w: string) =>
+              w === "send_a" ? "Chose A" : w === "send_b" ? "Chose B" : w === "either" ? "No preference" : "Rejected both";
+            const trustLabel = (t: string) =>
+              t === "version_a" ? "Version A" : t === "version_b" ? "Version B" : t === "both_equal" ? "Both equally" : "Neither";
+            const votes = [
+              { key: "all", label: "Everyone" },
+              { key: "send_a", label: "Chose A" },
+              { key: "send_b", label: "Chose B" },
+              { key: "either", label: "No preference" },
+              { key: "neither", label: "Rejected both" },
+            ] as const;
+            const voteCount = (k: string) => (k === "all" ? results.length : results.filter((r) => r.winner === k).length);
+            const segs = results.reduce<string[]>((a, r) => (a.includes(r.giving) ? a : [...a, r.giving]), []);
+            const filtered = results.filter(
+              (r) => (reactVote === "all" || r.winner === reactVote) && (reactSeg === "all" || r.giving === reactSeg)
+            );
+            return (
+              <section className="card">
+                <h2>The focus group</h2>
                 <p className="sub">
-                  Claude drafts a stronger challenger for the weaker version and re-runs the panel,
-                  repeating while the conversion rate climbs and stopping when it plateaus — up to{" "}
-                  {MAX_REFINE_ROUNDS} rounds, then it pauses.
+                  {results.length} simulated participants each read both versions and reacted. Here&apos;s how the
+                  room split — then what every participant said.
                 </p>
-                <div className="runbar">
-                  {refining ? (
-                    <button className="btn ghost" onClick={() => (stopRef.current = true)}>
-                      Stop after this round
-                    </button>
-                  ) : (
-                    <button className="btn primary" onClick={refineLoop} disabled={running}>
-                      Auto-refine
-                    </button>
-                  )}
-                  <span className="note">
-                    {refineNote ?? `Up to ${MAX_REFINE_ROUNDS} rounds · stops when conversion plateaus`}
-                  </span>
-                </div>
-                <p className="caveat" style={{ marginTop: 10 }}>
-                  Same-model caveat: Claude drafts the challenger and Claude-simulated bots score it,
-                  so a win can reflect the model preferring its own copy. Treat refined drafts as
-                  strong candidates to test with people.
-                </p>
-                {rounds.length > 0 && (
-                  <ol className="rounds">
-                    {rounds.map((r, i) => (
-                      <li key={i}>
-                        <div>
-                          <strong>Round {i + 1}</strong> · {r.labelA}{" "}
-                          <b>{r.votesA}–{r.votesB}</b> {r.labelB}
-                          <span className="note"> · would convert: {r.givesA} vs {r.givesB} · rejected both: {r.neither}</span>
-                        </div>
-                        {r.diagnosis && <div className="diag">{r.diagnosis}</div>}
-                        {r.draft && (
-                          <details className="draftdiff">
-                            <summary>
-                              What changed → Version {r.draft.version}: &ldquo;{r.draft.newLabel}&rdquo; replaced &ldquo;{r.draft.prevLabel}&rdquo;
-                            </summary>
-                            <DiffView before={r.draft.prevCopy} after={r.draft.newCopy} />
-                          </details>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-            )}
 
-            <p className="caveat" style={{ margin: "20px 0 0" }}>
-              Directional signal from {results.length} simulated reactions — persona-agent estimates,
-              not statistically significant at this panel size and not a prediction of real-world
-              behavior. Results depend on the persona model
-              {results[0]?.model ? ` (${results[0].model})` : ""}; confirm important calls with a
-              second model and a human read before you ship.
-            </p>
-          </section>
+                {/* How the room split */}
+                <div className="splitbar">
+                  {splitSegs.map((s) =>
+                    s.n2 > 0 ? (
+                      <span key={s.k} className="ss" style={{ width: `${(s.n2 / (results.length || 1)) * 100}%`, background: s.color }} title={`${s.label}: ${s.n2}`} />
+                    ) : null
+                  )}
+                </div>
+                <div className="splitkey">
+                  {splitSegs.map((s) => (
+                    <span key={s.k} className="sk">
+                      <i style={{ background: s.color }} />
+                      {s.label} <b>{s.n2}</b>
+                    </span>
+                  ))}
+                </div>
+                <p className="groupstat">
+                  Would act on it: A <b>{gA}</b> · B <b>{gB}</b>. &nbsp; Rated more trustworthy: A <b>{trustA}</b> · B{" "}
+                  <b>{trustB}</b>. &nbsp; Avg resonance: A <b>{mean("resonanceA").toFixed(1)}</b> · B{" "}
+                  <b>{mean("resonanceB").toFixed(1)}</b> (of 5).
+                </p>
+
+                {/* Participants */}
+                <h3 className="tabh">Every participant</h3>
+                <div className="rfilters">
+                  {votes.map((v) => (
+                    <button
+                      key={v.key}
+                      className={`rfchip ${pickCls(v.key)} ${reactVote === v.key ? "on" : ""}`}
+                      onClick={() => setReactVote(v.key)}
+                      disabled={v.key !== "all" && voteCount(v.key) === 0}
+                    >
+                      {v.label} <em>{voteCount(v.key)}</em>
+                    </button>
+                  ))}
+                </div>
+                <div className="rfilters seg">
+                  <button className={`segchip ${reactSeg === "all" ? "on" : ""}`} onClick={() => setReactSeg("all")}>
+                    All types
+                  </button>
+                  {segs.map((s) => (
+                    <button
+                      key={s}
+                      className={`segchip ${reactSeg === s ? "on" : ""}`}
+                      onClick={() => setReactSeg((cur) => (cur === s ? "all" : s))}
+                    >
+                      {segmentLabel(s)} <em>{results.filter((r) => r.giving === s).length}</em>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="participants">
+                  {filtered.map((r) => (
+                    <div key={r.personaId} className={`pcard ${pickCls(r.winner)}`}>
+                      <div className="phead">
+                        <span className="ico">{monogram(r.giving)}</span>
+                        <div className="pwho">
+                          <div className="pname">{r.personaName}</div>
+                          <div className="pseg">{segmentLabel(r.giving)}</div>
+                        </div>
+                        <span className={`pick ${pickCls(r.winner)}`}>{pickLabel(r.winner)}</span>
+                      </div>
+                      <div className="preact">&ldquo;{r.rationale}&rdquo;</div>
+                      <details className="pdetails">
+                        <summary>Ratings &amp; intent</summary>
+                        <div className="pdrow">
+                          Rated: A <b>{r.resonanceA}/5</b> · B <b>{r.resonanceB}/5</b>
+                        </div>
+                        <div className="pdrow">
+                          Would: A — {INTENT_LABELS[resultsAsset][r.intentA]} · B — {INTENT_LABELS[resultsAsset][r.intentB]}
+                        </div>
+                        <div className="pdrow">Trusted more: {trustLabel(r.trust)}</div>
+                      </details>
+                    </div>
+                  ))}
+                </div>
+                {filtered.length === 0 && <p className="note">No participants match this filter.</p>}
+
+                <p className="caveat" style={{ margin: "20px 0 0" }}>
+                  Directional signal from {results.length} simulated participants — persona-agent estimates, not a
+                  prediction of real-world behavior. Results depend on the persona model
+                  {results[0]?.model ? ` (${results[0].model})` : ""}; confirm important calls with real people.
+                </p>
+              </section>
+            );
+          })()}
+
+          {/* Auto-refine — optional, kept minimal */}
+          {canRefine && (
+            <section className="card">
+              <h2>Refine to a plateau</h2>
+              <p className="sub">
+                Claude drafts a stronger challenger for the weaker version and re-runs the panel until the
+                conversion rate plateaus — up to {MAX_REFINE_ROUNDS} rounds.
+              </p>
+              <div className="runbar">
+                {refining ? (
+                  <button className="btn ghost" onClick={() => (stopRef.current = true)}>
+                    Stop after this round
+                  </button>
+                ) : (
+                  <button className="btn primary" onClick={refineLoop} disabled={running}>
+                    Auto-refine
+                  </button>
+                )}
+                <span className="note">
+                  {refineNote ?? `Up to ${MAX_REFINE_ROUNDS} rounds · stops when conversion plateaus`}
+                </span>
+              </div>
+              {rounds.length > 0 && (
+                <ol className="rounds">
+                  {rounds.map((r, i) => (
+                    <li key={i}>
+                      <div>
+                        <strong>Round {i + 1}</strong> · {r.labelA} <b>{r.votesA}–{r.votesB}</b> {r.labelB}
+                        <span className="note"> · would convert: {r.givesA} vs {r.givesB} · rejected both: {r.neither}</span>
+                      </div>
+                      {r.draft && (
+                        <details className="draftdiff">
+                          <summary>
+                            What changed → Version {r.draft.version}: &ldquo;{r.draft.newLabel}&rdquo; replaced &ldquo;{r.draft.prevLabel}&rdquo;
+                          </summary>
+                          <DiffView before={r.draft.prevCopy} after={r.draft.newCopy} />
+                        </details>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          )}
         </>
       )}
     </>
