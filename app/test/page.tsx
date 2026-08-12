@@ -125,6 +125,7 @@ export default function Home() {
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      pushHistory("Before auto-craft", variants);
       setVariants((v) => ({
         ...v,
         labelA: data.labelA || v.labelA,
@@ -166,6 +167,19 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("summary");
   const [showAllQuotes, setShowAllQuotes] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Prior versions of the two messages (newest first), captured on each change.
+  const [history, setHistory] = useState<{ id: number; note: string; v: Variants }[]>([]);
+  const histId = useRef(0);
+
+  function pushHistory(note: string, snap: Variants) {
+    if (!snap.copyA && !snap.copyB) return; // don't snapshot an empty start
+    setHistory((h) => [{ id: (histId.current += 1), note, v: snap }, ...h].slice(0, 12));
+  }
+  function restoreVariant(entry: { v: Variants }) {
+    pushHistory("Before restore", variants);
+    setVariants(entry.v);
+    setAutoCrafted(false);
+  }
   const stopRef = useRef(false);
 
   const archetypes = useMemo(() => panelFor(industry), [industry]);
@@ -322,6 +336,7 @@ export default function Home() {
         draft.champion === "a"
           ? { ...v, labelB: draft.label, copyB: draft.copy }
           : { ...v, labelA: draft.label, copyA: draft.copy };
+      pushHistory(`Before refine round ${i + 1}`, v);
       setVariants(next);
       setRefineNote(
         `Round ${i + 2} of up to ${MAX_REFINE_ROUNDS + 1}: testing "${draft.label}" against "${champLabel}"…`
@@ -631,6 +646,42 @@ export default function Home() {
         </div>
         {error && <p className="error">{error}</p>}
       </section>
+
+      {history.length > 0 && (
+        <section className="card">
+          <h2>Variant history</h2>
+          <p className="sub">
+            Earlier versions of your two messages — newest first. Each change (auto-craft, a refine
+            round, or a restore) snapshots what came before. Restore any prior version.
+          </p>
+          <ol className="vhist">
+            {history.map((h) => (
+              <li key={h.id}>
+                <div className="vhist-h">
+                  <span className="vhist-note">{h.note}</span>
+                  <button className="linklike" onClick={() => restoreVariant(h)}>
+                    Restore
+                  </button>
+                </div>
+                <div className="vhist-labels">A · {h.v.labelA} &nbsp;·&nbsp; B · {h.v.labelB}</div>
+                <details className="draftdiff">
+                  <summary>View both messages</summary>
+                  <div className="vhist-copies">
+                    <div>
+                      <b>Version A — {h.v.labelA}</b>
+                      <pre>{h.v.copyA}</pre>
+                    </div>
+                    <div>
+                      <b>Version B — {h.v.labelB}</b>
+                      <pre>{h.v.copyB}</pre>
+                    </div>
+                  </div>
+                </details>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {results.length > 0 && (
         <>
