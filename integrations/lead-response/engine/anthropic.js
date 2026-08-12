@@ -51,9 +51,40 @@ export async function callClaude({ apiKey, model, system, messages, maxTokens = 
   return (data.content && data.content[0] && data.content[0].text) || "";
 }
 
-/** Pull the first {...} JSON object out of a model response and parse it. */
+/** Pull the first {...} JSON object out of a string and parse it. */
 export function extractJson(text) {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("Model returned no parseable JSON.");
   return JSON.parse(match[0]);
+}
+
+/**
+ * Call Claude and return parsed JSON, hardened against chatty/truncated output.
+ * Two mechanisms borrowed from common Anthropic practice:
+ *   1. Assistant prefill — seed the reply with "{" so the model must continue a
+ *      JSON object instead of prose. We prepend the "{" back before parsing.
+ *   2. One repair retry — if parsing still fails, re-ask for JSON only.
+ * @param {object} p - same shape as callClaude (system, messages, model, ...)
+ * @returns {Promise<object>}
+ */
+export async function callClaudeJson(p) {
+  const primed = {
+    ...p,
+    messages: [...p.messages, { role: "assistant", content: "{" }],
+  };
+  const text = await callClaude(primed);
+  try {
+    return extractJson("{" + text);
+  } catch {
+    // Repair pass: ask plainly for a single JSON object, no prefill.
+    const repair = await callClaude({
+      ...p,
+      messages: [
+        ...p.messages,
+        { role: "assistant", content: text },
+        { role: "user", content: "That was not valid JSON. Reply with ONLY the JSON object, nothing else." },
+      ],
+    });
+    return extractJson(repair);
+  }
 }

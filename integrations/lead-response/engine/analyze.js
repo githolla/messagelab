@@ -4,9 +4,11 @@
 // actions, and per-analyst reads.
 //
 // Ported from Message Lab's app/api/analyze/route.ts, email-only and reframed
-// for lead response.
+// for lead response. Reply rates now carry Wilson confidence intervals, and a
+// faithfulness note is included when the grounding pass flags reactions.
 
-import { callClaude, extractJson } from "./anthropic.js";
+import { callClaudeJson } from "./anthropic.js";
+import { shareWithCI, wilson } from "./stats.js";
 
 /** The specialist "analyst" lenses that interpret the panel. Edit freely. */
 export const ANALYSTS = [
@@ -45,14 +47,25 @@ function segmentsOf(results) {
   return seen;
 }
 
-/** Deterministic head-to-head + reply counts. Exposed for storing/UIs. */
+/** Deterministic head-to-head + reply counts, with Wilson CIs on reply rates. */
 export function tally(results) {
+  const n = results.length;
   const votesA = results.filter((r) => r.winner === "send_a").length;
   const votesB = results.filter((r) => r.winner === "send_b").length;
   const neither = results.filter((r) => r.winner === "neither").length;
   const repliesA = results.filter((r) => REPLY_INTENTS.includes(r.intentA)).length;
   const repliesB = results.filter((r) => REPLY_INTENTS.includes(r.intentB)).length;
-  return { votesA, votesB, neither, either: results.length - votesA - votesB - neither, repliesA, repliesB };
+  return {
+    n,
+    votesA,
+    votesB,
+    neither,
+    either: n - votesA - votesB - neither,
+    repliesA,
+    repliesB,
+    replyRateA: { ...wilson(repliesA, n), pct: n ? Math.round((repliesA / n) * 100) : 0, ci: shareWithCI(repliesA, n) },
+    replyRateB: { ...wilson(repliesB, n), pct: n ? Math.round((repliesB / n) * 100) : 0, ci: shareWithCI(repliesB, n) },
+  };
 }
 
 function buildSummary(results) {
@@ -76,7 +89,8 @@ function buildSummary(results) {
 
   return `Panel: ${results.length} simulated reactions across ${segmentsOf(results).length} lead archetypes.
 Head-to-head votes: A ${t.votesA}, B ${t.votesB}, either ${t.either}, neither ${t.neither}.
-Would reply: A ${t.repliesA}, B ${t.repliesB}.
+Would reply: A ${t.replyRateA.ci} (${t.repliesA}/${t.n}), B ${t.replyRateB.ci} (${t.repliesB}/${t.n}).
+(These are small-n simulated rates with wide intervals — treat as directional.)
 Intent distribution A: ${intentLine("intentA")}
 Intent distribution B: ${intentLine("intentB")}
 By archetype (resonance A/B; would-reply A/B):
@@ -89,15 +103,19 @@ ${quotes}`;
  * Analyze a completed panel into a decision report.
  * @param {object} variants - { labelA, labelB, copyA, copyB }
  * @param {Array}  results  - reaction results from reactToVariants()
- * @param {object} opts     - { apiKey, model?, context? }
+ * @param {object} opts     - { apiKey, model?, context?, faithfulness? }
  * @returns {Promise<{analysis: object, model: string, tally: object}>}
  */
 export async function analyzePanel(variants, results, opts) {
-  const { apiKey, model = "claude-sonnet-4-6", context = "" } = opts;
+  const { apiKey, model = "claude-sonnet-4-6", context = "", faithfulness = null } = opts;
   if (!results || !results.length) throw new Error("No results to analyze.");
 
   const analystList = ANALYSTS.map((a) => `- ${a.key} (${a.label}): ${a.lens}`).join("\n");
   const analystKeys = ANALYSTS.map((a) => a.key).join(", ");
+  const faithfulnessNote =
+    faithfulness && faithfulness.faithfulnessRate < 0.85
+      ? `\n\nNote: only ${Math.round(faithfulness.faithfulnessRate * 100)}% of reactions passed the faithfulness check (${faithfulness.flagged} flagged). Weight the verdict accordingly and call this out if it undermines confidence.`
+      : "";
 
   const schema = `Respond with ONLY a JSON object, no markdown fences:
 {
@@ -119,14 +137,14 @@ ${variants.copyA}
 ${variants.copyB}
 
 ## Panel results
-${buildSummary(results)}
+${buildSummary(results)}${faithfulnessNote}
 
 ## Your task
 You are a panel of specialist analysts:
 ${analystList}
 Interpret the reactions into a decision-ready report. ${schema}`;
 
-  const text = await callClaude({
+  const analysis = await callClaudeJson({
     apiKey,
     model,
     maxTokens: 2500,
@@ -135,5 +153,5 @@ Interpret the reactions into a decision-ready report. ${schema}`;
     messages: [{ role: "user", content: user }],
   });
 
-  return { analysis: extractJson(text), model, tally: tally(results) };
+  return { analysis, model, tally: tally(results) };
 }

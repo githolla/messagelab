@@ -21,7 +21,8 @@ db.exec(`
     label_b     TEXT,  copy_b  TEXT,
     verdict     TEXT,  headline TEXT,
     votes_a     INTEGER, votes_b INTEGER,
-    report_json TEXT,           -- full { analysis, tally, results, ... }
+    faithfulness REAL,  is_demo INTEGER,
+    report_json TEXT,           -- full { analysis, tally, results, faithfulness, manifest, ... }
     created_at  TEXT DEFAULT (datetime('now'))
   );
 `);
@@ -50,12 +51,12 @@ router.post("/api/message-tests", async (req, res) => {
       panel: buildPanel(), // or a per-campaign audience loaded from SQLite
     });
 
-    const { analysis, tally } = out;
+    const { analysis, tally, faithfulness } = out;
     const info = db
       .prepare(
         `INSERT INTO message_tests
-           (lead_id, label_a, copy_a, label_b, copy_b, verdict, headline, votes_a, votes_b, report_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           (lead_id, label_a, copy_a, label_b, copy_b, verdict, headline, votes_a, votes_b, faithfulness, is_demo, report_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         leadId,
@@ -67,6 +68,8 @@ router.post("/api/message-tests", async (req, res) => {
         analysis.headline,
         tally.votesA,
         tally.votesB,
+        faithfulness ? faithfulness.faithfulnessRate : null,
+        out.demo ? 1 : 0,
         JSON.stringify(out)
       );
 

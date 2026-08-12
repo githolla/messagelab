@@ -29,9 +29,12 @@ const out = await runTest(
 );
 
 console.log("\n");
-console.log("Verdict :", out.analysis.verdict);
-console.log("Headline:", out.analysis.headline);
-console.log("Votes   :", `A ${out.tally.votesA} / B ${out.tally.votesB}  (would reply: A ${out.tally.repliesA} / B ${out.tally.repliesB})`);
+console.log("Verdict     :", out.analysis.verdict, out.demo ? "(DEMO fallback — no live simulation)" : "");
+console.log("Headline    :", out.analysis.headline);
+console.log("Votes       :", `A ${out.tally.votesA} / B ${out.tally.votesB}`);
+console.log("Would reply : A", out.tally.replyRateA.ci, "| B", out.tally.replyRateB.ci);
+console.log("Faithfulness:", `${Math.round(out.faithfulness.faithfulnessRate * 100)}% (${out.faithfulness.flagged} flagged)`);
+console.log("Manifest    :", JSON.stringify(out.manifest));
 console.log("\nTop actions:");
 for (const a of out.analysis.actions.slice(0, 3)) console.log(`  [${a.priority}] ${a.action}`);
 if (out.errors.length) console.log(`\n(${out.errors.length} reaction(s) failed and were excluded.)`);

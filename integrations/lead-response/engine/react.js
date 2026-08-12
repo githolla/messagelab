@@ -1,12 +1,14 @@
 // Stage 2 — the core reaction. One Claude call per persona: condition the model
-// on a single lead persona (system prompt) and both email versions (user
-// prompt), and return that persona's questionnaire answers as strict JSON.
+// on a single lead persona (system prompt, via the grouped second-person
+// renderer) and both email versions (user prompt), and return that persona's
+// questionnaire answers as strict JSON.
 //
 // Email-only. Ported from Message Lab's app/api/run/route.ts, with the direct-
-// mail and website/vision branches removed and the intent vocabulary reframed
-// for sales-reply (lead response) instead of fundraising.
+// mail and website/vision branches removed, the intent vocabulary reframed for
+// sales-reply (lead response), and the persona prompt upgraded per MatrAIx.
 
-import { callClaude, extractJson } from "./anthropic.js";
+import { callClaudeJson } from "./anthropic.js";
+import { renderPersona } from "./persona-render.js";
 
 const SCHEMA_HINT = `Respond with ONLY a JSON object, no markdown fences, matching:
 {
@@ -46,13 +48,6 @@ function presentationOrder(id) {
   return (h >>> 0) % 2 === 0 ? "ab" : "ba";
 }
 
-function personaBlock(p) {
-  const dims = Object.entries(p.dimensions)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join("\n");
-  return `You are answering as this person. Stay fully in character — react the way THIS person would, not the way an average or agreeable person would.\n\nname: ${p.name}\n${dims}`;
-}
-
 /**
  * React one persona to two email versions.
  * @param {object} persona  - { id, name, segment, dimensions: {...} }
@@ -82,15 +77,14 @@ ${second.copy}
 
 ${QUESTIONNAIRE}`;
 
-  const text = await callClaude({
+  const parsed = await callClaudeJson({
     apiKey,
     model,
     maxTokens: 1024,
-    system: personaBlock(persona),
+    system: renderPersona(persona),
     messages: [{ role: "user", content }],
   });
 
-  const parsed = extractJson(text);
   return {
     personaId: persona.id,
     personaName: persona.name,
