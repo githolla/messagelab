@@ -140,6 +140,79 @@ export function IntentChart({
   );
 }
 
+/** Donut: distribution of head-to-head votes, with a center total and a legend. */
+export function VoteDonut({ results }: { results: PersonaResult[] }) {
+  const t = useTooltip();
+  const segs = [
+    { key: "send_a", label: "Send A", color: A },
+    { key: "send_b", label: "Send B", color: B },
+    { key: "either", label: "Either", color: "var(--neutral-bar)" },
+    { key: "neither", label: "Neither", color: "var(--line)" },
+  ] as const;
+  const counts = segs.map((s) => results.filter((r) => r.winner === s.key).length);
+  const total = results.length || 1;
+  const R = 52,
+    SW = 22,
+    C = 2 * Math.PI * R;
+  let acc = 0;
+
+  return (
+    <figure className="chart">
+      <figcaption>
+        Which version should be sent? <span className="capsub">one vote per persona</span>
+      </figcaption>
+      <div className="donutwrap">
+        <svg width="150" height="150" viewBox="0 0 140 140" role="img" aria-label="Vote distribution">
+          <circle cx="70" cy="70" r={R} fill="none" stroke="var(--bg-2)" strokeWidth={SW} />
+          {segs.map((s, i) => {
+            const frac = counts[i] / total;
+            if (!frac) return null;
+            const len = frac * C;
+            const off = -acc * C;
+            acc += frac;
+            return (
+              <circle
+                key={s.key}
+                cx="70"
+                cy="70"
+                r={R}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={SW}
+                strokeDasharray={`${len} ${C - len}`}
+                strokeDashoffset={off}
+                transform="rotate(-90 70 70)"
+                onMouseMove={(e) => t.show(e, `${s.label}: ${counts[i]} of ${total}`)}
+                onMouseLeave={t.hide}
+              />
+            );
+          })}
+          <text x="70" y="67" textAnchor="middle" fontSize="26" fontWeight="700" fill="var(--ink)" fontFamily="Georgia, serif">
+            {total}
+          </text>
+          <text x="70" y="86" textAnchor="middle" fontSize="9.5" letterSpacing="1" fill="var(--ink-3)" fontFamily="ui-monospace, monospace">
+            REACTIONS
+          </text>
+        </svg>
+        <div className="donutlegend">
+          {segs.map((s, i) =>
+            counts[i] > 0 ? (
+              <div className="dl" key={s.key}>
+                <span className="sw" style={{ background: s.color }} />
+                <span className="dl-l">{s.label}</span>
+                <span className="dl-v">
+                  {counts[i]} · {Math.round((counts[i] / total) * 100)}%
+                </span>
+              </div>
+            ) : null
+          )}
+        </div>
+      </div>
+      {t.node}
+    </figure>
+  );
+}
+
 /** Dot plot: average resonance by giving segment, two series. */
 export function ResonanceChart({ results }: { results: PersonaResult[] }) {
   const t = useTooltip();

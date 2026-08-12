@@ -10,7 +10,7 @@ import { INDUSTRIES } from "@/lib/industries";
 import { ANALYSTS, panelFor, instancesPer, monogram, messageAudienceKey } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
 import { sampleFor, isPristineCopy, MESSAGE_TYPES, messageTypesFor } from "@/lib/samples";
-import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/Charts";
+import { IntentChart, Legend, ResonanceChart, VoteDonut } from "@/components/Charts";
 import { DiffView } from "@/components/Diff";
 
 const CONCURRENCY = 4;
@@ -846,7 +846,49 @@ export default function Home() {
 
             {tab === "overview" && (
               <div className="tabbody">
-                <h3 className="tabh" style={{ marginTop: 0 }}>How the panel responded</h3>
+                <div className="kpirow">
+                  <div className="kpi">
+                    <div className="kpi-h">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5M21 20a6 6 0 0 0-4-5.6"/></svg>
+                      Panel
+                    </div>
+                    <div className="kpi-v"><span className="kpi-num">{results.length}</span><span className="kpi-sub">reactions</span></div>
+                  </div>
+                  <div className="kpi">
+                    <div className="kpi-h">
+                      <span className="dot" style={{ background: "var(--series-a)" }} />Would act · A
+                    </div>
+                    <div className="kpi-v">
+                      <span className="kpi-num">{gA}</span>
+                      <span className={`trend ${gA === gB ? "flat" : gA > gB ? "up" : "down"}`}>
+                        {gA === gB ? "even" : `${gA > gB ? "▲" : "▼"} ${Math.abs(gA - gB)} vs B`}
+                      </span>
+                    </div>
+                    <div className="kpi-foot">{pct(gA)}% of panel</div>
+                  </div>
+                  <div className="kpi">
+                    <div className="kpi-h">
+                      <span className="dot" style={{ background: "var(--series-b)" }} />Would act · B
+                    </div>
+                    <div className="kpi-v">
+                      <span className="kpi-num">{gB}</span>
+                      <span className={`trend ${gA === gB ? "flat" : gB > gA ? "up" : "down"}`}>
+                        {gA === gB ? "even" : `${gB > gA ? "▲" : "▼"} ${Math.abs(gA - gB)} vs A`}
+                      </span>
+                    </div>
+                    <div className="kpi-foot">{pct(gB)}% of panel</div>
+                  </div>
+                  <div className="kpi">
+                    <div className="kpi-h">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                      Rejected both
+                    </div>
+                    <div className="kpi-v"><span className="kpi-num">{neitherCount}</span><span className="kpi-sub">{pct(neitherCount)}%</span></div>
+                    <div className="kpi-foot">would act on neither</div>
+                  </div>
+                </div>
+
+                <h3 className="tabh">How the panel responded</h3>
                 <div className="compare">
                   {compareRows.map((row) => {
                     const win = row.a === row.b ? null : row.a > row.b ? "a" : "b";
@@ -881,8 +923,7 @@ export default function Home() {
                   {shareWithCI(gB, results.length)} for B — so read small gaps as directional.
                 </p>
                 <h3 className="tabh">How the panel voted</h3>
-                <Legend labelA={variants.labelA} labelB={variants.labelB} />
-                <WinnerChart results={results} />
+                <VoteDonut results={results} />
               </div>
             )}
 
