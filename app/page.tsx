@@ -1,5 +1,5 @@
 import { INDUSTRIES } from "@/lib/industries";
-import { ANALYSTS, panelFor } from "@/lib/archetypes";
+import { ANALYSTS, panelFor, monogram } from "@/lib/archetypes";
 
 export default function Home() {
   const industryCount = INDUSTRIES.length;
@@ -42,7 +42,7 @@ export default function Home() {
         <div className="lp-botrow">
           {sampleBots.map((a) => (
             <span className="chip" key={a.name}>
-              <span className="e">{a.icon}</span>
+              <span className="e">{monogram(a.name)}</span>
               {a.name}
             </span>
           ))}
@@ -51,7 +51,7 @@ export default function Home() {
         <div className="lp-botrow">
           {ANALYSTS.map((a) => (
             <span className="chip analyst" key={a.key}>
-              <span className="e">{a.icon}</span>
+              <span className="e">{monogram(a.label)}</span>
               {a.label}
             </span>
           ))}
@@ -61,7 +61,12 @@ export default function Home() {
       {/* Tools */}
       <section className="tools">
         <a className="toolcard" href="/test">
-          <div className="ti">🧪</div>
+          <div className="ti">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 3h12M9 3v6.5L4.5 17a2.5 2.5 0 0 0 2.2 3.7h10.6A2.5 2.5 0 0 0 19.5 17L15 9.5V3" />
+              <path d="M7.5 14h9" />
+            </svg>
+          </div>
           <h2>A/B Message Test</h2>
           <p>
             Pick an industry, paste two versions (or auto-craft them), and run them past the
@@ -71,7 +76,12 @@ export default function Home() {
           <span className="tlink">Open the test →</span>
         </a>
         <a className="toolcard" href="/review">
-          <div className="ti">🔍</div>
+          <div className="ti">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <path d="M20 20l-4.7-4.7" />
+            </svg>
+          </div>
           <h2>UX Page Review</h2>
           <p>
             Paste any URL. The app screenshots it and Claude returns an expert UI/UX and usability

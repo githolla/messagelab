@@ -7,7 +7,7 @@ import { demoResult } from "@/lib/demo";
 import { tally, type RoundSummary } from "@/lib/refine";
 import { shareWithCI } from "@/lib/stats";
 import { INDUSTRIES } from "@/lib/industries";
-import { ANALYSTS, panelFor, instancesPer } from "@/lib/archetypes";
+import { ANALYSTS, panelFor, instancesPer, monogram } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
 import { sampleFor, isPristineCopy, MESSAGE_TYPES } from "@/lib/samples";
 import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/Charts";
@@ -20,6 +20,8 @@ const ASSET_HINTS: Record<AssetType, string> = {
   email: "Paste the two versions you want to test. Replace the sample copy with your own — subject line and body.",
   direct_mail:
     "Paste the two letter versions. Include everything the recipient would read — headline, body, PS, reply-device copy.",
+  social:
+    "Paste the two post versions — the caption/body as it would appear in-feed, plus any hook line, hashtags, or CTA.",
   website:
     "Upload a screenshot of each page version. A focused capture (hero, primary CTA, key section) reads better than a very tall full-page one.",
 };
@@ -398,7 +400,7 @@ export default function Home() {
           {archetypes.map((a) => (
             <div className="botcard" key={a.name}>
               <div className="bt">
-                <span className="ico">{a.icon}</span>
+                <span className="ico">{monogram(a.name)}</span>
                 {a.name}
               </div>
               <div className="bh">{a.how}</div>
@@ -411,9 +413,9 @@ export default function Home() {
         </p>
         <div className="botgrid">
           {ANALYSTS.map((a) => (
-            <div className="botcard" key={a.key}>
+            <div className="botcard analyst" key={a.key}>
               <div className="bt">
-                <span className="ico">{a.icon}</span>
+                <span className="ico">{monogram(a.label)}</span>
                 {a.label}
               </div>
               <div className="bh">{a.lens}</div>
@@ -447,7 +449,7 @@ export default function Home() {
               onClick={autoCraft}
               disabled={drafting || running || refining}
             >
-              {drafting ? "Crafting…" : "✨ Auto-craft variants"}
+              {drafting ? "Crafting…" : "Auto-craft variants"}
             </button>
             <span className="note">
               Claude drafts two A/B versions for {INDUSTRIES.find((i) => i.key === industry)?.label},
@@ -725,7 +727,7 @@ export default function Home() {
                       const meta = ANALYSTS.find((x) => x.key === a.key);
                       return (
                         <div className="analystrow" key={i}>
-                          <div className="al"><span className="ico">{meta?.icon ?? "•"}</span>{meta?.label ?? a.key}</div>
+                          <div className="al"><span className="ico">{monogram(meta?.label ?? a.key)}</span>{meta?.label ?? a.key}</div>
                           <div className="ar">{a.read}</div>
                         </div>
                       );

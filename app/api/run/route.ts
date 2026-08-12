@@ -33,6 +33,13 @@ const CHANNELS: Record<
       '"dismiss" = toss it unopened; "engage_no_gift" = read it but take no action; "save_for_later" = set it aside to maybe act on later',
     winnerQ: "If only one letter could be mailed, which should it be?",
   },
+  social: {
+    intro: "Two versions of a social media post are being tested.",
+    intentQ: "If Version A appeared in your feed, what would you most likely do?",
+    intentDefs:
+      '"dismiss" = scroll right past; "engage_no_gift" = read or like it but take no further action; "save_for_later" = save or bookmark it to maybe act on later',
+    winnerQ: "If only one post could be published, which should it be?",
+  },
   website: {
     intro:
       "Two versions of a nonprofit donation web page are being tested. A screenshot of each version follows.",

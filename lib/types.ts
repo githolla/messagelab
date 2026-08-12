@@ -6,7 +6,7 @@ export interface Persona {
   dimensions: Record<string, string>;
 }
 
-export type AssetType = "email" | "direct_mail" | "website";
+export type AssetType = "email" | "direct_mail" | "website" | "social";
 
 export interface Variants {
   assetType: AssetType;
@@ -46,6 +46,7 @@ export interface PersonaResult {
 export const ASSET_LABELS: Record<AssetType, string> = {
   email: "Email",
   direct_mail: "Direct mail",
+  social: "Social post",
   website: "Website UI",
 };
 
@@ -62,6 +63,14 @@ export const INTENT_LABELS: Record<AssetType, Record<IntentChoice, string>> = {
     dismiss: "Toss unopened",
     engage_no_gift: "Read, no action",
     save_for_later: "Set aside",
+    give_small: "Convert, low",
+    give_suggested: "Convert, mid",
+    give_more: "Convert, high",
+  },
+  social: {
+    dismiss: "Scroll past",
+    engage_no_gift: "Read, no action",
+    save_for_later: "Save / bookmark",
     give_small: "Convert, low",
     give_suggested: "Convert, mid",
     give_more: "Convert, high",

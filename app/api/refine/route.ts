@@ -5,7 +5,7 @@ import { tally } from "@/lib/refine";
 
 export const maxDuration = 60;
 
-const CHANNEL_NOUN = { email: "email", direct_mail: "direct mail letter" } as const;
+const CHANNEL_NOUN = { email: "email", direct_mail: "direct mail letter", social: "social media post" } as const;
 
 function mean(xs: number[]): string {
   return xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1) : "–";
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   if (variants.assetType === "website") {
     return NextResponse.json(
-      { error: "Refinement drafts are text-only — supported for email and direct mail." },
+      { error: "Refinement drafts are text-only — supported for email, direct mail, and social posts." },
       { status: 400 }
     );
   }
@@ -85,7 +85,9 @@ export async function POST(req: NextRequest) {
   const formatNote =
     variants.assetType === "email"
       ? "Include a subject line. Same rough length as the tested versions."
-      : "Letter format (salutation, body, signature, PS). Same rough length as the tested versions.";
+      : variants.assetType === "social"
+        ? "In-feed post format (hook line, body, any CTA/hashtags). Same rough length as the tested versions."
+        : "Letter format (salutation, body, signature, PS). Same rough length as the tested versions.";
 
   const user = `Two versions of a ${noun} were tested on a simulated donor persona panel. The goal is to maximize the number of personas who would give. Version ${champion.toUpperCase()} ("${champLabel}") is the current best, with ${champGives} of ${results.length} personas willing to give.
 

@@ -10,6 +10,14 @@ export interface Archetype {
   base: number; // 0-1 baseline propensity to act (drives deterministic demo)
 }
 
+// A 2-letter monogram from a name — used in place of emoji on bot/analyst chips.
+// "Bargain Hunter" -> "BH", "Conversion" -> "CO", "First-time Visitor" -> "FV".
+export function monogram(name: string): string {
+  const words = name.replace(/[^A-Za-z0-9 -]/g, "").split(/[ -]+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return (name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "?").toUpperCase();
+}
+
 export interface Analyst {
   key: string;
   label: string;
