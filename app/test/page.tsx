@@ -7,7 +7,7 @@ import { demoResult } from "@/lib/demo";
 import { tally, type RoundSummary } from "@/lib/refine";
 import { shareWithCI } from "@/lib/stats";
 import { INDUSTRIES } from "@/lib/industries";
-import { ANALYSTS, panelFor, instancesPer, monogram } from "@/lib/archetypes";
+import { ANALYSTS, panelFor, instancesPer, monogram, messageAudienceKey } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
 import { sampleFor, isPristineCopy, MESSAGE_TYPES, messageTypesFor } from "@/lib/samples";
 import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/Charts";
@@ -30,8 +30,8 @@ type PanelMember = { persona: Persona; base: number };
 
 // Build the run panel from the chosen industry's archetypes: a few individual
 // instances per archetype so the segment carries a usable sample.
-function buildPanel(industryKey: string): PanelMember[] {
-  const arch = panelFor(industryKey);
+function buildPanel(industryKey: string, messageType?: string): PanelMember[] {
+  const arch = panelFor(industryKey, messageType);
   const per = instancesPer(arch.length);
   const out: PanelMember[] = [];
   for (const a of arch) {
@@ -182,7 +182,7 @@ export default function Home() {
   }
   const stopRef = useRef(false);
 
-  const archetypes = useMemo(() => panelFor(industry), [industry]);
+  const archetypes = useMemo(() => panelFor(industry, messageType), [industry, messageType]);
   const msgTypes = useMemo(() => messageTypesFor(industry), [industry]);
   const plannedSize = useMemo(
     () => archetypes.length * instancesPer(archetypes.length),
@@ -190,7 +190,7 @@ export default function Home() {
   );
 
   async function runPanel(v: Variants): Promise<PersonaResult[]> {
-    const members = buildPanel(industry);
+    const members = buildPanel(industry, messageType);
     setRunning(true);
     setResultsAsset(v.assetType);
     setError(null);
@@ -284,7 +284,7 @@ export default function Home() {
     setIsDemo(true);
     setShowAllQuotes(false);
     setTab("summary");
-    const members = buildPanel(industry);
+    const members = buildPanel(industry, messageType);
     const res = members.map((m) => demoResult(m.persona, m.base));
     setResultsAsset(variants.assetType);
     setResults(res);
@@ -546,7 +546,14 @@ export default function Home() {
 
         <p className="sub" style={{ margin: "16px 0 8px" }}>
           <strong>Audience bots</strong> — {archetypes.length} archetypes react as your panel
-          ({plannedSize} reactions total):
+          ({plannedSize} reactions total)
+          {variants.assetType !== "website" && messageAudienceKey(messageType) ? (
+            <>
+              , led by a <b style={{ color: "var(--ink)" }}>{archetypes[0].name}</b> for a{" "}
+              {messageType.toLowerCase()}
+            </>
+          ) : null}
+          :
         </p>
         <div className="botgrid">
           {archetypes.map((a) => (

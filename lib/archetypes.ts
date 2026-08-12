@@ -213,8 +213,44 @@ export const INDUSTRY_ARCHETYPES: Record<string, Archetype[]> = {
   ],
 };
 
-export function panelFor(industryKey?: string): Archetype[] {
-  return INDUSTRY_ARCHETYPES[industryKey ?? "general"] ?? GENERAL;
+// Audience-state modifiers. The message type implies WHO is receiving it (a
+// win-back goes to lapsed customers, onboarding to brand-new ones), so we lead
+// the industry panel with a state archetype that matches the message type. Icon
+// is unused (the UI renders monograms), kept for the shared Archetype shape.
+const AUDIENCE: Record<string, Archetype> = {
+  new: { name: "New Arrival", icon: "", how: "Just discovered you — needs the value obvious in seconds, no jargon", base: 0.3 },
+  lapsed: { name: "Lapsed Customer", icon: "", how: "Used to engage, then went quiet — needs a genuine reason to come back", base: 0.25 },
+  hesitating: { name: "Hesitating Buyer", icon: "", how: "Was about to act and stopped — one objection away from converting", base: 0.6 },
+  renewing: { name: "Renewing Customer", icon: "", how: "Already a customer deciding whether to stay — weighs value vs. alternatives", base: 0.55 },
+  upsell: { name: "Upsell Candidate", icon: "", how: "Happy customer weighing whether to spend more", base: 0.5 },
+  warm: { name: "Warm Prospect", icon: "", how: "Talked to you once then went quiet — needs a nudge with real substance", base: 0.45 },
+  advocate: { name: "Potential Referrer", icon: "", how: "Likes you enough to refer — needs it easy and worth their while", base: 0.5 },
+  loyal: { name: "Loyal Regular", icon: "", how: "Deeply engaged already — wants recognition and what's next", base: 0.7 },
+};
+
+/** Infer the audience state a message type targets, from its wording. */
+export function messageAudienceKey(messageType?: string): keyof typeof AUDIENCE | null {
+  if (!messageType) return null;
+  const s = messageType.toLowerCase();
+  if (/welcome|onboard|new-patient|new patient|first-time|first time|new account|new-account|prospective|apply invite|info session/.test(s)) return "new";
+  if (/win-back|winback|win back|re-engag|reengag|lapsed|dormant|recall/.test(s)) return "lapsed";
+  if (/abandon|cart|pre-trip|hesitat/.test(s)) return "hesitating";
+  if (/renew|retention|expir|lease-end|contract reminder|autopay|bill /.test(s)) return "renewing";
+  if (/upsell|cross-sell|upgrade|expansion|add-on|premium|catering|group offer/.test(s)) return "upsell";
+  if (/follow-up|follow up|application follow|case follow|nurture|application follow-up|closing|next steps|interview/.test(s)) return "warm";
+  if (/referral|refer a|share/.test(s)) return "advocate";
+  if (/loyal|vip|milestone|community update|impact update/.test(s)) return "loyal";
+  return null; // promotional / announcement / newsletter → the base audience
+}
+
+// The panel for a run: the industry's archetypes, led by an audience-state
+// archetype when the message type implies a specific audience. Panel size holds.
+export function panelFor(industryKey?: string, messageType?: string): Archetype[] {
+  const base = INDUSTRY_ARCHETYPES[industryKey ?? "general"] ?? GENERAL;
+  const key = messageAudienceKey(messageType);
+  if (!key) return base;
+  const state = AUDIENCE[key];
+  return [state, ...base.filter((a) => a.name !== state.name)].slice(0, base.length);
 }
 
 // Target ~20 reactions per run: spread instances evenly across the archetypes.
