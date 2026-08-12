@@ -11,10 +11,16 @@ a segment-level results dashboard. "Message Lab" is a working title.
 - Routes: `/` is a landing page explaining the product + linking the two tools;
   `/test` is the A/B message test; `/review` is the UX page review. `components/Nav.tsx`
   is the primary nav (A/B Message Test | UX Page Review) with active states.
-- The run route retries transient failures (429/529/5xx) with backoff; the client
-  surfaces the real error (not a canned "check your key") and distinguishes auth
-  vs rate-limit causes.
-- Deployed on Vercel. No database in v1 — results live in client state with JSON export.
+- All five model routes call the shared `lib/anthropic.ts` `callModel()` helper,
+  which retries transient failures (429/529/5xx) with backoff and enforces a
+  per-attempt timeout. The client surfaces the real error (not a canned "check
+  your key") and distinguishes auth vs rate-limit causes. The run route also
+  validates/coerces model output against the known enums/ranges before it reaches
+  the tally + stats, and puts server-authored identity fields after the spread.
+- Deployed on Vercel. No database in v1 — results live in client state. The A/B
+  tool exports a run as JSON (with a reproducibility manifest) via `lib/export.ts`,
+  a Markdown report, and print-to-PDF; completed runs are also persisted to
+  localStorage (`lib/runstore.ts`) for a "Past runs" strip + two-run comparison.
 - Persona simulation: `app/api/run/route.ts` is a serverless route called once per
   reaction (client fans out, concurrency 4). It conditions Claude on a persona/
   archetype's dimensions (system prompt) and returns questionnaire answers as strict JSON.
@@ -22,7 +28,14 @@ a segment-level results dashboard. "Message Lab" is a working title.
   audience archetypes (e.g. e-commerce: Bargain Hunter, Brand Loyalist, …), a few
   instances each (~20 reactions), plus a shared team of analyst bots (Conversion,
   Trust, Accessibility, Copy, Brand). Picking an industry (`lib/industries.ts`) swaps
-  the archetype panel and both are previewed as cards before running.
+  the archetype panel and both are previewed as cards before running. The panel
+  size (Small/Standard/Large) and the message type (which audience state leads the
+  panel) are explicit controls in Step 1.
+- `lib/samples.ts`: per-industry A/B sample copy (`sampleFor`), industry message-type
+  lists, and `isPristineCopy` (guards live runs against untouched sample copy and
+  safely refills on industry switch). `app/api/draft/route.ts` powers Auto-craft:
+  Claude drafts two strategically-contrasting A/B versions for the industry + message
+  type. Browsing industries never fires a paid re-draft — re-crafting is explicit.
 - Analysis: `app/api/analyze/route.ts` takes the panel results + industry and returns
   a decision-ready report (verdict, headline, exec summary, per-segment drivers,
   prioritized actions, per-analyst reads). `lib/analysis.ts` has the type + a
@@ -31,7 +44,7 @@ a segment-level results dashboard. "Message Lab" is a working title.
   Analysts / Reactions / Data) to keep them scannable instead of one long scroll.
 - The MatrAIx-donor persona panel (`lib/personas.json`) is legacy for the A/B tool
   now that it uses industry archetypes; kept for reference/roadmap.
-- Asset types (`lib/types.ts`): email / direct_mail / website. Intent keys are
+- Asset types (`lib/types.ts`): email / direct_mail / social / website. Intent keys are
   channel-neutral (dismiss, engage_no_gift, save_for_later, give_*) with per-channel
   display labels and per-channel questionnaire wording in the route. Website tests
   send two screenshots as vision inputs; the client downscales uploads to ≤1568px
@@ -45,7 +58,9 @@ a segment-level results dashboard. "Message Lab" is a working title.
   "Load demo results" button for zero-cost demos. No Math.random anywhere.
 - `lib/refine.ts` + `app/api/refine/route.ts`: auto-refinement loop (email /
   direct mail only). Claude diagnoses a round's results and drafts a challenger
-  to replace the losing version; client re-runs the panel up to 3 rounds/click,
+  to replace the losing version; client re-runs the panel up to
+  `MAX_REFINE_ROUNDS` (10) rounds/click, with a live session cost meter and a soft
+  confirm before it gets expensive,
   stopping when the champion holds. Carries the shared-backbone caveat in the UI.
 - `app/review` + `app/api/review/route.ts`: standalone "Review a page" tool
   (linked from the header nav). Paste a URL → the route screenshots it headless

@@ -1,6 +1,7 @@
 import type { PersonaResult, Variants } from "./types";
 import { tally, GIVE_INTENTS } from "./refine";
 import { ANALYSTS } from "./archetypes";
+import { orderedSegments } from "./util";
 
 export type Verdict = "ship_a" | "ship_b" | "rework" | "tie";
 
@@ -21,12 +22,6 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   rework: "Rework both",
   tie: "Too close to call",
 };
-
-function uniqueSegments(results: PersonaResult[]): string[] {
-  const seen: string[] = [];
-  for (const r of results) if (!seen.includes(r.giving)) seen.push(r.giving);
-  return seen;
-}
 
 // Deterministic analysis for demo mode — data-aware, no API calls, no Math.random.
 export function demoAnalysis(variants: Variants, results: PersonaResult[]): Analysis {
@@ -55,7 +50,7 @@ export function demoAnalysis(variants: Variants, results: PersonaResult[]): Anal
             t.givesB
           )} vs ${Math.min(t.givesA, t.givesB)}).`;
 
-  const segments = uniqueSegments(results).map((g) => {
+  const segments = orderedSegments(results).map((g) => {
     const rs = results.filter((r) => r.giving === g);
     const convA = rs.filter((r) => GIVE_INTENTS.includes(r.intentA)).length;
     const convB = rs.filter((r) => GIVE_INTENTS.includes(r.intentB)).length;

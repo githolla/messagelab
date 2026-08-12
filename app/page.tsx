@@ -15,9 +15,9 @@ export default function Home() {
           <span>before you hit send.</span>
         </h1>
         <p>
-          Message Lab reacts your emails, letters, and landing pages against a panel of
+          Message Lab tests your emails, letters, and landing pages against a panel of
           industry-specific customer bots, then hands you a decision: which version wins, who
-          bounces, and exactly what to change.
+          bounces, and where to focus.
         </p>
         <div className="herocta">
           <a className="btn primary" href="/test">
@@ -38,7 +38,7 @@ export default function Home() {
       {/* Meet the panel */}
       <section className="lp-panel">
         <div className="lp-eyebrow">Meet your panel</div>
-        <h2>Real audience archetypes react — specialist analysts interpret.</h2>
+        <h2>Audience archetypes react — specialist analysts interpret.</h2>
         <div className="lp-botrow">
           {sampleBots.map((a) => (
             <span className="chip" key={a.name}>

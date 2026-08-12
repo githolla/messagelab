@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { AssetType, Persona, Variants } from "@/lib/types";
+import type { AssetType, IntentChoice, Persona, Variants } from "@/lib/types";
+import { INTENT_ORDER } from "@/lib/types";
+import { callModel, extractJson, ModelError } from "@/lib/anthropic";
 
 export const maxDuration = 60;
+
+// Validate model output against the known enums/ranges so garbage (a string
+// resonance, an out-of-vocab intent, a null winner) can't skew tally() or the
+// Wilson CIs the dashboard presents as precise.
+const TRUST = new Set(["version_a", "version_b", "both_equal", "neither"]);
+const WINNER = new Set(["send_a", "send_b", "either", "neither"]);
+function coerceIntent(v: unknown): IntentChoice {
+  return INTENT_ORDER.includes(v as IntentChoice) ? (v as IntentChoice) : "engage_no_gift";
+}
+function coerce15(v: unknown): number {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.max(1, Math.min(5, n)) : 3;
+}
+function coerceEnum(v: unknown, set: Set<string>, fallback: string): string {
+  return typeof v === "string" && set.has(v) ? v : fallback;
+}
 
 const SCHEMA_HINT = `Respond with ONLY a JSON object, no markdown fences, matching:
 {
@@ -104,10 +122,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { persona, variants } = (await req.json()) as {
-    persona: Persona;
-    variants: Variants;
-  };
+  let persona: Persona;
+  let variants: Variants;
+  try {
+    const parsed = (await req.json()) as { persona: Persona; variants: Variants };
+    persona = parsed.persona;
+    variants = parsed.variants;
+  } catch {
+    return NextResponse.json({ error: "Malformed request body." }, { status: 400 });
+  }
+  if (!persona || !persona.dimensions || !variants || !variants.assetType) {
+    return NextResponse.json(
+      { error: "Request must include a persona (with dimensions) and variants." },
+      { status: 400 }
+    );
+  }
 
   const ch = CHANNELS[variants.assetType] ?? CHANNELS.email;
   const preamble = `${ch.intro} React to both, then answer the questionnaire honestly as yourself. "I would ignore this" and low ratings are valid answers. Judge each version on its own merits — there is no expected "right" answer, and preferring neither is fine.`;
@@ -149,68 +178,44 @@ ${questionnaire(ch)}`;
   }
 
   const model = process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6";
-  const body = JSON.stringify({
-    model,
-    max_tokens: 1024,
-    system: personaBlock(persona),
-    messages: [{ role: "user", content }],
-  });
 
-  // Retry transient failures (rate limits / overload / 5xx) with backoff —
-  // the panel fans out ~20 requests at once and can trip rate limits.
-  let resp: Response | null = null;
-  let lastDetail = "";
-  for (let attempt = 0; attempt < 4; attempt++) {
-    resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body,
-    });
-    if (resp.ok) break;
-    lastDetail = await resp.text();
-    const transient = resp.status === 429 || resp.status === 529 || resp.status >= 500;
-    if (!transient || attempt === 3) break;
-    const retryAfter = Number(resp.headers.get("retry-after")) || 0;
-    const wait = retryAfter ? retryAfter * 1000 : 800 * Math.pow(2, attempt);
-    await new Promise((r) => setTimeout(r, wait));
-  }
-
-  if (!resp || !resp.ok) {
-    const status = resp?.status ?? 0;
-    return NextResponse.json(
-      { error: `Model call failed (${status}): ${lastDetail.slice(0, 300)}` },
-      { status: 502 }
-    );
-  }
-
-  const data = await resp.json();
-  const text: string = data.content?.[0]?.text ?? "";
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) {
-    return NextResponse.json(
-      { error: "Model returned no parseable JSON." },
-      { status: 502 }
-    );
-  }
-
+  let text: string;
   try {
-    const parsed = JSON.parse(match[0]);
-    return NextResponse.json({
-      personaId: persona.id,
-      personaName: persona.name,
-      giving: persona.giving,
-      ...parsed,
+    text = await callModel({
+      apiKey,
       model,
-      order,
+      maxTokens: 1024,
+      system: personaBlock(persona),
+      messages: [{ role: "user", content }],
     });
-  } catch {
-    return NextResponse.json(
-      { error: "Model JSON failed to parse." },
-      { status: 502 }
-    );
+  } catch (e) {
+    const err = e instanceof ModelError ? e : new ModelError(502, "unknown error");
+    return NextResponse.json({ error: err.message }, { status: 502 });
   }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = extractJson(text);
+  } catch {
+    return NextResponse.json({ error: "Model returned no parseable JSON." }, { status: 502 });
+  }
+
+  // Validate/coerce every field before it reaches the tally + stats. The
+  // server-authored identity fields go LAST so a hallucinated persona id/name
+  // can't override the ground truth.
+  return NextResponse.json({
+    intentA: coerceIntent(parsed.intentA),
+    intentB: coerceIntent(parsed.intentB),
+    resonanceA: coerce15(parsed.resonanceA),
+    resonanceB: coerce15(parsed.resonanceB),
+    trust: coerceEnum(parsed.trust, TRUST, "neither"),
+    winner: coerceEnum(parsed.winner, WINNER, "either"),
+    rationale: typeof parsed.rationale === "string" ? parsed.rationale : "",
+    baselineIntent: coerce15(parsed.baselineIntent),
+    personaId: persona.id,
+    personaName: persona.name,
+    giving: persona.giving,
+    model,
+    order,
+  });
 }

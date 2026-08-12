@@ -4,14 +4,10 @@ import { INTENT_LABELS, INTENT_ORDER } from "@/lib/types";
 import { tally, GIVE_INTENTS } from "@/lib/refine";
 import { ANALYSTS } from "@/lib/archetypes";
 import { industry } from "@/lib/industries";
+import { orderedSegments as segments } from "@/lib/util";
+import { callModel, extractJson, ModelError } from "@/lib/anthropic";
 
 export const maxDuration = 60;
-
-function segments(results: PersonaResult[]): string[] {
-  const seen: string[] = [];
-  for (const r of results) if (!seen.includes(r.giving)) seen.push(r.giving);
-  return seen;
-}
 
 function mean(xs: number[]): string {
   return xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1) : "–";
@@ -59,11 +55,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { variants, results, industry: industryKey } = (await req.json()) as {
-    variants: Variants;
-    results: PersonaResult[];
-    industry?: string;
+  let variants: Variants;
+  let results: PersonaResult[];
+  let industryKey: string | undefined;
+  try {
+    const parsed = (await req.json()) as {
+      variants: Variants;
+      results: PersonaResult[];
+      industry?: string;
     };
+    variants = parsed.variants;
+    results = parsed.results;
+    industryKey = parsed.industry;
+  } catch {
+    return NextResponse.json({ error: "Malformed request body." }, { status: 400 });
+  }
+  if (!variants?.assetType) {
+    return NextResponse.json({ error: "Request must include variants." }, { status: 400 });
+  }
 
   if (!results?.length) {
     return NextResponse.json({ error: "No results to analyze." }, { status: 400 });
@@ -88,12 +97,13 @@ Include 4-6 keyPoints ordered most-important first — these are the reasons beh
     (a) => a.key
   ).join(", ")}), and 3-6 actions ordered most-impactful first. Ground every claim in the numbers or rationales — no generic advice.`;
 
+  const cap = (s: string) => (s || "").slice(0, 120);
   const user = `Two versions of a ${variants.assetType.replace("_", " ")} were tested against a simulated audience panel. ${industryLine}
 
-## Version A — "${variants.labelA}"
+## Version A — "${cap(variants.labelA)}"
 ${variants.assetType === "website" ? "(tested as a screenshot)" : variants.copyA}
 
-## Version B — "${variants.labelB}"
+## Version B — "${cap(variants.labelB)}"
 ${variants.assetType === "website" ? "(tested as a screenshot)" : variants.copyB}
 
 ## Panel results
@@ -105,40 +115,24 @@ ${analystList}
 Interpret the reactions into a decision-ready report. ${schema}`;
 
   const model = process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6";
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
+  let text: string;
+  try {
+    text = await callModel({
+      apiKey,
       model,
-      max_tokens: 2500,
+      maxTokens: 2500,
       system:
         "You are a team of senior conversion, trust, accessibility, copy, and brand analysts. You turn simulated-audience reactions into a crisp, evidence-driven, decision-ready report. No fluff, no hedging beyond the stated caveats.",
       messages: [{ role: "user", content: user }],
-    }),
-  });
-
-  if (!resp.ok) {
-    const detail = await resp.text();
-    return NextResponse.json(
-      { error: `Model call failed (${resp.status}): ${detail.slice(0, 300)}` },
-      { status: 502 }
-    );
-  }
-
-  const data = await resp.json();
-  const text: string = data.content?.[0]?.text ?? "";
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) {
-    return NextResponse.json({ error: "Model returned no parseable analysis." }, { status: 502 });
+    });
+  } catch (e) {
+    const err = e instanceof ModelError ? e : new ModelError(502, "unknown error");
+    return NextResponse.json({ error: err.message }, { status: 502 });
   }
   try {
-    const analysis = JSON.parse(match[0]);
+    const analysis = extractJson(text);
     return NextResponse.json({ analysis, model });
   } catch {
-    return NextResponse.json({ error: "Analysis JSON failed to parse." }, { status: 502 });
+    return NextResponse.json({ error: "Model returned no parseable analysis." }, { status: 502 });
   }
 }

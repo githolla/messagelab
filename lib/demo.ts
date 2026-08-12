@@ -1,22 +1,5 @@
 import type { IntentChoice, Persona, PersonaResult } from "./types";
-import { INTENT_ORDER } from "./types";
-
-// Deterministic pseudo-random from a string seed (no Math.random — reproducible demos).
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0) / 4294967295;
-}
-
-const GIVING_BASE: Record<string, number> = {
-  "Regular donor": 0.78,
-  Occasional: 0.55,
-  Rare: 0.32,
-  Never: 0.12,
-};
+import { fnv1aFloat, clamp } from "./util";
 
 function intentFrom(score: number): IntentChoice {
   if (score < 0.18) return "dismiss";
@@ -27,41 +10,55 @@ function intentFrom(score: number): IntentChoice {
   return "give_more";
 }
 
-export function demoResult(p: Persona, baseOverride?: number): PersonaResult {
-  const base = baseOverride ?? GIVING_BASE[p.giving] ?? 0.3;
-  const empathic =
-    p.dimensions["cog_empathy_expression"] === "High" ||
-    p.dimensions["cog_empathy_expression"] === "Very high" ||
-    p.dimensions["big5_altruism"] === "High" ||
-    p.dimensions["big5_altruism"] === "Very high";
-  const analytic =
-    p.dimensions["acad_statistics"] === "Interested" ||
-    p.dimensions["cog_precision_of_language"] === "Very precise" ||
-    p.dimensions["att_online_reviews"] === "Positive";
+// Industry/channel-neutral rationales, keyed off the demo winner — so a demo of
+// a SaaS or e-commerce message doesn't surface food-bank donation quotes. Two
+// options per outcome, picked deterministically so cards read varied.
+const RATIONALE_BANK: Record<PersonaResult["winner"], [string, string]> = {
+  send_a: [
+    "Version A's angle spoke to what I actually care about — it felt written for me, not at me.",
+    "A led with the thing that matters to me and made the next step obvious. That's what won me over.",
+  ],
+  send_b: [
+    "Version B was the clearer, more concrete pitch — the specifics are what moved me.",
+    "B got to the point and backed it up. A was warmer but vaguer, so B is the one I'd act on.",
+  ],
+  either: [
+    "Honestly both were close for me — the underlying offer matters more than the wording here.",
+    "Neither pulled ahead. If the offer's the same, I'd act on whichever I saw first.",
+  ],
+  neither: [
+    "Neither one gave me a strong enough reason to act right now — I'd move on.",
+    "I see a lot of these. Nothing here made me stop and do something about it.",
+  ],
+};
 
-  const jitterA = (hash(p.id + "a") - 0.5) * 0.3;
-  const jitterB = (hash(p.id + "b") - 0.5) * 0.3;
-  const scoreA = Math.max(0, Math.min(1, base + (empathic ? 0.14 : -0.02) + jitterA));
-  const scoreB = Math.max(0, Math.min(1, base + (analytic ? 0.12 : -0.04) + jitterB));
+/**
+ * Deterministic demo reaction (no API, no Math.random). The A-vs-B lean is
+ * derived from a hash of the archetype AND the copy being tested (`leanKey`),
+ * so different archetypes and different copy swing both directions — there is no
+ * built-in bias toward Version A.
+ */
+export function demoResult(p: Persona, baseOverride?: number, leanKey?: string): PersonaResult {
+  const base = baseOverride ?? 0.3;
+  const lean = (fnv1aFloat(`${p.giving}|lean|${leanKey ?? ""}`) - 0.5) * 0.3;
+  const jitterA = (fnv1aFloat(p.id + "a") - 0.5) * 0.24;
+  const jitterB = (fnv1aFloat(p.id + "b") - 0.5) * 0.24;
+  const scoreA = clamp(base + lean + jitterA, 0, 1);
+  const scoreB = clamp(base - lean + jitterB, 0, 1);
 
-  const resonanceA = Math.max(1, Math.min(5, Math.round(scoreA * 4 + (empathic ? 1.4 : 0.8))));
-  const resonanceB = Math.max(1, Math.min(5, Math.round(scoreB * 4 + (analytic ? 1.2 : 0.6))));
+  const resonanceA = clamp(Math.round(scoreA * 4 + 1), 1, 5);
+  const resonanceB = clamp(Math.round(scoreB * 4 + 1), 1, 5);
 
-  const winner =
-    Math.abs(scoreA - scoreB) < 0.04
-      ? scoreA + scoreB < 0.35
-        ? ("neither" as const)
-        : ("either" as const)
+  const winner: PersonaResult["winner"] =
+    Math.abs(scoreA - scoreB) < 0.06
+      ? scoreA + scoreB < 0.4
+        ? "neither"
+        : "either"
       : scoreA > scoreB
-        ? ("send_a" as const)
-        : ("send_b" as const);
+        ? "send_a"
+        : "send_b";
 
-  const rationaleBank = {
-    send_a: `"The shelf where the canned vegetables usually sit was bare" — that image stuck with me more than any statistic could.`,
-    send_b: `"$50 provides 200 meals" told me exactly what my money does. The story version felt manipulative by comparison.`,
-    either: `Both landed about the same for me — the match offer ("your gift is doubled") is what actually matters.`,
-    neither: `Honestly, I get a dozen of these a month. Neither subject line would have survived my inbox.`,
-  };
+  const pick = RATIONALE_BANK[winner][fnv1aFloat(p.id + "r") < 0.5 ? 0 : 1];
 
   return {
     personaId: p.id,
@@ -80,11 +77,7 @@ export function demoResult(p: Persona, baseOverride?: number): PersonaResult {
             ? "both_equal"
             : "neither",
     winner,
-    rationale: rationaleBank[winner],
-    baselineIntent: Math.max(1, Math.min(5, Math.round(base * 5 + hash(p.id + "c")))),
+    rationale: pick,
+    baselineIntent: clamp(Math.round(base * 5 + fnv1aFloat(p.id + "c")), 1, 5),
   };
-}
-
-export function intentIndex(i: IntentChoice): number {
-  return INTENT_ORDER.indexOf(i);
 }

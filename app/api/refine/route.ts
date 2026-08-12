@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PersonaResult, Variants } from "@/lib/types";
 import { INTENT_LABELS, INTENT_ORDER } from "@/lib/types";
 import { tally } from "@/lib/refine";
+import { callModel, extractJson, ModelError } from "@/lib/anthropic";
 
 export const maxDuration = 60;
 
 const CHANNEL_NOUN = { email: "email", direct_mail: "direct mail letter", social: "social media post" } as const;
+
+/** Cap user-controlled strings before they enter a prompt header. */
+const cap = (s: string, n = 120) => (s || "").slice(0, n);
 
 function mean(xs: number[]): string {
   return xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1) : "–";
@@ -60,10 +64,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { variants, results } = (await req.json()) as {
-    variants: Variants;
-    results: PersonaResult[];
-  };
+  let variants: Variants;
+  let results: PersonaResult[];
+  try {
+    const parsed = (await req.json()) as { variants: Variants; results: PersonaResult[] };
+    variants = parsed.variants;
+    results = parsed.results;
+  } catch {
+    return NextResponse.json({ error: "Malformed request body." }, { status: 400 });
+  }
+  if (!variants?.assetType) {
+    return NextResponse.json({ error: "Request must include variants." }, { status: 400 });
+  }
 
   if (variants.assetType === "website") {
     return NextResponse.json(
@@ -89,13 +101,13 @@ export async function POST(req: NextRequest) {
         ? "In-feed post format (hook line, body, any CTA/hashtags). Same rough length as the tested versions."
         : "Letter format (salutation, body, signature, PS). Same rough length as the tested versions.";
 
-  const user = `Two versions of a ${noun} were tested on a simulated donor persona panel. The goal is to maximize the number of personas who would give. Version ${champion.toUpperCase()} ("${champLabel}") is the current best, with ${champGives} of ${results.length} personas willing to give.
+  const user = `Two versions of a ${noun} were tested on a simulated donor persona panel. The goal is to maximize the number of personas who would give. Version ${champion.toUpperCase()} ("${cap(champLabel)}") is the current best, with ${champGives} of ${results.length} personas willing to give.
 
-## Version A — "${variants.labelA}"
+## Version A — "${cap(variants.labelA)}"
 
 ${variants.copyA}
 
-## Version B — "${variants.labelB}"
+## Version B — "${cap(variants.labelB)}"
 
 ${variants.copyB}
 
@@ -111,44 +123,28 @@ ${summarize(variants, results)}
 Respond with ONLY a JSON object, no markdown fences:
 {"diagnosis": "...", "label": "short name for the new draft, e.g. \\"R2 — story + concrete math\\"", "copy": "the full draft"}`;
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
+  let text: string;
+  try {
+    text = await callModel({
+      apiKey,
       model: process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6",
-      max_tokens: 2500,
+      maxTokens: 2500,
       system:
         "You are a senior nonprofit fundraising copywriter and message-testing analyst. Precise, evidence-driven, no fluff.",
       messages: [{ role: "user", content: user }],
-    }),
-  });
-
-  if (!resp.ok) {
-    const detail = await resp.text();
-    return NextResponse.json(
-      { error: `Model call failed (${resp.status}): ${detail.slice(0, 300)}` },
-      { status: 502 }
-    );
-  }
-
-  const data = await resp.json();
-  const text: string = data.content?.[0]?.text ?? "";
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) {
-    return NextResponse.json({ error: "Model returned no parseable JSON." }, { status: 502 });
+    });
+  } catch (e) {
+    const err = e instanceof ModelError ? e : new ModelError(502, "unknown error");
+    return NextResponse.json({ error: err.message }, { status: 502 });
   }
 
   try {
-    const parsed = JSON.parse(match[0]);
+    const parsed = extractJson<{ copy?: string; label?: string; diagnosis?: string }>(text);
     if (!parsed.copy || !parsed.label || !parsed.diagnosis) {
       return NextResponse.json({ error: "Model draft was incomplete." }, { status: 502 });
     }
     return NextResponse.json({ ...parsed, champion });
   } catch {
-    return NextResponse.json({ error: "Model JSON failed to parse." }, { status: 502 });
+    return NextResponse.json({ error: "Model returned no parseable JSON." }, { status: 502 });
   }
 }

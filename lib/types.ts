@@ -55,33 +55,33 @@ export const INTENT_LABELS: Record<AssetType, Record<IntentChoice, string>> = {
     dismiss: "Delete unread",
     engage_no_gift: "Read, no action",
     save_for_later: "Save for later",
-    give_small: "Convert, low",
-    give_suggested: "Convert, mid",
-    give_more: "Convert, high",
+    give_small: "Convert (small)",
+    give_suggested: "Convert (suggested)",
+    give_more: "Convert (larger)",
   },
   direct_mail: {
     dismiss: "Toss unopened",
     engage_no_gift: "Read, no action",
     save_for_later: "Set aside",
-    give_small: "Convert, low",
-    give_suggested: "Convert, mid",
-    give_more: "Convert, high",
+    give_small: "Convert (small)",
+    give_suggested: "Convert (suggested)",
+    give_more: "Convert (larger)",
   },
   social: {
     dismiss: "Scroll past",
     engage_no_gift: "Read, no action",
     save_for_later: "Save / bookmark",
-    give_small: "Convert, low",
-    give_suggested: "Convert, mid",
-    give_more: "Convert, high",
+    give_small: "Convert (small)",
+    give_suggested: "Convert (suggested)",
+    give_more: "Convert (larger)",
   },
   website: {
     dismiss: "Leave page",
     engage_no_gift: "Browse, no action",
     save_for_later: "Come back later",
-    give_small: "Convert, low",
-    give_suggested: "Convert, mid",
-    give_more: "Convert, high",
+    give_small: "Convert (small)",
+    give_suggested: "Convert (suggested)",
+    give_more: "Convert (larger)",
   },
 };
 
@@ -94,7 +94,6 @@ export const INTENT_ORDER: IntentChoice[] = [
   "give_more",
 ];
 
-export const GIVING_ORDER = ["Regular donor", "Occasional", "Rare", "Never"];
 
 // Neutral display labels for the panel's engagement segments (the underlying
 // persona attribute is prior giving/engagement frequency).

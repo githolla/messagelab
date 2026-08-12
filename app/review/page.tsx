@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { INDUSTRIES } from "@/lib/industries";
 
 interface ReviewIssue {
@@ -59,6 +59,7 @@ export default function ReviewPage() {
   const [context, setContext] = useState("");
   const [reviewedFor, setReviewedFor] = useState<string | null>(null);
   const [rtab, setRtab] = useState<ReviewTab>("fixes");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function submit(body: { url?: string; image?: string }) {
     setBusy(true);
@@ -96,8 +97,9 @@ export default function ReviewPage() {
         </p>
         <div className="grid2" style={{ marginBottom: 12 }}>
           <div>
-            <label className="fld">Industry</label>
+            <label className="fld" htmlFor="rev-industry">Industry</label>
             <select
+              id="rev-industry"
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
               disabled={busy}
@@ -110,8 +112,9 @@ export default function ReviewPage() {
             </select>
           </div>
           <div>
-            <label className="fld">Context (optional)</label>
+            <label className="fld" htmlFor="rev-context">Context (optional)</label>
             <input
+              id="rev-context"
               type="text"
               placeholder="Audience, page goal, brand voice…"
               value={context}
@@ -121,8 +124,10 @@ export default function ReviewPage() {
             />
           </div>
         </div>
+        <label className="fld" htmlFor="rev-url">Page URL</label>
         <div className="runbar">
           <input
+            id="rev-url"
             type="text"
             placeholder="https://example.com"
             value={url}
@@ -140,24 +145,32 @@ export default function ReviewPage() {
         </div>
         <p className="note" style={{ marginTop: 10 }}>
           Site blocks headless browsers or needs a login?{" "}
-          <label className="linklike">
+          <button
+            type="button"
+            className="linklike"
+            style={{ background: "none", border: 0, font: "inherit", padding: 0 }}
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+          >
             Upload a screenshot instead
-            <input
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                try {
-                  submit({ image: await fileToDataUrl(file) });
-                } catch {
-                  setError("Could not read that image file.");
-                }
-              }}
-            />
-          </label>
+          </button>
           .
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            // Visually hidden but kept in the tab order via the button above.
+            style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap", border: 0 }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                submit({ image: await fileToDataUrl(file) });
+              } catch {
+                setError("Could not read that image file.");
+              }
+            }}
+          />
         </p>
         {error && <p className="error">{error}</p>}
       </section>
@@ -191,7 +204,7 @@ export default function ReviewPage() {
                 ["strengths", `Strengths${review.strengths?.length ? ` (${review.strengths.length})` : ""}`],
                 ["screenshot", "Screenshot"],
               ] as [ReviewTab, string][]).map(([k, lbl]) => (
-                <button key={k} className={rtab === k ? "on" : ""} onClick={() => setRtab(k)}>
+                <button key={k} className={rtab === k ? "on" : ""} aria-pressed={rtab === k} onClick={() => setRtab(k)}>
                   {lbl}
                 </button>
               ))}

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { industry } from "@/lib/industries";
+import { assertPublicUrl } from "@/lib/net";
+import { callModel, extractJson, ModelError } from "@/lib/anthropic";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,16 +27,10 @@ const SYSTEM =
 type Shot = { dataUrl: string; note: string };
 
 async function capture(url: string): Promise<Shot> {
-  // Validate + normalize the URL; only http(s).
-  let target: URL;
-  try {
-    target = new URL(url);
-  } catch {
-    throw new Error("That doesn't look like a valid URL.");
-  }
-  if (target.protocol !== "http:" && target.protocol !== "https:") {
-    throw new Error("Only http(s) URLs can be captured.");
-  }
+  // SSRF guard: http(s) only AND the hostname must resolve entirely to public
+  // addresses — no loopback/private/link-local ranges or the metadata IP.
+  const safeUrl = await assertPublicUrl(url);
+  const target = new URL(safeUrl);
 
   const isServerless = !!process.env.AWS_LAMBDA_FUNCTION_VERSION || process.env.VERCEL === "1";
   const puppeteer = (await import("puppeteer-core")).default;
@@ -58,6 +54,9 @@ async function capture(url: string): Promise<Shot> {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
     await page.goto(target.toString(), { waitUntil: "networkidle2", timeout: 30000 });
+    // Redirect-escape guard: a public URL can 3xx to an internal host, so
+    // re-validate where we actually landed before screenshotting it.
+    await assertPublicUrl(page.url());
     // Above-the-fold + a bit more is what a donor first meets; cap height so the
     // vision payload stays small.
     const buf = (await page.screenshot({
@@ -83,12 +82,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { url, image, industry: industryKey, context } = (await req.json()) as {
-    url?: string;
-    image?: string;
-    industry?: string;
-    context?: string;
-  };
+  let url: string | undefined;
+  let image: string | undefined;
+  let industryKey: string | undefined;
+  let context: string | undefined;
+  try {
+    const parsed = (await req.json()) as {
+      url?: string;
+      image?: string;
+      industry?: string;
+      context?: string;
+    };
+    ({ url, image, industry: industryKey, context } = parsed);
+  } catch {
+    return NextResponse.json({ error: "Malformed request body." }, { status: 400 });
+  }
 
   const ind = industry(industryKey);
   const focusParts: string[] = [];
@@ -121,20 +129,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Provide a URL or a screenshot." }, { status: 400 });
   }
 
-  const m = shot.dataUrl.match(/^data:(image\/[a-z]+);base64,(.+)$/);
+  const m = shot.dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
   if (!m) return NextResponse.json({ error: "Screenshot encoding failed." }, { status: 500 });
 
   const model = process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6";
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
+  let text: string;
+  try {
+    text = await callModel({
+      apiKey,
       model,
-      max_tokens: 2000,
+      maxTokens: 2000,
       system: SYSTEM,
       messages: [
         {
@@ -148,25 +152,13 @@ export async function POST(req: NextRequest) {
           ],
         },
       ],
-    }),
-  });
-
-  if (!resp.ok) {
-    const detail = await resp.text();
-    return NextResponse.json(
-      { error: `Model call failed (${resp.status}): ${detail.slice(0, 300)}` },
-      { status: 502 }
-    );
-  }
-
-  const data = await resp.json();
-  const text: string = data.content?.[0]?.text ?? "";
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) {
-    return NextResponse.json({ error: "Model returned no parseable review." }, { status: 502 });
+    });
+  } catch (e) {
+    const err = e instanceof ModelError ? e : new ModelError(502, "unknown error");
+    return NextResponse.json({ error: err.message }, { status: 502 });
   }
   try {
-    const review = JSON.parse(match[0]);
+    const review = extractJson(text);
     return NextResponse.json({
       review,
       screenshot: shot.dataUrl,
