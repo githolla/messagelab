@@ -474,14 +474,19 @@ figure.chart .capsub { font-size: 12px; color: var(--ink-3); font-weight: 400; }
 .groupstat b { color: var(--ink); font-variant-numeric: tabular-nums; }
 
 .participants { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 4px; }
-.pcard { border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 11px; padding: 13px 15px; background: var(--card); }
+.pcard {
+  display: block; width: 100%; text-align: left; font: inherit; cursor: pointer;
+  border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 11px;
+  padding: 13px 15px; background: var(--card); transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+}
+.pcard:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
 .pcard.a { border-left-color: var(--series-a); }
 .pcard.b { border-left-color: var(--series-b); }
 .pcard.either { border-left-color: var(--neutral-bar); }
 .phead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .phead .ico { width: 26px; height: 26px; }
 .pwho { flex: 1; min-width: 0; }
-.pname { font-size: 13px; font-weight: 650; }
+.pname { font-size: 13px; font-weight: 650; color: var(--ink); }
 .pseg { font-size: 10.5px; color: var(--ink-3); font-family: var(--mono); }
 .pick {
   font-family: var(--mono); font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
@@ -490,10 +495,36 @@ figure.chart .capsub { font-size: 12px; color: var(--ink-3); font-weight: 400; }
 .pick.a { background: #eaf1f8; color: #2d557f; border-color: #cadcee; }
 .pick.b { background: #eef6e0; color: #4d7314; border-color: #d5e8b6; }
 .preact { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; font-style: italic; }
-.pdetails { margin-top: 10px; }
-.pdetails summary { cursor: pointer; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--primary); }
-.pdrow { font-size: 12px; color: var(--ink-2); margin-top: 7px; line-height: 1.5; }
-.pdrow b { color: var(--ink); }
+.pmore { margin-top: 9px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--primary); }
+
+/* Participant detail modal */
+.pmodal-bg {
+  position: fixed; inset: 0; background: rgba(20, 22, 28, 0.5); backdrop-filter: blur(2px); z-index: 100;
+  display: flex; align-items: flex-start; justify-content: center; padding: 44px 20px; overflow-y: auto;
+}
+.pmodal {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-md);
+  max-width: 520px; width: 100%; padding: 26px 26px 24px; position: relative;
+}
+.pmodal-x { position: absolute; top: 14px; right: 16px; border: 0; background: transparent; font-size: 24px; line-height: 1; color: var(--ink-3); cursor: pointer; }
+.pmodal-x:hover { color: var(--ink); }
+.pm-head { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; padding-right: 24px; }
+.pm-head .ico { width: 34px; height: 34px; border-radius: 9px; font-size: 11px; }
+.pm-name { font-family: var(--serif); font-size: 19px; font-weight: 600; }
+.pm-sec { margin-bottom: 18px; }
+.pm-k { font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin-bottom: 7px; }
+.pm-p { font-size: 13.5px; color: var(--ink-2); margin: 0; line-height: 1.6; }
+.pm-quote { font-size: 14px; color: var(--ink); margin: 0; line-height: 1.6; font-style: italic; border-left: 2px solid var(--line); padding-left: 12px; }
+.pm-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.pm-bl { font-family: var(--mono); font-size: 10px; color: var(--ink-3); width: 12px; }
+.pm-track { flex: 1; height: 9px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.pm-fill { height: 100%; border-radius: 5px; }
+.pm-fill.a { background: var(--series-a); }
+.pm-fill.b { background: var(--series-b); }
+.pm-bar b { font-family: var(--mono); font-size: 12px; width: 34px; text-align: right; color: var(--ink); }
+.pm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; margin-bottom: 16px; }
+.pm-cell .pm-v { font-size: 13px; color: var(--ink); margin-top: 2px; }
+.pm-meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); border-top: 1px solid var(--line-2); padding-top: 12px; letter-spacing: 0.02em; }
 
 /* ---------- Table ---------- */
 table.results { width: 100%; border-collapse: collapse; font-size: 12.5px; }

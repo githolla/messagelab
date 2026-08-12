@@ -165,6 +165,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [reactVote, setReactVote] = useState<"all" | "send_a" | "send_b" | "either" | "neither">("all");
   const [reactSeg, setReactSeg] = useState<string>("all");
+  const [openP, setOpenP] = useState<PersonaResult | null>(null);
   // Prior versions of the two messages (newest first), captured on each change.
   const [history, setHistory] = useState<{ id: number; note: string; v: Variants }[]>([]);
   const histId = useRef(0);
@@ -391,6 +392,13 @@ export default function Home() {
   const trustB = results.filter((r) => r.trust === "version_b").length;
   const neitherCount = results.filter((r) => r.winner === "neither").length;
 
+
+  // Participant pick/trust label helpers (shared by the cards and the detail modal).
+  const pickCls = (w: string) => (w === "send_a" ? "a" : w === "send_b" ? "b" : w === "either" ? "either" : "neither");
+  const pickLabel = (w: string) =>
+    w === "send_a" ? "Chose A" : w === "send_b" ? "Chose B" : w === "either" ? "No preference" : "Rejected both";
+  const trustLabel = (t: string) =>
+    t === "version_a" ? "Version A" : t === "version_b" ? "Version B" : t === "both_equal" ? "Both equally" : "Neither";
 
   // A clean, data-driven verdict line — avoids leaning on the model's (sometimes
   // awkward) auto-generated labels for the headline.
@@ -778,12 +786,6 @@ export default function Home() {
               { k: "either", n2: eitherCount, label: "No preference", color: "var(--neutral-bar)" },
               { k: "neither", n2: neitherCount, label: "Rejected both", color: "var(--line)" },
             ];
-            const pickCls = (w: string) =>
-              w === "send_a" ? "a" : w === "send_b" ? "b" : w === "either" ? "either" : "neither";
-            const pickLabel = (w: string) =>
-              w === "send_a" ? "Chose A" : w === "send_b" ? "Chose B" : w === "either" ? "No preference" : "Rejected both";
-            const trustLabel = (t: string) =>
-              t === "version_a" ? "Version A" : t === "version_b" ? "Version B" : t === "both_equal" ? "Both equally" : "Neither";
             const votes = [
               { key: "all", label: "Everyone" },
               { key: "send_a", label: "Chose A" },
@@ -857,7 +859,7 @@ export default function Home() {
 
                 <div className="participants">
                   {filtered.map((r) => (
-                    <div key={r.personaId} className={`pcard ${pickCls(r.winner)}`}>
+                    <button key={r.personaId} className={`pcard ${pickCls(r.winner)}`} onClick={() => setOpenP(r)}>
                       <div className="phead">
                         <span className="ico">{monogram(r.giving)}</span>
                         <div className="pwho">
@@ -867,17 +869,8 @@ export default function Home() {
                         <span className={`pick ${pickCls(r.winner)}`}>{pickLabel(r.winner)}</span>
                       </div>
                       <div className="preact">&ldquo;{r.rationale}&rdquo;</div>
-                      <details className="pdetails">
-                        <summary>Ratings &amp; intent</summary>
-                        <div className="pdrow">
-                          Rated: A <b>{r.resonanceA}/5</b> · B <b>{r.resonanceB}/5</b>
-                        </div>
-                        <div className="pdrow">
-                          Would: A — {INTENT_LABELS[resultsAsset][r.intentA]} · B — {INTENT_LABELS[resultsAsset][r.intentB]}
-                        </div>
-                        <div className="pdrow">Trusted more: {trustLabel(r.trust)}</div>
-                      </details>
-                    </div>
+                      <div className="pmore">View full analysis →</div>
+                    </button>
                   ))}
                 </div>
                 {filtered.length === 0 && <p className="note">No participants match this filter.</p>}
@@ -935,6 +928,57 @@ export default function Home() {
               )}
             </section>
           )}
+
+          {/* Participant detail — full read on one person */}
+          {openP && (() => {
+            const how = archetypes.find((a) => a.name === openP.giving)?.how;
+            const resPct = (v: number) => Math.max(4, (v / 5) * 100);
+            return (
+              <div className="pmodal-bg" onClick={() => setOpenP(null)}>
+                <div className="pmodal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                  <button className="pmodal-x" onClick={() => setOpenP(null)} aria-label="Close">×</button>
+                  <div className="pm-head">
+                    <span className="ico">{monogram(openP.giving)}</span>
+                    <div className="pwho">
+                      <div className="pm-name">{openP.personaName}</div>
+                      <div className="pseg">{segmentLabel(openP.giving)}</div>
+                    </div>
+                    <span className={`pick ${pickCls(openP.winner)}`}>{pickLabel(openP.winner)}</span>
+                  </div>
+
+                  {how && (
+                    <div className="pm-sec">
+                      <div className="pm-k">How this person reads a message</div>
+                      <p className="pm-p">{how}</p>
+                    </div>
+                  )}
+
+                  <div className="pm-sec">
+                    <div className="pm-k">In their words</div>
+                    <p className="pm-quote">&ldquo;{openP.rationale}&rdquo;</p>
+                  </div>
+
+                  <div className="pm-sec">
+                    <div className="pm-k">How they rated each version</div>
+                    <div className="pm-bar"><span className="pm-bl">A</span><div className="pm-track"><div className="pm-fill a" style={{ width: `${resPct(openP.resonanceA)}%` }} /></div><b>{openP.resonanceA}/5</b></div>
+                    <div className="pm-bar"><span className="pm-bl">B</span><div className="pm-track"><div className="pm-fill b" style={{ width: `${resPct(openP.resonanceB)}%` }} /></div><b>{openP.resonanceB}/5</b></div>
+                  </div>
+
+                  <div className="pm-grid">
+                    <div className="pm-cell"><div className="pm-k">Would do · A</div><div className="pm-v">{INTENT_LABELS[resultsAsset][openP.intentA]}</div></div>
+                    <div className="pm-cell"><div className="pm-k">Would do · B</div><div className="pm-v">{INTENT_LABELS[resultsAsset][openP.intentB]}</div></div>
+                    <div className="pm-cell"><div className="pm-k">Trusted more</div><div className="pm-v">{trustLabel(openP.trust)}</div></div>
+                    <div className="pm-cell"><div className="pm-k">Baseline intent</div><div className="pm-v">{openP.baselineIntent}/5 to act at all</div></div>
+                  </div>
+
+                  <div className="pm-meta">
+                    Saw {openP.order === "ba" ? "B first, then A" : "A first, then B"}
+                    {openP.model ? ` · simulated by ${openP.model}` : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </>
       )}
     </>
