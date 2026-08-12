@@ -79,11 +79,12 @@ export async function POST(req: NextRequest) {
   "verdict": "ship_a" | "ship_b" | "rework" | "tie",
   "headline": "one punchy sentence — the single most important takeaway",
   "summary": "2-4 sentence executive summary a busy stakeholder can act on",
+  "keyPoints": [ {"point": "the finding in a few words", "why": "one sentence of reasoning grounded in a specific number or a quoted reaction"} ],
   "segments": [ {"segment": "archetype name exactly as given", "driver": "what pulled this group toward acting", "barrier": "what held them back", "divergence": "how A vs B differed for them"} ],
   "actions": [ {"priority": "high" | "medium" | "low", "action": "one concrete, specific change to make"} ],
   "analysts": [ {"key": "one of the analyst keys", "read": "1-2 sentence read through that lens, grounded in the data"} ]
 }
-Include one segments entry per archetype, one analysts entry per analyst key (${ANALYSTS.map(
+Include 4-6 keyPoints ordered most-important first — these are the reasons behind the verdict, and each "why" must cite a specific count, rate, or quoted rationale (not a generalization). Include one segments entry per archetype, one analysts entry per analyst key (${ANALYSTS.map(
     (a) => a.key
   ).join(", ")}), and 3-6 actions ordered most-impactful first. Ground every claim in the numbers or rationales — no generic advice.`;
 

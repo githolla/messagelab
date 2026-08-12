@@ -8,6 +8,8 @@ export interface Analysis {
   verdict: Verdict;
   headline: string;
   summary: string;
+  /** The reasons behind the verdict, most important first — each a claim + the evidence for it. */
+  keyPoints?: { point: string; why: string }[];
   segments: { segment: string; driver: string; barrier: string; divergence: string }[];
   actions: { priority: "high" | "medium" | "low"; action: string }[];
   analysts: { key: string; read: string }[];
@@ -82,6 +84,21 @@ export function demoAnalysis(variants: Variants, results: PersonaResult[]): Anal
     { priority: "low", action: "Tighten length — several reactions mention skimming." },
   ];
 
+  const winner = winLabel ? label(winLabel as "A" | "B") : null;
+  const keyPoints: NonNullable<Analysis["keyPoints"]> = [
+    verdict === "rework"
+      ? { point: "Neither version is landing yet", why: `${t.neither} of ${n} personas would act on neither — the offer or framing needs rework before another test.` }
+      : verdict === "tie"
+        ? { point: "No clear winner yet", why: `A and B convert about equally (${t.givesA} vs ${t.givesB}); the difference is within noise at n=${n}.` }
+        : { point: `${winner} converts more of the panel`, why: `${Math.max(t.givesA, t.givesB)} of ${n} personas would act on ${winner}, vs ${Math.min(t.givesA, t.givesB)} on the other version.` },
+    strong
+      ? { point: "The gap looks meaningful", why: "The margin shows up across segments, not just one archetype — worth acting on." }
+      : { point: "Treat the gap as directional", why: `At n=${n} the margin is small; a confidence interval would overlap, so read it as a signal, not proof.` },
+    { point: "Skeptical segments want proof", why: "Archetypes that hunt for evidence held back until they saw specifics — add a concrete proof point before the ask." },
+    { point: "Concrete beats abstract", why: "In the reaction rationales, specific lines (numbers, names, a clear next step) moved more personas than general framing." },
+    { point: "The call-to-action can be sharper", why: "Several reactions mention skimming or vagueness — one specific next step would lift intent to act." },
+  ];
+
   const analysts = ANALYSTS.map((a) => ({
     key: a.key,
     read:
@@ -98,5 +115,5 @@ export function demoAnalysis(variants: Variants, results: PersonaResult[]): Anal
               : "Emotional resonance split by segment — one voice won't fit every archetype.",
   }));
 
-  return { verdict, headline, summary: headline + " " + (strong ? "" : "Treat as directional only."), segments, actions, analysts };
+  return { verdict, headline, summary: headline + " " + (strong ? "" : "Treat as directional only."), keyPoints, segments, actions, analysts };
 }

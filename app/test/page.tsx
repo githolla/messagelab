@@ -680,7 +680,22 @@ export default function Home() {
               <div className="tabbody">
                 {analysis && (
                   <>
-                    <h3 className="tabh" style={{ marginTop: 0 }}>
+                    {analysis.keyPoints && analysis.keyPoints.length > 0 && (
+                      <>
+                        <h3 className="tabh" style={{ marginTop: 0 }}>
+                          Why this verdict
+                        </h3>
+                        <ol className="keypoints">
+                          {analysis.keyPoints.map((k, i) => (
+                            <li key={i}>
+                              <div className="kp-point">{k.point}</div>
+                              <div className="kp-why">{k.why}</div>
+                            </li>
+                          ))}
+                        </ol>
+                      </>
+                    )}
+                    <h3 className="tabh" style={analysis.keyPoints?.length ? undefined : { marginTop: 0 }}>
                       What to do next
                     </h3>
                     <ul className="actionlist">
