@@ -371,6 +371,26 @@ export default function Home() {
   const givers = (k: "intentA" | "intentB") =>
     results.filter((r) => ["give_small", "give_suggested", "give_more"].includes(r[k])).length;
 
+  // Head-to-head scorecard: the key metrics for A vs B, side by side, with the
+  // winner of each row flagged. Higher is better on every metric here.
+  const scoreRows = (() => {
+    const n = results.length || 1;
+    const pct = (k: number) => Math.round((k / n) * 100);
+    const mean = (key: "resonanceA" | "resonanceB") =>
+      results.length ? results.reduce((s, r) => s + (r[key] || 0), 0) / results.length : 0;
+    const trust = (v: "version_a" | "version_b") => results.filter((r) => r.trust === v).length;
+    const gA = givers("intentA");
+    const gB = givers("intentB");
+    const win = (a: number, b: number) => (a === b ? null : a > b ? "a" : "b");
+    return [
+      { label: "Would convert", a: `${gA}`, aSub: `${pct(gA)}%`, b: `${gB}`, bSub: `${pct(gB)}%`, win: win(gA, gB) },
+      { label: "Head-to-head vote", a: `${winners.a}`, b: `${winners.b}`, win: win(winners.a, winners.b) },
+      { label: "Avg resonance", a: mean("resonanceA").toFixed(1), aSub: "of 5", b: mean("resonanceB").toFixed(1), bSub: "of 5", win: win(mean("resonanceA"), mean("resonanceB")) },
+      { label: "Felt more trustworthy", a: `${trust("version_a")}`, b: `${trust("version_b")}`, win: win(trust("version_a"), trust("version_b")) },
+    ] as { label: string; a: string; aSub?: string; b: string; bSub?: string; win: "a" | "b" | null }[];
+  })();
+  const neitherCount = results.filter((r) => r.winner === "neither").length;
+
   const canRefine = !isDemo && resultsAsset !== "website";
 
   // A representative reaction for a segment: prefer one whose vote matches the
@@ -638,47 +658,51 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Stat tiles */}
-          <section className="statrow">
-            <div className="stat">
-              <div className="v">
-                {winners.a !== winners.b && (
-                  <span
-                    className="sw"
-                    style={{ background: winners.a > winners.b ? "var(--series-a)" : "var(--series-b)" }}
-                  />
-                )}
-                {winners.a > winners.b ? "A" : winners.b > winners.a ? "B" : "Tie"}
-              </div>
-              <div className="k">Winning version</div>
-              <div className="d">{winners.a} vs {winners.b} head-to-head</div>
-            </div>
-            <div className="stat">
-              <div className="v">
-                <span className="sw" style={{ background: "var(--series-a)" }} />
-                {givers("intentA")}
-              </div>
-              <div className="k">Would convert — A</div>
-              <div className="d">{shareWithCI(givers("intentA"), results.length)}</div>
-            </div>
-            <div className="stat">
-              <div className="v">
-                <span className="sw" style={{ background: "var(--series-b)" }} />
-                {givers("intentB")}
-              </div>
-              <div className="k">Would convert — B</div>
-              <div className="d">{shareWithCI(givers("intentB"), results.length)}</div>
-            </div>
-            <div className="stat">
-              <div className="v">{results.filter((r) => r.winner === "neither").length}</div>
-              <div className="k">Rejected both</div>
-              <div className="d">signal to rework</div>
-            </div>
+          {/* Head-to-head scorecard — A vs B at a glance, winner highlighted per row */}
+          <section className="card scorecard-card">
+            <div className="vlabel">A vs B at a glance</div>
+            <table className="scorecard">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>
+                    <span className="sw" style={{ background: "var(--series-a)" }} />A · {variants.labelA}
+                  </th>
+                  <th>
+                    <span className="sw" style={{ background: "var(--series-b)" }} />B · {variants.labelB}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {scoreRows.map((row) => (
+                  <tr key={row.label}>
+                    <th scope="row">{row.label}</th>
+                    <td className={row.win === "a" ? "win a" : ""}>
+                      {row.a}
+                      {row.aSub && <span className="sc-sub">{row.aSub}</span>}
+                      {row.win === "a" && <span className="sc-win">Winner</span>}
+                    </td>
+                    <td className={row.win === "b" ? "win b" : ""}>
+                      {row.b}
+                      {row.bSub && <span className="sc-sub">{row.bSub}</span>}
+                      {row.win === "b" && <span className="sc-win">Winner</span>}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="sc-foot">
+                  <th scope="row">Rejected both</th>
+                  <td colSpan={2}>
+                    {neitherCount} of {results.length} personas would act on neither
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </section>
           <p className="statnote">
-            &ldquo;Would convert&rdquo; = the share of the panel who said they&apos;d take the
-            action; the range is a 95% confidence interval. &ldquo;Winning version&rdquo; is the
-            head-to-head vote.
+            &ldquo;Would convert&rdquo; = the share of the panel who said they&apos;d take the action
+            ({shareWithCI(givers("intentA"), results.length)} for A, {shareWithCI(givers("intentB"), results.length)} for B —
+            the range is a 95% confidence interval). &ldquo;Head-to-head vote&rdquo; is which version each
+            persona picked.
           </p>
 
           <p className="caveat">
