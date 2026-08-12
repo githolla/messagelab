@@ -248,7 +248,9 @@ export default function Home() {
   // Prior versions of the two messages (newest first), captured on each change.
   const [history, setHistory] = useState<{ id: number; note: string; v: Variants }[]>([]);
   const histId = useRef(0);
-  const resultsRef = useRef<HTMLDivElement>(null);
+  // Two-screen flow: the setup screen, then a dedicated results screen the run
+  // navigates to on completion (so setup and results are never one long page).
+  const [view, setView] = useState<"setup" | "results">("setup");
 
   useEffect(() => {
     setPastRuns(listRuns());
@@ -439,8 +441,8 @@ export default function Home() {
     setRounds([]);
     setRefineNote(null);
     setAnalysis(null);
-    scrollToResults();
     const res = await runPanel(variants);
+    goToResults();
     setRounds([{ labelA: variants.labelA, labelB: variants.labelB, ...tally(res) }]);
     const a = await analyze(variants, res);
     persistRun(variants, res, a, false);
@@ -465,7 +467,7 @@ export default function Home() {
     const a = demoAnalysis(variants, res);
     setAnalysis(a);
     persistRun(variants, res, a, true);
-    scrollToResults();
+    goToResults();
   }
 
   // Add another standard panel to the current results — the lever to fix a
@@ -588,8 +590,10 @@ export default function Home() {
     setRefining(false);
   }
 
-  function scrollToResults() {
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+  // Navigate to the dedicated results screen and start it at the top.
+  function goToResults() {
+    setView("results");
+    setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 60);
   }
 
   // ---- Derived counts (one source of truth: GIVE_INTENTS) ----
@@ -815,13 +819,15 @@ export default function Home() {
     setDone(r.results.length);
     setGeneratedAt(r.createdAt);
     setRounds([{ labelA: r.variants.labelA, labelB: r.variants.labelB, ...tally(r.results) }]);
-    scrollToResults();
+    goToResults();
   }
 
   const estCost = estimateRunCost(plannedSize, true);
 
   return (
     <>
+      {view === "setup" && (
+      <>
       <div className="pagehead">
         <h1>A/B message test</h1>
         <p>
@@ -1237,9 +1243,22 @@ export default function Home() {
         </section>
       )}
 
-      <div ref={resultsRef} />
+      </>
+      )}
 
-      {results.length > 0 && (
+      {view === "results" && (
+        <>
+          <div className="resultshead">
+            <button className="backbtn" onClick={() => { setView("setup"); window.scrollTo({ top: 0 }); }}>
+              ← Back to setup
+            </button>
+            <div className="rh-meta">
+              <b>{INDUSTRIES.find((i) => i.key === ranIndustry)?.label ?? "Results"}</b>
+              <span> · {ASSET_LABELS[resultsAsset]} · {results.length} in the room · {cohortSummary(ranFacets, ranCohortText)}</span>
+            </div>
+          </div>
+
+          {results.length > 0 && (
         <>
           {/* Verdict hero */}
           {(() => {
@@ -1705,6 +1724,8 @@ export default function Home() {
               </div>
             );
           })()}
+        </>
+      )}
         </>
       )}
     </>

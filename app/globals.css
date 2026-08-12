@@ -851,3 +851,17 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
   font-size: 12px; font-weight: 500; color: var(--ink-2);
   background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px;
 }
+
+/* ---------- Results screen header ---------- */
+.resultshead {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin: 4px 0 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line);
+}
+.backbtn {
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 8px 15px;
+  transition: border-color 0.12s, color 0.12s, background 0.12s; flex-shrink: 0;
+}
+.backbtn:hover { border-color: var(--ink-3); color: var(--ink); background: var(--bg-2); }
+.rh-meta { font-size: 13.5px; color: var(--ink-3); line-height: 1.4; }
+.rh-meta b { color: var(--ink); font-weight: 650; }
