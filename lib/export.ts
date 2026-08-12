@@ -6,9 +6,9 @@
 import type { AssetType, PersonaResult, Variants } from "./types";
 import { INTENT_LABELS, segmentLabel } from "./types";
 import { GIVE_INTENTS } from "./refine";
-import { orderedSegments } from "./util";
 import { shareWithCI, wilson } from "./stats";
 import { VERDICT_LABEL, type Analysis } from "./analysis";
+import { personaDemographics, cohortSummary, emptyCohort, type CohortFacets } from "./cohort";
 
 export interface ExportInput {
   variants: Variants;
@@ -21,6 +21,8 @@ export interface ExportInput {
   isDemo: boolean;
   generatedAt: string; // ISO timestamp
   confidence: { label: string; note: string } | null;
+  facets?: CohortFacets;
+  cohortText?: string;
 }
 
 function counts(results: PersonaResult[]) {
@@ -46,6 +48,7 @@ function counts(results: PersonaResult[]) {
 /** The full JSON payload written to disk on "Download run". */
 export function buildRunExport(input: ExportInput): Record<string, unknown> {
   const { results, variants, analysis } = input;
+  const facets = input.facets ?? emptyCohort();
   const c = counts(results);
   const n = results.length;
   return {
@@ -57,6 +60,7 @@ export function buildRunExport(input: ExportInput): Record<string, unknown> {
       industry: { key: input.industryKey, label: input.industryLabel },
       assetType: input.assetType,
       panelSize: n,
+      cohort: { summary: cohortSummary(facets, input.cohortText ?? ""), facets, description: input.cohortText ?? "" },
       presentationOrders: { ab: c.orderAB, ba: c.orderBA },
       methodology:
         "Persona-agent simulation (MatrAIx-grounded): model-dependent, hypothesis-generating, not a prediction. A/B presentation order alternated per persona; give-rates reported with 95% Wilson intervals.",
@@ -94,6 +98,7 @@ export function buildRunExport(input: ExportInput): Record<string, unknown> {
     },
     results: results.map((r) => ({
       persona: r.personaName,
+      demographics: personaDemographics(r.personaId, facets),
       segment: r.giving,
       chose: r.winner,
       trust: r.trust,
@@ -111,6 +116,7 @@ export function buildRunExport(input: ExportInput): Record<string, unknown> {
 /** A printable Markdown report — the same content, formatted for a doc/PDF. */
 export function runToMarkdown(input: ExportInput): string {
   const { results, variants, analysis } = input;
+  const facets = input.facets ?? emptyCohort();
   const c = counts(results);
   const n = results.length;
   const L: string[] = [];
@@ -118,6 +124,7 @@ export function runToMarkdown(input: ExportInput): string {
 
   L.push(`# Message test — ${analysis ? VERDICT_LABEL[analysis.verdict] : "results"}`);
   if (input.isDemo) L.push(`> **DEMO — sample data, not a real run.**`);
+  L.push("", `**Cohort:** ${cohortSummary(facets, input.cohortText ?? "")}`);
   if (analysis?.headline) L.push("", analysis.headline);
   if (input.confidence) L.push("", `**Confidence:** ${input.confidence.label} — ${input.confidence.note}.`);
 
@@ -160,8 +167,9 @@ export function runToMarkdown(input: ExportInput): string {
 
   L.push("", "## Every participant", "");
   for (const r of results) {
+    const d = personaDemographics(r.personaId, facets);
     L.push(
-      `- **${r.personaName}** (${segmentLabel(r.giving)}) — chose ${r.winner}; ` +
+      `- **${r.personaName}** (${d.age}, ${d.region}, ${segmentLabel(r.giving)}) — chose ${r.winner}; ` +
         `A: ${labels[r.intentA]} / B: ${labels[r.intentB]}. "${r.rationale}"`
     );
   }

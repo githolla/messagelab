@@ -821,3 +821,33 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
   .pmodal-bg { padding: 20px 12px; }
   .pmodal { padding: 22px 18px; }
 }
+
+/* ---------- Cohort builder ---------- */
+.cohort { border-top: 1px solid var(--line-2); margin-top: 4px; padding-top: 6px; }
+.facetgroups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 22px; margin-top: 14px; }
+@media (max-width: 640px) { .facetgroups { grid-template-columns: 1fr; } }
+.facetlabel { font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 8px; }
+.facetchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.facetchip {
+  font: inherit; font-size: 12px; font-weight: 500; color: var(--ink-2); cursor: pointer;
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.facetchip:hover:not(:disabled) { border-color: var(--ink-3); color: var(--ink); }
+.facetchip.on { background: var(--primary-tint); border-color: var(--primary-line); color: var(--primary); font-weight: 600; }
+.facetchip:disabled { opacity: 0.5; cursor: default; }
+
+/* ---------- Focus-group header + table view ---------- */
+.fgh { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 22px 0 8px; }
+.tablewrap { overflow-x: auto; margin-top: 4px; border: 1px solid var(--line); border-radius: 11px; }
+.tablewrap table.results { margin: 0; min-width: 720px; }
+.tablewrap table.results th, .tablewrap table.results td { padding: 9px 12px; white-space: nowrap; }
+.tablewrap table.results tbody tr { transition: background 0.1s; }
+.rowsub { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+
+/* ---------- Modal demographic tags ---------- */
+.pm-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pm-tag {
+  font-size: 12px; font-weight: 500; color: var(--ink-2);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px;
+}

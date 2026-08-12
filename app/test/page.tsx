@@ -7,10 +7,20 @@ import { demoResult } from "@/lib/demo";
 import { tally, GIVE_INTENTS, type RoundSummary } from "@/lib/refine";
 import { wilson, shareWithCI } from "@/lib/stats";
 import { INDUSTRIES } from "@/lib/industries";
-import { ANALYSTS, panelFor, monogram, messageAudienceKey } from "@/lib/archetypes";
+import { ANALYSTS, panelFor, monogram, messageAudienceKey, personaName, memberNo } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
 import { sampleFor, isPristineCopy, MESSAGE_TYPES, messageTypesFor } from "@/lib/samples";
 import { estimateRunCost, formatCost } from "@/lib/util";
+import {
+  FACET_GROUPS,
+  emptyCohort,
+  cohortIsEmpty,
+  cohortSummary,
+  personaDemographics,
+  cohortConditioning,
+  type CohortFacets,
+  type FacetKey,
+} from "@/lib/cohort";
 import { buildRunExport, runToMarkdown, type ExportInput } from "@/lib/export";
 import {
   listRuns,
@@ -52,22 +62,31 @@ function perFor(count: number, target: number): number {
   return Math.max(2, Math.round(target / Math.max(1, count)));
 }
 
-function buildPanel(industryKey: string, messageType: string | undefined, target: number): PanelMember[] {
+function buildPanel(
+  industryKey: string,
+  messageType: string | undefined,
+  target: number,
+  facets: CohortFacets,
+  cohortText: string
+): PanelMember[] {
   const arch = panelFor(industryKey, messageType);
   const per = perFor(arch.length, target);
   const out: PanelMember[] = [];
   for (const a of arch) {
     for (let i = 0; i < per; i++) {
+      const id = `${industryKey}:${a.name}:${i}`;
+      const demo = personaDemographics(id, facets);
       out.push({
         base: a.base,
         persona: {
-          id: `${industryKey}:${a.name}:${i}`,
-          name: `${a.name} #${i + 1}`,
+          id,
+          name: personaName(id),
           giving: a.name,
-          age: null,
+          age: demo.age,
           dimensions: {
             archetype: a.name,
             how_they_judge: a.how,
+            ...cohortConditioning(demo, cohortText),
             note: "You are one specific individual of this type — bring your own quirks, mood, and priorities. Do not answer as a generic average.",
           },
         },
@@ -120,7 +139,20 @@ export default function Home() {
   });
   const [messageType, setMessageType] = useState(MESSAGE_TYPES[0]);
   const [panelPreset, setPanelPreset] = useState<PanelPreset>("standard");
+  const [cohort, setCohort] = useState<CohortFacets>(emptyCohort);
+  const [cohortText, setCohortText] = useState("");
+  // The cohort actually used for the shown run (so displayed demographics stay
+  // stable even if the builder is edited afterward).
+  const [ranFacets, setRanFacets] = useState<CohortFacets>(emptyCohort);
+  const [ranCohortText, setRanCohortText] = useState("");
   const [drafting, setDrafting] = useState(false);
+
+  function toggleFacet(key: FacetKey, opt: string) {
+    setCohort((c) => {
+      const cur = c[key];
+      return { ...c, [key]: cur.includes(opt) ? cur.filter((o) => o !== opt) : [...cur, opt] };
+    });
+  }
   // Whether the current copy came from Auto-craft (vs a sample or the user's own).
   const [autoCrafted, setAutoCrafted] = useState(false);
 
@@ -207,8 +239,8 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [reactVote, setReactVote] = useState<"all" | "send_a" | "send_b" | "either" | "neither">("all");
   const [reactSeg, setReactSeg] = useState<string>("all");
-  const [showAll, setShowAll] = useState(false);
   const [openP, setOpenP] = useState<PersonaResult | null>(null);
+  const [detailView, setDetailView] = useState<"cards" | "table">("cards");
   const [sessionSpend, setSessionSpend] = useState(0);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [pastRuns, setPastRuns] = useState<StoredRun[]>([]);
@@ -301,15 +333,16 @@ export default function Home() {
   }
 
   async function runPanel(v: Variants): Promise<PersonaResult[]> {
-    const members = buildPanel(industry, messageType, target);
+    const members = buildPanel(industry, messageType, target, cohort, cohortText);
     setRunning(true);
     setResultsAsset(v.assetType);
     setRanVariants(v);
     setRanIndustry(industry);
+    setRanFacets(cohort);
+    setRanCohortText(cohortText);
     setError(null);
     setResults([]);
     setIsDemo(false);
-    setShowAll(false);
     setDone(0);
     setPanelSize(members.length);
     const clean = await fanOut(members, v);
@@ -367,6 +400,8 @@ export default function Home() {
       results: res,
       analysis: a,
       model: res[0]?.model ?? null,
+      facets: cohort,
+      cohortText,
     };
     setPastRuns(saveRun(run));
   }
@@ -414,13 +449,14 @@ export default function Home() {
   function runDemo() {
     setError(null);
     setIsDemo(true);
-    setShowAll(false);
-    const members = buildPanel(industry, messageType, target);
+    const members = buildPanel(industry, messageType, target, cohort, cohortText);
     const leanKey = `${variants.copyA}|${variants.copyB}`;
     const res = members.map((m) => demoResult(m.persona, m.base, leanKey));
     setResultsAsset(variants.assetType);
     setRanVariants(variants);
     setRanIndustry(industry);
+    setRanFacets(cohort);
+    setRanCohortText(cohortText);
     setResults(res);
     setPanelSize(members.length);
     setDone(members.length);
@@ -437,7 +473,7 @@ export default function Home() {
   async function addMoreReactions() {
     const v = ranVariants ?? variants;
     if (isDemo) return;
-    const members = buildPanel(ranIndustry, messageType, PANEL_PRESETS.standard.target);
+    const members = buildPanel(ranIndustry, messageType, PANEL_PRESETS.standard.target, ranFacets, ranCohortText);
     setRunning(true);
     setError(null);
     setDone(0);
@@ -575,6 +611,7 @@ export default function Home() {
 
   const shown = ranVariants ?? variants;
   const modelUsed = results[0]?.model ?? null;
+  const demoOf = (id: string) => personaDemographics(id, ranFacets);
 
   const pickCls = (w: string) => (w === "send_a" ? "a" : w === "send_b" ? "b" : w === "either" ? "either" : "neither");
   const pickLabel = (w: string) =>
@@ -667,6 +704,8 @@ export default function Home() {
       isDemo,
       generatedAt: generatedAt ?? new Date().toISOString(),
       confidence: c ? { label: c.label, note: c.note } : null,
+      facets: ranFacets,
+      cohortText: ranCohortText,
     };
   }
 
@@ -766,6 +805,8 @@ export default function Home() {
     setRanIndustry(r.industryKey);
     setVariants(r.variants);
     setRanVariants(r.variants);
+    setRanFacets(r.facets ?? emptyCohort());
+    setRanCohortText(r.cohortText ?? "");
     setResults(r.results);
     setAnalysis(r.analysis);
     setResultsAsset(r.assetType);
@@ -774,32 +815,10 @@ export default function Home() {
     setDone(r.results.length);
     setGeneratedAt(r.createdAt);
     setRounds([{ labelA: r.variants.labelA, labelB: r.variants.labelB, ...tally(r.results) }]);
-    setShowAll(false);
     scrollToResults();
   }
 
   const estCost = estimateRunCost(plannedSize, true);
-
-  // ---- Representative participant slice (default view isn't a 24-card wall) ----
-  function representative(list: PersonaResult[], count = 6): PersonaResult[] {
-    if (list.length <= count) return list;
-    const pick: PersonaResult[] = [];
-    const take = (pred: (r: PersonaResult) => boolean, k: number) => {
-      for (const r of list) {
-        if (pick.length >= count) break;
-        if (pred(r) && !pick.includes(r) && pick.filter(pred).length < k) pick.push(r);
-      }
-    };
-    take((r) => r.winner === "send_a", 2);
-    take((r) => r.winner === "send_b", 2);
-    take((r) => r.winner === "neither", 1);
-    take((r) => r.winner === "either", 1);
-    for (const r of list) {
-      if (pick.length >= count) break;
-      if (!pick.includes(r)) pick.push(r);
-    }
-    return pick;
-  }
 
   return (
     <>
@@ -960,43 +979,108 @@ export default function Home() {
           </div>
         </div>
 
-        <p className="sub" style={{ margin: "16px 0 8px" }}>
-          <strong>Audience bots</strong> — {archetypes.length} archetypes react as your panel
-          ({plannedSize} reactions total)
-          {variants.assetType !== "website" && messageAudienceKey(messageType) ? (
-            <>
-              , led by a <b style={{ color: "var(--ink)" }}>{archetypes[0].name}</b> for a{" "}
-              {messageType.toLowerCase()}
-            </>
-          ) : null}
-          :
-        </p>
-        <div className="botgrid">
-          {archetypes.map((a) => (
-            <div className="botcard" key={a.name}>
-              <div className="bt">
-                <span className="ico">{monogram(a.name)}</span>
-                {a.name}
+        {/* Cohort builder — auto-fills to a general population; dial in exact demographics */}
+        <div className="cohort">
+          <div className="fld" style={{ marginTop: 18 }}>
+            Audience cohort{" "}
+            <span className="note" style={{ textTransform: "none", letterSpacing: 0, fontFamily: "var(--sans)" }}>
+              · optional — leave blank for a general population
+            </span>
+          </div>
+          <input
+            type="text"
+            placeholder="Describe your audience — e.g. “busy parents who watch grocery prices”"
+            value={cohortText}
+            onChange={(e) => setCohortText(e.target.value)}
+            disabled={running || refining}
+            maxLength={400}
+          />
+          <div className="facetgroups">
+            {FACET_GROUPS.map((g) => (
+              <div className="facetgroup" key={g.key}>
+                <div className="facetlabel">{g.label}</div>
+                <div className="facetchips">
+                  {g.options.map((opt) => {
+                    const on = cohort[g.key].includes(opt);
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        className={`facetchip ${on ? "on" : ""}`}
+                        aria-pressed={on}
+                        onClick={() => toggleFacet(g.key, opt)}
+                        disabled={running || refining}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="bh">{a.how}</div>
-            </div>
-          ))}
+            ))}
+          </div>
+          <p className="projn">
+            Panel: <b>{cohortSummary(cohort, cohortText)}</b>
+            {!cohortIsEmpty(cohort, cohortText) && (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  className="linklike"
+                  onClick={() => {
+                    setCohort(emptyCohort());
+                    setCohortText("");
+                  }}
+                >
+                  reset to general
+                </button>
+              </>
+            )}
+          </p>
         </div>
 
-        <p className="sub" style={{ margin: "16px 0 8px" }}>
-          <strong>Analyst bots</strong> — specialists that interpret the reactions into your report:
-        </p>
-        <div className="botgrid">
-          {ANALYSTS.map((a) => (
-            <div className="botcard analyst" key={a.key}>
-              <div className="bt">
-                <span className="ico">{monogram(a.label)}</span>
-                {a.label}
-              </div>
-              <div className="bh">{a.lens}</div>
+        <details className="method" style={{ marginTop: 16 }}>
+          <summary>Preview the {archetypes.length} audience bots + {ANALYSTS.length} analysts</summary>
+          <div style={{ marginTop: 12 }}>
+            <p className="sub" style={{ margin: "4px 0 8px" }}>
+              <strong>Audience bots</strong> — {archetypes.length} archetypes react as your panel
+              ({plannedSize} reactions total)
+              {variants.assetType !== "website" && messageAudienceKey(messageType) ? (
+                <>
+                  , led by a <b style={{ color: "var(--ink)" }}>{archetypes[0].name}</b> for a{" "}
+                  {messageType.toLowerCase()}
+                </>
+              ) : null}
+              :
+            </p>
+            <div className="botgrid">
+              {archetypes.map((a) => (
+                <div className="botcard" key={a.name}>
+                  <div className="bt">
+                    <span className="ico">{monogram(a.name)}</span>
+                    {a.name}
+                  </div>
+                  <div className="bh">{a.how}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+
+            <p className="sub" style={{ margin: "16px 0 8px" }}>
+              <strong>Analyst bots</strong> — specialists that interpret the reactions into your report:
+            </p>
+            <div className="botgrid">
+              {ANALYSTS.map((a) => (
+                <div className="botcard analyst" key={a.key}>
+                  <div className="bt">
+                    <span className="ico">{monogram(a.label)}</span>
+                    {a.label}
+                  </div>
+                  <div className="bh">{a.lens}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
       </section>
 
       {/* Variants */}
@@ -1252,8 +1336,7 @@ export default function Home() {
             const filtered = results.filter(
               (r) => (reactVote === "all" || r.winner === reactVote) && (reactSeg === "all" || r.giving === reactSeg)
             );
-            const isDefault = reactVote === "all" && reactSeg === "all" && !showAll;
-            const visible = isDefault ? representative(filtered) : filtered;
+            const visible = filtered;
             return (
               <section className="card">
                 <h2 className="step">The focus group</h2>
@@ -1301,7 +1384,13 @@ export default function Home() {
                 {orderCheck() && <p className="smalln">{orderCheck()}</p>}
 
                 {/* Participants */}
-                <h3 className="tabh">Participants</h3>
+                <div className="fgh">
+                  <h3 className="tabh" style={{ margin: 0 }}>The room — all {results.length} participants</h3>
+                  <div className="seg" role="group" aria-label="Detail view" style={{ marginBottom: 0 }}>
+                    <button className={detailView === "cards" ? "on" : ""} aria-pressed={detailView === "cards"} onClick={() => setDetailView("cards")}>Cards</button>
+                    <button className={detailView === "table" ? "on" : ""} aria-pressed={detailView === "table"} onClick={() => setDetailView("table")}>Table</button>
+                  </div>
+                </div>
                 <div className="rfilters">
                   {votes.map((v) => (
                     <button
@@ -1331,26 +1420,66 @@ export default function Home() {
                   ))}
                 </div>
 
-                <div className="participants">
-                  {visible.map((r) => (
-                    <button key={r.personaId} className={`pcard ${pickCls(r.winner)}`} onClick={() => setOpenP(r)}>
-                      <div className="phead">
-                        <span className="ico">{monogram(r.giving)}</span>
-                        <div className="pwho">
-                          <div className="pname">{r.personaName}</div>
-                          <div className="pseg">{segmentLabel(r.giving)}</div>
-                        </div>
-                        <span className={`pick ${pickCls(r.winner)}`}>{pickLabel(r.winner)}</span>
-                      </div>
-                      <div className="preact">&ldquo;{r.rationale}&rdquo;</div>
-                      <div className="pmore">Open profile →</div>
-                    </button>
-                  ))}
-                </div>
-                {isDefault && filtered.length > visible.length && (
-                  <button className="showall" onClick={() => setShowAll(true)}>
-                    Show all {filtered.length} participants
-                  </button>
+                {detailView === "cards" ? (
+                  <div className="participants">
+                    {visible.map((r) => {
+                      const d = demoOf(r.personaId);
+                      return (
+                        <button key={r.personaId} className={`pcard ${pickCls(r.winner)}`} onClick={() => setOpenP(r)}>
+                          <div className="phead">
+                            <span className="ico">{monogram(r.personaName)}</span>
+                            <div className="pwho">
+                              <div className="pname">{r.personaName}</div>
+                              <div className="pseg">{d.age} · {d.region} · {segmentLabel(r.giving)}</div>
+                            </div>
+                            <span className={`pick ${pickCls(r.winner)}`}>{pickLabel(r.winner)}</span>
+                          </div>
+                          <div className="preact">&ldquo;{r.rationale}&rdquo;</div>
+                          <div className="pmore">Open profile →</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="tablewrap">
+                    <table className="results">
+                      <thead>
+                        <tr>
+                          <th>Respondent</th>
+                          <th>Age</th>
+                          <th>Region</th>
+                          <th>Type</th>
+                          <th>Chose</th>
+                          <th>Would do · A</th>
+                          <th>Would do · B</th>
+                          <th>Res A/B</th>
+                          <th>Trusted</th>
+                          <th>Saw</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visible.map((r) => {
+                          const d = demoOf(r.personaId);
+                          return (
+                            <tr key={r.personaId} onClick={() => setOpenP(r)} style={{ cursor: "pointer" }}>
+                              <td>
+                                <b>{r.personaName}</b> <span className="rowsub">{memberNo(r.personaId)}</span>
+                              </td>
+                              <td>{d.age}</td>
+                              <td>{d.region}</td>
+                              <td>{segmentLabel(r.giving)}</td>
+                              <td><span className={`pick ${pickCls(r.winner)}`}>{pickLabel(r.winner)}</span></td>
+                              <td>{INTENT_LABELS[resultsAsset][r.intentA]}</td>
+                              <td>{INTENT_LABELS[resultsAsset][r.intentB]}</td>
+                              <td>{r.resonanceA}/{r.resonanceB}</td>
+                              <td>{trustLabelOf(r.trust)}</td>
+                              <td>{r.order === "ba" ? "B" : "A"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
                 {filtered.length === 0 && <p className="note">No participants match this filter.</p>}
 
@@ -1363,10 +1492,12 @@ export default function Home() {
             );
           })()}
 
-          {/* What the analysts saw — pays off the "analysts interpret" promise */}
+          {/* What the analysts saw — collapsed by default so the focus group leads */}
           {analysis && (analysis.keyPoints?.length || analysis.segments?.length || analysis.analysts?.length) ? (
             <section className="card">
-              <h2 className="step">Why — the analyst read</h2>
+              <details className="method">
+                <summary style={{ fontSize: 15 }}>Analyst breakdown — why, what to do, by segment</summary>
+                <div style={{ marginTop: 14 }}>
 
               {analysis.keyPoints?.length ? (
                 <ol className="keypoints">
@@ -1432,6 +1563,8 @@ export default function Home() {
                   </div>
                 </>
               ) : null}
+                </div>
+              </details>
             </section>
           ) : null}
 
@@ -1516,13 +1649,28 @@ export default function Home() {
                 >
                   <button className="pmodal-x" onClick={() => setOpenP(null)} aria-label="Close">×</button>
                   <div className="pm-head">
-                    <span className="ico">{monogram(openP.giving)}</span>
+                    <span className="ico">{monogram(openP.personaName)}</span>
                     <div className="pwho">
                       <div className="pm-name" id="pm-name">{openP.personaName}</div>
-                      <div className="pseg">{segmentLabel(openP.giving)}</div>
+                      <div className="pseg">{segmentLabel(openP.giving)} · {memberNo(openP.personaId)}</div>
                     </div>
                     <span className={`pick ${pickCls(openP.winner)}`}>{pickLabel(openP.winner)}</span>
                   </div>
+
+                  {(() => {
+                    const d = demoOf(openP.personaId);
+                    return (
+                      <div className="pm-sec">
+                        <div className="pm-k">Who they are</div>
+                        <div className="pm-tags">
+                          <span className="pm-tag">{d.age}</span>
+                          <span className="pm-tag">{d.region}</span>
+                          <span className="pm-tag">{d.household}</span>
+                          <span className="pm-tag">{d.behavior}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {how && (
                     <div className="pm-sec">

@@ -6,6 +6,7 @@
 import type { AssetType, PersonaResult, Variants } from "./types";
 import type { Analysis } from "./analysis";
 import type { Verdict } from "./analysis";
+import type { CohortFacets } from "./cohort";
 
 const KEY = "messagelab.runs.v1";
 const MAX_RUNS = 12;
@@ -29,6 +30,8 @@ export interface StoredRun {
   results: PersonaResult[];
   analysis: Analysis | null;
   model: string | null;
+  facets?: CohortFacets;
+  cohortText?: string;
 }
 
 /** Summary shape for the "Past runs" strip (everything but the heavy payload). */

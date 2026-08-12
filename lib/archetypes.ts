@@ -18,6 +18,40 @@ export function monogram(name: string): string {
   return (name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "?").toUpperCase();
 }
 
+// Deterministic human name + member number for a panelist, so the focus group
+// reads as a room of named people rather than "Skimmer #1". No Math.random —
+// derived from the persona's stable id so reruns/demos are reproducible.
+const FIRST_NAMES = [
+  "Maya", "Liam", "Sofia", "Ethan", "Priya", "Noah", "Ava", "Diego", "Chloe", "Omar",
+  "Zoe", "Marcus", "Nina", "Kenji", "Aisha", "Lucas", "Elena", "Tariq", "Grace", "Andre",
+  "Yuki", "Hassan", "Clara", "Mateo", "Fatima", "Owen", "Leila", "Sven", "Rina", "Cole",
+  "Ingrid", "Rahul", "Bianca", "Theo", "Amara", "Felix", "Dara", "Nikolai", "Talia", "Wei",
+];
+const LAST_NAMES = [
+  "Chen", "Okafor", "Rossi", "Nguyen", "Patel", "Kim", "Silva", "Haddad", "Novak", "Mbeki",
+  "Torres", "Larsen", "Ahmed", "Bennett", "Kowalski", "Reyes", "Sato", "Dubois", "Weber", "Ali",
+  "Ivanova", "Costa", "Fischer", "Mensah", "Park", "Romano", "Yilmaz", "Petrov", "Kaur", "Moreau",
+];
+
+export function personaName(seed: string): string {
+  const f = FIRST_NAMES[monogramHash(seed) % FIRST_NAMES.length];
+  const l = LAST_NAMES[monogramHash(seed + "•") % LAST_NAMES.length];
+  return `${f} ${l}`;
+}
+
+export function memberNo(seed: string): string {
+  return "#" + String(1000 + (monogramHash(seed + "#") % 9000));
+}
+
+function monogramHash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 export interface Analyst {
   key: string;
   label: string;
