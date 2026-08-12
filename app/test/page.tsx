@@ -76,7 +76,7 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-type Tab = "summary" | "segments" | "analysts" | "reactions" | "data";
+type Tab = "overview" | "reasoning" | "segments" | "analysts" | "reactions" | "data" | "refine";
 
 export default function Home() {
   const [industry, setIndustry] = useState("general");
@@ -164,8 +164,7 @@ export default function Home() {
   const [refineNote, setRefineNote] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [tab, setTab] = useState<Tab>("summary");
-  const [showAllQuotes, setShowAllQuotes] = useState(false);
+  const [tab, setTab] = useState<Tab>("overview");
   const [copied, setCopied] = useState(false);
   const [reactVote, setReactVote] = useState<"all" | "send_a" | "send_b" | "either" | "neither">("all");
   const [reactSeg, setReactSeg] = useState<string>("all");
@@ -200,7 +199,6 @@ export default function Home() {
     setIsDemo(false);
     setDone(0);
     setPanelSize(members.length);
-    setShowAllQuotes(false);
     const out: PersonaResult[] = [];
     const queue = [...members];
     let firstError = "";
@@ -275,7 +273,7 @@ export default function Home() {
     setRounds([]);
     setRefineNote(null);
     setAnalysis(null);
-    setTab("summary");
+    setTab("overview");
     const res = await runPanel(variants);
     setRounds([{ labelA: variants.labelA, labelB: variants.labelB, ...tally(res) }]);
     await analyze(variants, res);
@@ -284,8 +282,7 @@ export default function Home() {
   function runDemo() {
     setError(null);
     setIsDemo(true);
-    setShowAllQuotes(false);
-    setTab("summary");
+    setTab("overview");
     const members = buildPanel(industry, messageType);
     const res = members.map((m) => demoResult(m.persona, m.base));
     setResultsAsset(variants.assetType);
@@ -829,114 +826,17 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Comparison bars — how A and B compared, uniform + captioned */}
-          <section className="card">
-            <div className="vlabel">How the panel responded</div>
-            <div className="compare">
-              {compareRows.map((row) => {
-                const win = row.a === row.b ? null : row.a > row.b ? "a" : "b";
-                return (
-                  <div className="cmp" key={row.label}>
-                    <div className="cmp-head">
-                      <span className="cmp-label">{row.label}</span>
-                      {win && <span className={`cmp-win ${win}`}>{win.toUpperCase()} leads</span>}
-                    </div>
-                    {(["a", "b"] as const).map((side) => {
-                      const val = side === "a" ? row.a : row.b;
-                      return (
-                        <div className="cmp-bar" key={side}>
-                          <span className="cmp-k">{side.toUpperCase()}</span>
-                          <div className="cmp-track">
-                            <div
-                              className={`cmp-fill ${side}${win && win !== side ? " lose" : ""}`}
-                              style={{ width: `${Math.max(3, (val / row.max) * 100)}%` }}
-                            />
-                          </div>
-                          <span className="cmp-v">{row.fmt(val)}</span>
-                        </div>
-                      );
-                    })}
-                    <div className="cmp-cap">{row.caption}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="statnote" style={{ marginTop: 18 }}>
-              &ldquo;Would act&rdquo; shares carry a 95% confidence interval — {shareWithCI(gA, results.length)} for A,{" "}
-              {shareWithCI(gB, results.length)} for B — so read small gaps as directional.
-            </p>
-          </section>
-
-          <p className="caveat">
-            Directional signal from {results.length} simulated reactions — persona-agent estimates,
-            not statistically significant at this panel size and not a prediction of real-world
-            behavior. Segment splits are descriptive only. Results depend on the persona
-            model{results[0]?.model ? ` (${results[0].model})` : ""}; confirm important calls with a
-            second model and a human read before you ship.
-          </p>
-
-          {/* Refine */}
-          {canRefine && (
-            <section className="card">
-              <h2>Refine to a plateau</h2>
-              <p className="sub">
-                Claude drafts a stronger challenger for the weaker version and re-runs the panel,
-                repeating while the conversion rate climbs and stopping when it plateaus — up to{" "}
-                {MAX_REFINE_ROUNDS} rounds, then it pauses.
-              </p>
-              <div className="runbar">
-                {refining ? (
-                  <button className="btn ghost" onClick={() => (stopRef.current = true)}>
-                    Stop after this round
-                  </button>
-                ) : (
-                  <button className="btn primary" onClick={refineLoop} disabled={running}>
-                    Auto-refine
-                  </button>
-                )}
-                <span className="note">
-                  {refineNote ?? `Up to ${MAX_REFINE_ROUNDS} rounds · stops when conversion plateaus`}
-                </span>
-              </div>
-              <p className="caveat" style={{ marginTop: 10 }}>
-                Same-model caveat: Claude drafts the challenger and Claude-simulated bots score it,
-                so a win can reflect the model preferring its own copy. Treat refined drafts as
-                strong candidates to test with people.
-              </p>
-              {rounds.length > 0 && (
-                <ol className="rounds">
-                  {rounds.map((r, i) => (
-                    <li key={i}>
-                      <div>
-                        <strong>Round {i + 1}</strong> · {r.labelA}{" "}
-                        <b>{r.votesA}–{r.votesB}</b> {r.labelB}
-                        <span className="note"> · would convert: {r.givesA} vs {r.givesB} · rejected both: {r.neither}</span>
-                      </div>
-                      {r.diagnosis && <div className="diag">{r.diagnosis}</div>}
-                      {r.draft && (
-                        <details className="draftdiff">
-                          <summary>
-                            What changed → Version {r.draft.version}: &ldquo;{r.draft.newLabel}&rdquo; replaced &ldquo;{r.draft.prevLabel}&rdquo;
-                          </summary>
-                          <DiffView before={r.draft.prevCopy} after={r.draft.newCopy} />
-                        </details>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
-          )}
-
-          {/* Tabbed detail — keeps the stats scannable instead of one long scroll */}
+          {/* One tab bar for the whole analysis — recommendation stays pinned above */}
           <section className="card">
             <div className="tabs">
               {([
-                ["summary", "Summary"],
+                ["overview", "Overview"],
+                ["reasoning", "Why & fixes"],
                 ["segments", "By segment"],
                 ["analysts", "Analysts"],
                 ["reactions", "Reactions"],
                 ["data", "Data"],
+                ...(canRefine ? ([["refine", "Refine"]] as [Tab, string][]) : []),
               ] as [Tab, string][]).map(([k, lbl]) => (
                 <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
                   {lbl}
@@ -944,7 +844,49 @@ export default function Home() {
               ))}
             </div>
 
-            {tab === "summary" && (
+            {tab === "overview" && (
+              <div className="tabbody">
+                <h3 className="tabh" style={{ marginTop: 0 }}>How the panel responded</h3>
+                <div className="compare">
+                  {compareRows.map((row) => {
+                    const win = row.a === row.b ? null : row.a > row.b ? "a" : "b";
+                    return (
+                      <div className="cmp" key={row.label}>
+                        <div className="cmp-head">
+                          <span className="cmp-label">{row.label}</span>
+                          {win && <span className={`cmp-win ${win}`}>{win.toUpperCase()} leads</span>}
+                        </div>
+                        {(["a", "b"] as const).map((side) => {
+                          const val = side === "a" ? row.a : row.b;
+                          return (
+                            <div className="cmp-bar" key={side}>
+                              <span className="cmp-k">{side.toUpperCase()}</span>
+                              <div className="cmp-track">
+                                <div
+                                  className={`cmp-fill ${side}${win && win !== side ? " lose" : ""}`}
+                                  style={{ width: `${Math.max(3, (val / row.max) * 100)}%` }}
+                                />
+                              </div>
+                              <span className="cmp-v">{row.fmt(val)}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="cmp-cap">{row.caption}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="statnote" style={{ marginTop: 18 }}>
+                  &ldquo;Would act&rdquo; shares carry a 95% confidence interval — {shareWithCI(gA, results.length)} for A,{" "}
+                  {shareWithCI(gB, results.length)} for B — so read small gaps as directional.
+                </p>
+                <h3 className="tabh">How the panel voted</h3>
+                <Legend labelA={variants.labelA} labelB={variants.labelB} />
+                <WinnerChart results={results} />
+              </div>
+            )}
+
+            {tab === "reasoning" && (
               <div className="tabbody">
                 {analysis && (
                   <>
@@ -974,11 +916,8 @@ export default function Home() {
                         </li>
                       ))}
                     </ul>
-                    <h3 className="tabh">How the panel voted</h3>
                   </>
                 )}
-                <Legend labelA={variants.labelA} labelB={variants.labelB} />
-                <WinnerChart results={results} />
               </div>
             )}
 
@@ -1149,6 +1088,66 @@ export default function Home() {
                 </button>
               </div>
             )}
+
+            {tab === "refine" && canRefine && (
+              <div className="tabbody">
+                <h3 className="tabh" style={{ marginTop: 0 }}>Refine to a plateau</h3>
+                <p className="sub">
+                  Claude drafts a stronger challenger for the weaker version and re-runs the panel,
+                  repeating while the conversion rate climbs and stopping when it plateaus — up to{" "}
+                  {MAX_REFINE_ROUNDS} rounds, then it pauses.
+                </p>
+                <div className="runbar">
+                  {refining ? (
+                    <button className="btn ghost" onClick={() => (stopRef.current = true)}>
+                      Stop after this round
+                    </button>
+                  ) : (
+                    <button className="btn primary" onClick={refineLoop} disabled={running}>
+                      Auto-refine
+                    </button>
+                  )}
+                  <span className="note">
+                    {refineNote ?? `Up to ${MAX_REFINE_ROUNDS} rounds · stops when conversion plateaus`}
+                  </span>
+                </div>
+                <p className="caveat" style={{ marginTop: 10 }}>
+                  Same-model caveat: Claude drafts the challenger and Claude-simulated bots score it,
+                  so a win can reflect the model preferring its own copy. Treat refined drafts as
+                  strong candidates to test with people.
+                </p>
+                {rounds.length > 0 && (
+                  <ol className="rounds">
+                    {rounds.map((r, i) => (
+                      <li key={i}>
+                        <div>
+                          <strong>Round {i + 1}</strong> · {r.labelA}{" "}
+                          <b>{r.votesA}–{r.votesB}</b> {r.labelB}
+                          <span className="note"> · would convert: {r.givesA} vs {r.givesB} · rejected both: {r.neither}</span>
+                        </div>
+                        {r.diagnosis && <div className="diag">{r.diagnosis}</div>}
+                        {r.draft && (
+                          <details className="draftdiff">
+                            <summary>
+                              What changed → Version {r.draft.version}: &ldquo;{r.draft.newLabel}&rdquo; replaced &ldquo;{r.draft.prevLabel}&rdquo;
+                            </summary>
+                            <DiffView before={r.draft.prevCopy} after={r.draft.newCopy} />
+                          </details>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            )}
+
+            <p className="caveat" style={{ margin: "20px 0 0" }}>
+              Directional signal from {results.length} simulated reactions — persona-agent estimates,
+              not statistically significant at this panel size and not a prediction of real-world
+              behavior. Results depend on the persona model
+              {results[0]?.model ? ` (${results[0].model})` : ""}; confirm important calls with a
+              second model and a human read before you ship.
+            </p>
           </section>
         </>
       )}
