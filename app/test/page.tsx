@@ -167,6 +167,8 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("summary");
   const [showAllQuotes, setShowAllQuotes] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reactVote, setReactVote] = useState<"all" | "send_a" | "send_b" | "either" | "neither">("all");
+  const [reactSeg, setReactSeg] = useState<string>("all");
   // Prior versions of the two messages (newest first), captured on each change.
   const [history, setHistory] = useState<{ id: number; note: string; v: Variants }[]>([]);
   const histId = useRef(0);
@@ -961,28 +963,72 @@ export default function Home() {
               </div>
             )}
 
-            {tab === "reactions" && (
-              <div className="tabbody">
-                <p className="sub">Each bot&apos;s stated reason, tagged by its winner vote.</p>
-                {results.slice(0, showAllQuotes ? results.length : 10).map((r) => (
-                  <div
-                    key={r.personaId}
-                    className={`quote ${r.winner === "send_a" ? "a" : r.winner === "send_b" ? "b" : ""}`}
-                  >
-                    {r.rationale}
-                    <div className="who">
-                      {segmentLabel(r.giving)} · voted{" "}
-                      {r.winner === "send_a" ? "Version A" : r.winner === "send_b" ? "Version B" : r.winner}
-                    </div>
+            {tab === "reactions" && (() => {
+              const voteLabel = (w: string) =>
+                w === "send_a" ? "Prefers A" : w === "send_b" ? "Prefers B" : w === "either" ? "Either" : "Neither";
+              const voteCls = (w: string) => (w === "send_a" ? "a" : w === "send_b" ? "b" : "n");
+              const votes = [
+                { key: "all", label: "All" },
+                { key: "send_a", label: "Prefer A" },
+                { key: "send_b", label: "Prefer B" },
+                { key: "either", label: "Either" },
+                { key: "neither", label: "Neither" },
+              ] as const;
+              const voteCount = (k: string) => (k === "all" ? results.length : results.filter((r) => r.winner === k).length);
+              const segs = results.reduce<string[]>((a, r) => (a.includes(r.giving) ? a : [...a, r.giving]), []);
+              const filtered = results.filter(
+                (r) => (reactVote === "all" || r.winner === reactVote) && (reactSeg === "all" || r.giving === reactSeg)
+              );
+              return (
+                <div className="tabbody">
+                  <p className="sub">
+                    Every persona&apos;s reason for its pick. Filter to talk through a group — say, everyone who
+                    preferred B, or just the skeptics.
+                  </p>
+                  <div className="rfilters">
+                    {votes.map((v) => (
+                      <button
+                        key={v.key}
+                        className={`rfchip ${voteCls(v.key)} ${reactVote === v.key ? "on" : ""}`}
+                        onClick={() => setReactVote(v.key)}
+                        disabled={v.key !== "all" && voteCount(v.key) === 0}
+                      >
+                        {v.key === "send_a" && <span className="sw" style={{ background: "var(--series-a)" }} />}
+                        {v.key === "send_b" && <span className="sw" style={{ background: "var(--series-b)" }} />}
+                        {v.label} <em>{voteCount(v.key)}</em>
+                      </button>
+                    ))}
                   </div>
-                ))}
-                {results.length > 10 && (
-                  <button className="btn ghost" style={{ marginTop: 8 }} onClick={() => setShowAllQuotes((s) => !s)}>
-                    {showAllQuotes ? "Show fewer" : `Show all ${results.length}`}
-                  </button>
-                )}
-              </div>
-            )}
+                  <div className="rfilters seg">
+                    <button className={`segchip ${reactSeg === "all" ? "on" : ""}`} onClick={() => setReactSeg("all")}>
+                      All segments
+                    </button>
+                    {segs.map((s) => (
+                      <button
+                        key={s}
+                        className={`segchip ${reactSeg === s ? "on" : ""}`}
+                        onClick={() => setReactSeg((cur) => (cur === s ? "all" : s))}
+                      >
+                        {segmentLabel(s)} <em>{results.filter((r) => r.giving === s).length}</em>
+                      </button>
+                    ))}
+                  </div>
+                  {filtered.length === 0 ? (
+                    <p className="note" style={{ marginTop: 14 }}>No reactions match this filter.</p>
+                  ) : (
+                    filtered.map((r) => (
+                      <div key={r.personaId} className={`quote ${voteCls(r.winner)}`}>
+                        <div className="qtop">
+                          <span className={`votepill ${voteCls(r.winner)}`}>{voteLabel(r.winner)}</span>
+                          <span className="qseg">{segmentLabel(r.giving)}</span>
+                        </div>
+                        {r.rationale}
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })()}
 
             {tab === "data" && (
               <div className="tabbody">
