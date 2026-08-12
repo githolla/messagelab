@@ -140,6 +140,7 @@ export default function Home() {
   const [analyzing, setAnalyzing] = useState(false);
   const [tab, setTab] = useState<Tab>("summary");
   const [showAllQuotes, setShowAllQuotes] = useState(false);
+  const [copied, setCopied] = useState(false);
   const stopRef = useRef(false);
 
   const archetypes = useMemo(() => panelFor(industry), [industry]);
@@ -346,6 +347,49 @@ export default function Home() {
 
   const canRefine = !isDemo && resultsAsset !== "website";
 
+  // A representative reaction for a segment: prefer one whose vote matches the
+  // verdict (a decisive voice), else the first with a real rationale.
+  function segQuote(segment: string): string | null {
+    const rs = results.filter((r) => r.giving === segment && r.rationale && r.rationale.length > 12);
+    if (!rs.length) return null;
+    const want =
+      analysis?.verdict === "ship_a" ? "send_a" : analysis?.verdict === "ship_b" ? "send_b" : null;
+    const pick = (want && rs.find((r) => r.winner === want)) || rs[0];
+    return pick.rationale;
+  }
+
+  // Plain-text summary a rep can paste into an email or doc.
+  function summaryText(): string {
+    if (!analysis) return "";
+    const L = [
+      `MESSAGE TEST — ${VERDICT_LABEL[analysis.verdict]}`,
+      analysis.headline,
+      "",
+      `A "${variants.labelA}" vs B "${variants.labelB}" · ${results.length} simulated reactions`,
+      `Head-to-head: A ${winners.a} / B ${winners.b}. Would convert: A ${givers("intentA")} / B ${givers("intentB")} (of ${results.length}).`,
+    ];
+    if (analysis.keyPoints?.length) {
+      L.push("", "WHY:");
+      analysis.keyPoints.forEach((k, i) => L.push(`  ${i + 1}. ${k.point} — ${k.why}`));
+    }
+    if (analysis.actions?.length) {
+      L.push("", "WHAT TO DO:");
+      analysis.actions.forEach((a) => L.push(`  [${a.priority}] ${a.action}`));
+    }
+    L.push("", "Simulated audience responses — directional signal, not a prediction. Validate with real sends.");
+    return L.join("\n");
+  }
+
+  async function copySummary() {
+    try {
+      await navigator.clipboard.writeText(summaryText());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Couldn't copy to clipboard — your browser may block it on this page.");
+    }
+  }
+
   return (
     <>
       <div className="pagehead">
@@ -541,7 +585,14 @@ export default function Home() {
         <>
           {/* Verdict hero */}
           <section className="card verdict">
-            <div className="vlabel">Recommendation</div>
+            <div className="vtop">
+              <div className="vlabel">Recommendation</div>
+              {analysis && (
+                <button className="copybtn" onClick={copySummary} title="Copy the verdict and reasoning as text">
+                  {copied ? "Copied ✓" : "Copy summary"}
+                </button>
+              )}
+            </div>
             <div className="vhead">
               <span className={`vbadge ${analysis?.verdict ?? "tie"}`}>
                 {analyzing ? "Analyzing…" : analysis ? VERDICT_LABEL[analysis.verdict] : "—"}
@@ -718,14 +769,18 @@ export default function Home() {
               <div className="tabbody">
                 {analysis && (
                   <div className="segcards">
-                    {analysis.segments.map((s, i) => (
-                      <div className="segcard" key={i}>
-                        <div className="st">{segmentLabel(s.segment)}</div>
-                        <div className="sl"><b>Driver:</b> {s.driver}</div>
-                        <div className="sl"><b>Barrier:</b> {s.barrier}</div>
-                        <div className="sl muted">{s.divergence}</div>
-                      </div>
-                    ))}
+                    {analysis.segments.map((s, i) => {
+                      const q = segQuote(s.segment);
+                      return (
+                        <div className="segcard" key={i}>
+                          <div className="st">{segmentLabel(s.segment)}</div>
+                          <div className="sl"><b>Driver:</b> {s.driver}</div>
+                          <div className="sl"><b>Barrier:</b> {s.barrier}</div>
+                          <div className="sl muted">{s.divergence}</div>
+                          {q && <div className="segquote">&ldquo;{q}&rdquo;</div>}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
                 <h3 className="tabh">Emotional resonance by segment</h3>
