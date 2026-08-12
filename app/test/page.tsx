@@ -86,10 +86,18 @@ export default function Home() {
   });
   const [messageType, setMessageType] = useState(MESSAGE_TYPES[0]);
   const [drafting, setDrafting] = useState(false);
+  // Whether the current copy came from Auto-craft (vs a sample or the user's own).
+  const [autoCrafted, setAutoCrafted] = useState(false);
 
-  // Switch industries: refill the sample copy only if the user hasn't edited it.
+  // Switch industries. If the copy was auto-crafted, re-craft it for the new
+  // industry; if it's still an untouched sample, swap in the new sample; if the
+  // user typed their own, leave it alone.
   function changeIndustry(key: string) {
     setIndustry(key);
+    if (autoCrafted) {
+      autoCraft(key);
+      return;
+    }
     setVariants((v) => {
       if (isPristineCopy(v.copyA) && isPristineCopy(v.copyB)) {
         const s = sampleFor(key);
@@ -99,14 +107,15 @@ export default function Home() {
     });
   }
 
-  async function autoCraft() {
+  async function autoCraft(overrideIndustry?: string) {
+    const ind = overrideIndustry ?? industry;
     setDrafting(true);
     setError(null);
     try {
       const resp = await fetch("/api/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ industry, assetType: variants.assetType, messageType }),
+        body: JSON.stringify({ industry: ind, assetType: variants.assetType, messageType }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -117,6 +126,7 @@ export default function Home() {
         labelB: data.labelB || v.labelB,
         copyB: data.copyB,
       }));
+      setAutoCrafted(true);
     } catch (e) {
       setError(
         (e instanceof Error ? e.message : "Auto-craft failed") +
@@ -126,6 +136,15 @@ export default function Home() {
       setDrafting(false);
     }
   }
+
+  // Grow a copy textarea to fit its content so both messages are readable
+  // side-by-side without an inner scrollbar.
+  function autoSize(el: HTMLTextAreaElement | null) {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.max(el.scrollHeight, 150) + "px";
+  }
+
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(0);
   const [panelSize, setPanelSize] = useState(0);
@@ -490,7 +509,7 @@ export default function Home() {
             </div>
             <button
               className="btn primary"
-              onClick={autoCraft}
+              onClick={() => autoCraft()}
               disabled={drafting || running || refining}
             >
               {drafting ? "Crafting…" : "Auto-craft variants"}
@@ -547,8 +566,13 @@ export default function Home() {
                       Version {v} copy
                     </label>
                     <textarea
+                      className="grow"
+                      ref={autoSize}
                       value={variants[copyKey]}
-                      onChange={(e) => setVariants({ ...variants, [copyKey]: e.target.value })}
+                      onChange={(e) => {
+                        setVariants({ ...variants, [copyKey]: e.target.value });
+                        setAutoCrafted(false);
+                      }}
                     />
                   </>
                 )}
@@ -783,7 +807,6 @@ export default function Home() {
                     })}
                   </div>
                 )}
-                <h3 className="tabh">Emotional resonance by segment</h3>
                 <Legend labelA={variants.labelA} labelB={variants.labelB} />
                 <ResonanceChart results={results} />
               </div>

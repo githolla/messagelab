@@ -120,6 +120,12 @@ export function IntentChart({
                 onMouseMove={(e) => t.show(e, `Version B · ${labels[k]}: ${countsB[i]}`)}
                 onMouseLeave={t.hide}
               />
+              {countsA[i] > 0 && (
+                <text x={cx - barW / 2 - gap / 2} y={PLOT_H - hA - 5} textAnchor="middle" fontSize="10" fontWeight="700" fill={A}>{countsA[i]}</text>
+              )}
+              {countsB[i] > 0 && (
+                <text x={cx + barW / 2 + gap / 2} y={PLOT_H - hB - 5} textAnchor="middle" fontSize="10" fontWeight="700" fill={B}>{countsB[i]}</text>
+              )}
               {labels[k].split(", ").map((line, li) => (
                 <text key={li} x={cx} y={PLOT_H + 16 + li * 13} textAnchor="middle" fontSize="10.5" fill="var(--ink-2)">
                   {line}
@@ -142,14 +148,14 @@ export function ResonanceChart({ results }: { results: PersonaResult[] }) {
     return acc;
   }, []);
   const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-  const W = 640, LBL = 160, ROW = 30, PADR = 30;
-  const H = segs.length * ROW + 24;
+  const W = 640, LBL = 150, ROW = 42, PADR = 40;
+  const H = segs.length * ROW + 26;
   const x = (v: number) => LBL + ((v - 1) / 4) * (W - LBL - PADR);
 
   return (
     <figure className="chart">
       <figcaption>
-        Emotional resonance by segment <span className="capsub">mean rating, 1–5</span>
+        Emotional resonance by segment <span className="capsub">mean rating, 1–5 · higher is stronger</span>
       </figcaption>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Resonance by segment">
         {[1, 2, 3, 4, 5].map((v) => (
@@ -177,6 +183,9 @@ export function ResonanceChart({ results }: { results: PersonaResult[] }) {
                 onMouseMove={(e) => t.show(e, `Version B · ${segmentLabel(g)}: ${mB.toFixed(1)} (n=${rs.length})`)}
                 onMouseLeave={t.hide}
               />
+              {/* Inline value labels so the numbers are readable without hovering — A above, B below. */}
+              <text x={x(mA)} y={y - 11} textAnchor="middle" fontSize="11" fontWeight="700" fill={A}>{mA.toFixed(1)}</text>
+              <text x={x(mB)} y={y + 18} textAnchor="middle" fontSize="11" fontWeight="700" fill={B}>{mB.toFixed(1)}</text>
             </g>
           );
         })}

@@ -247,6 +247,8 @@ input[type="text"], textarea, select {
 }
 select { height: 42px; cursor: pointer; }
 textarea { min-height: 220px; resize: vertical; line-height: 1.55; }
+/* Auto-growing copy fields — height set in JS to fit content, no inner scrollbar. */
+textarea.grow { min-height: 150px; overflow: hidden; resize: none; }
 input::placeholder, textarea::placeholder { color: var(--ink-3); }
 input:focus, textarea:focus, select:focus {
   outline: none;
