@@ -5,7 +5,7 @@ import type { AssetType, Persona, PersonaResult, Variants } from "@/lib/types";
 import { ASSET_LABELS, INTENT_LABELS, segmentLabel } from "@/lib/types";
 import { demoResult } from "@/lib/demo";
 import { tally, type RoundSummary } from "@/lib/refine";
-import { shareWithCI } from "@/lib/stats";
+import { shareWithCI, wilson } from "@/lib/stats";
 import { INDUSTRIES } from "@/lib/industries";
 import { ANALYSTS, panelFor, instancesPer, monogram, messageAudienceKey } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
@@ -455,6 +455,37 @@ export default function Home() {
     return `Version ${win} converted more of the panel — ${Math.max(gA, gB)} vs ${Math.min(gA, gB)} of ${n} would act.`;
   }
 
+  // How much to trust the call — driven by whether the two reply-rate confidence
+  // intervals overlap (non-overlap = a real separation at this panel size).
+  function confidence(): { level: 0 | 1 | 2 | 3; label: string; note: string } | null {
+    if (!analysis || !results.length) return null;
+    if (analysis.verdict === "rework")
+      return { level: 1, label: "Rework", note: `${neitherCount} of ${n} would act on neither version` };
+    if (analysis.verdict === "tie")
+      return { level: 1, label: "Low", note: "the two versions are within noise of each other" };
+    const a = wilson(gA, n);
+    const b = wilson(gB, n);
+    const overlap = Math.min(a.high, b.high) - Math.max(a.low, b.low);
+    if (overlap <= 0) return { level: 3, label: "High", note: "the reply-rate intervals don't overlap" };
+    if (overlap < 0.12) return { level: 2, label: "Moderate", note: `a clear lead, though the intervals still touch at n=${n}` };
+    return { level: 1, label: "Low", note: `the intervals overlap — read as directional at n=${n}` };
+  }
+
+  // The single concrete next step to take on this recommendation.
+  function nextStep(): string {
+    if (!analysis) return "";
+    const topHigh = analysis.actions?.find((a) => a.priority === "high") ?? analysis.actions?.[0];
+    if (analysis.verdict === "tie")
+      return `Refine the weaker version and re-test${canRefine ? " (try Auto-refine below)" : ""}, or decide on other factors — the panel can't separate them yet.`;
+    if (analysis.verdict === "rework")
+      return topHigh ? topHigh.action : "Rework the core offer before running another test.";
+    const win = analysis.verdict === "ship_a" ? variants.labelA : variants.labelB;
+    const letter = analysis.verdict === "ship_a" ? "A" : "B";
+    return topHigh
+      ? `Ship Version ${letter} (“${win}”) — but first: ${topHigh.action.replace(/\.$/, "")}.`
+      : `Ship Version ${letter} (“${win}”) as-is.`;
+  }
+
   const canRefine = !isDemo && resultsAsset !== "website";
 
   // A representative reaction for a segment: prefer one whose vote matches the
@@ -471,9 +502,12 @@ export default function Home() {
   // Plain-text summary a rep can paste into an email or doc.
   function summaryText(): string {
     if (!analysis) return "";
+    const c = confidence();
     const L = [
       `MESSAGE TEST — ${VERDICT_LABEL[analysis.verdict]}`,
-      analysis.headline,
+      verdictLine(),
+      c ? `Confidence: ${c.label} — ${c.note}.` : "",
+      `Next: ${nextStep()}`,
       "",
       `A "${variants.labelA}" vs B "${variants.labelB}" · ${results.length} simulated reactions`,
       `Head-to-head: A ${winners.a} / B ${winners.b}. Would convert: A ${givers("intentA")} / B ${givers("intentB")} (of ${results.length}).`,
@@ -758,6 +792,34 @@ export default function Home() {
               {analysis && <div className="vheadline">{verdictLine()}</div>}
             </div>
             {analyzing && <p className="note">The analyst bots are interpreting the reactions…</p>}
+            {analysis && (() => {
+              const c = confidence();
+              return (
+                <>
+                  {c && (
+                    <div className="confrow">
+                      <span className={`confmeter lvl${c.level}`} aria-hidden="true">
+                        <i /><i /><i />
+                      </span>
+                      <span className="conflabel">{c.label} confidence</span>
+                      <span className="confnote">— {c.note}</span>
+                    </div>
+                  )}
+                  <div className="recgrid">
+                    {analysis.keyPoints?.[0]?.point && (
+                      <div className="recline">
+                        <span className="reck">Why</span>
+                        <span>{analysis.keyPoints[0].point}.</span>
+                      </div>
+                    )}
+                    <div className="recline">
+                      <span className="reck next">Next</span>
+                      <span>{nextStep()}</span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
             <div className="vmeta">
               A · {variants.labelA} &nbsp;vs&nbsp; B · {variants.labelB}
             </div>
