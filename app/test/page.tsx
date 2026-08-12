@@ -386,25 +386,72 @@ export default function Home() {
   const givers = (k: "intentA" | "intentB") =>
     results.filter((r) => ["give_small", "give_suggested", "give_more"].includes(r[k])).length;
 
-  // Head-to-head scorecard: the key metrics for A vs B, side by side, with the
-  // winner of each row flagged. Higher is better on every metric here.
-  const scoreRows = (() => {
-    const n = results.length || 1;
-    const pct = (k: number) => Math.round((k / n) * 100);
-    const mean = (key: "resonanceA" | "resonanceB") =>
-      results.length ? results.reduce((s, r) => s + (r[key] || 0), 0) / results.length : 0;
-    const trust = (v: "version_a" | "version_b") => results.filter((r) => r.trust === v).length;
-    const gA = givers("intentA");
-    const gB = givers("intentB");
-    const win = (a: number, b: number) => (a === b ? null : a > b ? "a" : "b");
-    return [
-      { label: "Would convert", a: `${gA}`, aSub: `${pct(gA)}%`, b: `${gB}`, bSub: `${pct(gB)}%`, win: win(gA, gB) },
-      { label: "Head-to-head vote", a: `${winners.a}`, b: `${winners.b}`, win: win(winners.a, winners.b) },
-      { label: "Avg resonance", a: mean("resonanceA").toFixed(1), aSub: "of 5", b: mean("resonanceB").toFixed(1), bSub: "of 5", win: win(mean("resonanceA"), mean("resonanceB")) },
-      { label: "Felt more trustworthy", a: `${trust("version_a")}`, b: `${trust("version_b")}`, win: win(trust("version_a"), trust("version_b")) },
-    ] as { label: string; a: string; aSub?: string; b: string; bSub?: string; win: "a" | "b" | null }[];
-  })();
+  // Compact A-vs-B comparison bars — every metric on a "share of the panel"
+  // basis so the numbers are directly comparable, with a plain caption each.
+  const n = results.length || 1;
+  const gA = givers("intentA");
+  const gB = givers("intentB");
+  const mean = (key: "resonanceA" | "resonanceB") =>
+    results.length ? results.reduce((s, r) => s + (r[key] || 0), 0) / results.length : 0;
+  const trustA = results.filter((r) => r.trust === "version_a").length;
+  const trustB = results.filter((r) => r.trust === "version_b").length;
   const neitherCount = results.filter((r) => r.winner === "neither").length;
+  const eitherNeither = n - winners.a - winners.b;
+  const pct = (k: number) => Math.round((k / n) * 100);
+
+  const compareRows: {
+    label: string;
+    a: number;
+    b: number;
+    max: number;
+    fmt: (v: number) => string;
+    caption: string;
+  }[] = [
+    {
+      label: "Would act on it",
+      a: gA,
+      b: gB,
+      max: n,
+      fmt: (v) => `${v} · ${pct(v)}%`,
+      caption: `took the action the message asked for (of ${n})`,
+    },
+    {
+      label: "Preferred this version",
+      a: winners.a,
+      b: winners.b,
+      max: n,
+      fmt: (v) => `${v}`,
+      caption: `head-to-head pick · ${eitherNeither} chose either or neither`,
+    },
+    {
+      label: "Felt more trustworthy",
+      a: trustA,
+      b: trustB,
+      max: n,
+      fmt: (v) => `${v}`,
+      caption: `${n - trustA - trustB} found them equal or neither`,
+    },
+    {
+      label: "Emotional pull",
+      a: mean("resonanceA"),
+      b: mean("resonanceB"),
+      max: 5,
+      fmt: (v) => `${v.toFixed(1)} / 5`,
+      caption: "mean resonance rating, 1–5",
+    },
+  ];
+
+  // A clean, data-driven verdict line — avoids leaning on the model's (sometimes
+  // awkward) auto-generated labels for the headline.
+  function verdictLine(): string {
+    if (!analysis) return "";
+    if (analysis.verdict === "rework")
+      return `Most of the panel would act on neither version — ${neitherCount} of ${n} rejected both.`;
+    if (analysis.verdict === "tie")
+      return `Too close to call — ${gA} vs ${gB} of ${n} would act on it.`;
+    const win = analysis.verdict === "ship_a" ? "A" : "B";
+    return `Version ${win} converted more of the panel — ${Math.max(gA, gB)} vs ${Math.min(gA, gB)} of ${n} would act.`;
+  }
 
   const canRefine = !isDemo && resultsAsset !== "website";
 
@@ -699,62 +746,55 @@ export default function Home() {
               <span className={`vbadge ${analysis?.verdict ?? "tie"}`}>
                 {analyzing ? "Analyzing…" : analysis ? VERDICT_LABEL[analysis.verdict] : "—"}
               </span>
-              {analysis && <div className="vheadline">{analysis.headline}</div>}
+              {analysis && <div className="vheadline">{verdictLine()}</div>}
             </div>
-            {analysis && <p className="vsummary">{analysis.summary}</p>}
             {analyzing && <p className="note">The analyst bots are interpreting the reactions…</p>}
             <div className="vmeta">
-              Tested {results.length} reactions ·{" "}
-              {INDUSTRIES.find((i) => i.key === industry)?.label} · {ASSET_LABELS[resultsAsset]}
+              A · {variants.labelA} &nbsp;vs&nbsp; B · {variants.labelB}
+            </div>
+            <div className="vmeta">
+              {results.length} reactions · {INDUSTRIES.find((i) => i.key === industry)?.label} ·{" "}
+              {ASSET_LABELS[resultsAsset]}
             </div>
           </section>
 
-          {/* Head-to-head scorecard — A vs B at a glance, winner highlighted per row */}
-          <section className="card scorecard-card">
-            <div className="vlabel">A vs B at a glance</div>
-            <table className="scorecard">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>
-                    <span className="sw" style={{ background: "var(--series-a)" }} />A · {variants.labelA}
-                  </th>
-                  <th>
-                    <span className="sw" style={{ background: "var(--series-b)" }} />B · {variants.labelB}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {scoreRows.map((row) => (
-                  <tr key={row.label}>
-                    <th scope="row">{row.label}</th>
-                    <td className={row.win === "a" ? "win a" : ""}>
-                      {row.a}
-                      {row.aSub && <span className="sc-sub">{row.aSub}</span>}
-                      {row.win === "a" && <span className="sc-win">Winner</span>}
-                    </td>
-                    <td className={row.win === "b" ? "win b" : ""}>
-                      {row.b}
-                      {row.bSub && <span className="sc-sub">{row.bSub}</span>}
-                      {row.win === "b" && <span className="sc-win">Winner</span>}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="sc-foot">
-                  <th scope="row">Rejected both</th>
-                  <td colSpan={2}>
-                    {neitherCount} of {results.length} personas would act on neither
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          {/* Comparison bars — how A and B compared, uniform + captioned */}
+          <section className="card">
+            <div className="vlabel">How the panel responded</div>
+            <div className="compare">
+              {compareRows.map((row) => {
+                const win = row.a === row.b ? null : row.a > row.b ? "a" : "b";
+                return (
+                  <div className="cmp" key={row.label}>
+                    <div className="cmp-head">
+                      <span className="cmp-label">{row.label}</span>
+                      {win && <span className={`cmp-win ${win}`}>{win.toUpperCase()} leads</span>}
+                    </div>
+                    {(["a", "b"] as const).map((side) => {
+                      const val = side === "a" ? row.a : row.b;
+                      return (
+                        <div className="cmp-bar" key={side}>
+                          <span className="cmp-k">{side.toUpperCase()}</span>
+                          <div className="cmp-track">
+                            <div
+                              className={`cmp-fill ${side}${win && win !== side ? " lose" : ""}`}
+                              style={{ width: `${Math.max(3, (val / row.max) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="cmp-v">{row.fmt(val)}</span>
+                        </div>
+                      );
+                    })}
+                    <div className="cmp-cap">{row.caption}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="statnote" style={{ marginTop: 18 }}>
+              &ldquo;Would act&rdquo; shares carry a 95% confidence interval — {shareWithCI(gA, results.length)} for A,{" "}
+              {shareWithCI(gB, results.length)} for B — so read small gaps as directional.
+            </p>
           </section>
-          <p className="statnote">
-            &ldquo;Would convert&rdquo; = the share of the panel who said they&apos;d take the action
-            ({shareWithCI(givers("intentA"), results.length)} for A, {shareWithCI(givers("intentB"), results.length)} for B —
-            the range is a 95% confidence interval). &ldquo;Head-to-head vote&rdquo; is which version each
-            persona picked.
-          </p>
 
           <p className="caveat">
             Directional signal from {results.length} simulated reactions — persona-agent estimates,

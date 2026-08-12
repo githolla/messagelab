@@ -338,37 +338,29 @@ input:focus, textarea:focus, select:focus {
   padding: 10px 12px; margin: 6px 0 0; line-height: 1.55;
 }
 
-/* ---------- Head-to-head scorecard ---------- */
-.scorecard-card .vlabel { margin-bottom: 14px; }
-.scorecard { width: 100%; border-collapse: separate; border-spacing: 0; }
-.scorecard th, .scorecard td { padding: 12px 16px; border-top: 1px solid var(--line-2); }
-.scorecard thead th {
-  border-top: 0; text-align: right; font-family: var(--mono); font-size: 10.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); vertical-align: bottom;
+/* ---------- A-vs-B comparison bars ---------- */
+.compare { display: flex; flex-direction: column; gap: 20px; }
+.cmp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.cmp-label { font-size: 13.5px; font-weight: 650; }
+.cmp-win {
+  font-family: var(--mono); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 8px; border-radius: 5px;
 }
-.scorecard thead th:first-child { width: 40%; }
-.scorecard thead th .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
-.scorecard tbody th {
-  text-align: left; font-size: 13px; font-weight: 600; color: var(--ink-2);
+.cmp-win.a { background: #eaf1f8; color: #2d557f; }
+.cmp-win.b { background: #eef6e0; color: #4d7314; }
+.cmp-bar { display: flex; align-items: center; gap: 11px; margin-bottom: 7px; }
+.cmp-bar:last-of-type { margin-bottom: 0; }
+.cmp-k { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--ink-3); width: 12px; flex-shrink: 0; }
+.cmp-track { flex: 1; height: 12px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.cmp-fill { height: 100%; border-radius: 6px; transition: width 0.35s; }
+.cmp-fill.a { background: var(--series-a); }
+.cmp-fill.b { background: var(--series-b); }
+.cmp-fill.lose { opacity: 0.42; }
+.cmp-v {
+  font-family: var(--mono); font-size: 12px; color: var(--ink); width: 78px; text-align: right;
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
 }
-.scorecard tbody td {
-  text-align: right; font-family: var(--serif); font-size: 19px; font-weight: 600; color: var(--ink-3);
-  font-variant-numeric: tabular-nums; position: relative; width: 30%;
-}
-.scorecard td.win { color: var(--ink); }
-.scorecard td.win.a { background: #eaf1f8; }
-.scorecard td.win.b { background: #eef6e0; }
-.scorecard .sc-sub { font-family: var(--sans); font-size: 11px; font-weight: 500; color: var(--ink-3); margin-left: 5px; }
-.scorecard .sc-win {
-  display: block; font-family: var(--mono); font-size: 8.5px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.06em; margin-top: 2px;
-}
-.scorecard td.win.a .sc-win { color: #2d557f; }
-.scorecard td.win.b .sc-win { color: #4d7314; }
-.scorecard .sc-foot th, .scorecard .sc-foot td {
-  font-family: var(--sans); font-size: 12.5px; font-weight: 500; color: var(--ink-3); text-align: left;
-  background: var(--bg-2);
-}
+.cmp-cap { font-size: 11.5px; color: var(--ink-3); margin-top: 7px; line-height: 1.5; }
 
 /* ---------- Charts ---------- */
 .legend { display: flex; gap: 18px; margin: 6px 0 12px; font-size: 12.5px; color: var(--ink-2); }

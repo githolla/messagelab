@@ -115,5 +115,11 @@ export function demoAnalysis(variants: Variants, results: PersonaResult[]): Anal
               : "Emotional resonance split by segment — one voice won't fit every archetype.",
   }));
 
-  return { verdict, headline, summary: headline + " " + (strong ? "" : "Treat as directional only."), keyPoints, segments, actions, analysts };
+  const summary =
+    verdict === "rework"
+      ? "Most of the panel would act on neither version — rework the core offer before testing again."
+      : verdict === "tie"
+        ? "The two versions pull about the same share of the panel; decide on other factors, or refine and re-test."
+        : `${winner} pulled ahead on intent to act${strong ? "" : ", though the margin is small at this panel size"}. The key points below explain why.`;
+  return { verdict, headline, summary, keyPoints, segments, actions, analysts };
 }
