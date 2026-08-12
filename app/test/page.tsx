@@ -9,7 +9,7 @@ import { shareWithCI } from "@/lib/stats";
 import { INDUSTRIES } from "@/lib/industries";
 import { ANALYSTS, panelFor, instancesPer, monogram } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
-import { sampleFor, isPristineCopy, MESSAGE_TYPES } from "@/lib/samples";
+import { sampleFor, isPristineCopy, MESSAGE_TYPES, messageTypesFor } from "@/lib/samples";
 import { IntentChart, Legend, ResonanceChart, WinnerChart } from "@/components/Charts";
 import { DiffView } from "@/components/Diff";
 
@@ -94,8 +94,13 @@ export default function Home() {
   // user typed their own, leave it alone.
   function changeIndustry(key: string) {
     setIndustry(key);
+    // Swap the auto-craft message-type options to the new industry; keep the
+    // current pick if it still exists, else default to the first.
+    const list = messageTypesFor(key);
+    const mt = list.includes(messageType) ? messageType : list[0];
+    setMessageType(mt);
     if (autoCrafted) {
-      autoCraft(key);
+      autoCraft(key, mt);
       return;
     }
     setVariants((v) => {
@@ -107,15 +112,16 @@ export default function Home() {
     });
   }
 
-  async function autoCraft(overrideIndustry?: string) {
+  async function autoCraft(overrideIndustry?: string, overrideMsgType?: string) {
     const ind = overrideIndustry ?? industry;
+    const mt = overrideMsgType ?? messageType;
     setDrafting(true);
     setError(null);
     try {
       const resp = await fetch("/api/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ industry: ind, assetType: variants.assetType, messageType }),
+        body: JSON.stringify({ industry: ind, assetType: variants.assetType, messageType: mt }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -163,6 +169,7 @@ export default function Home() {
   const stopRef = useRef(false);
 
   const archetypes = useMemo(() => panelFor(industry), [industry]);
+  const msgTypes = useMemo(() => messageTypesFor(industry), [industry]);
   const plannedSize = useMemo(
     () => archetypes.length * instancesPer(archetypes.length),
     [archetypes]
@@ -500,7 +507,7 @@ export default function Home() {
                 onChange={(e) => setMessageType(e.target.value)}
                 disabled={drafting || running || refining}
               >
-                {MESSAGE_TYPES.map((m) => (
+                {msgTypes.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>

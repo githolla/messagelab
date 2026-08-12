@@ -7,7 +7,7 @@ export interface Sample {
   copyB: string;
 }
 
-// Message types the auto-craft drafter can generate (generic across industries).
+// Message types the auto-craft drafter can generate (generic default).
 export const MESSAGE_TYPES = [
   "Promotional offer",
   "Product / feature announcement",
@@ -20,6 +20,40 @@ export const MESSAGE_TYPES = [
   "Survey / feedback request",
   "Thank-you",
 ];
+
+// Industry-specific message types — the auto-craft dropdown swaps to these when
+// the industry changes. Anything not listed falls back to MESSAGE_TYPES.
+export const MESSAGE_TYPES_BY_INDUSTRY: Record<string, string[]> = {
+  ecommerce: ["Promotional offer", "Abandoned cart", "New arrival / drop", "Back in stock", "Loyalty / VIP reward", "Post-purchase / review request"],
+  saas: ["Free-trial invite", "Onboarding nudge", "Feature announcement", "Upgrade / plan prompt", "Renewal reminder", "Win-back"],
+  banking: ["New-account offer", "Savings / APY promo", "Fee-waiver offer", "Security / fraud alert", "Card / loan cross-sell", "Digital-banking nudge"],
+  finance: ["Account / funding offer", "Rate / yield promo", "Portfolio review invite", "Fee transparency", "Market update", "Referral ask"],
+  mortgage: ["Rate-drop alert", "Pre-qualification invite", "Refinance offer", "First-time buyer guide", "Application follow-up", "Closing / next steps"],
+  insurance: ["Quote invite", "Renewal reminder", "Bundle-and-save offer", "Coverage-gap review", "Claims reassurance", "Life-event check-in"],
+  realestate: ["New-listing alert", "Home-valuation offer", "Open-house invite", "Buyer consultation", "Price-drop alert", "Just-sold / market update"],
+  healthcare: ["Appointment reminder", "New-patient welcome", "Preventive-care nudge", "Program announcement", "Patient survey", "Recall / re-engagement"],
+  fitness: ["Membership offer", "Free-class / trial invite", "Challenge / program launch", "Lapsed-member win-back", "Milestone / progress", "Referral ask"],
+  education: ["Program info / apply invite", "Info-session invite", "Financial-aid nudge", "Application follow-up", "Enrollment reminder", "Alumni / donor ask"],
+  nonprofit: ["Fundraising appeal", "Year-end / matching gift", "Impact update", "Event invite", "Volunteer recruitment", "Lapsed-donor win-back"],
+  travel: ["Deal / flash sale", "Trip inspiration", "Abandoned-booking follow-up", "Loyalty reward", "Pre-trip / upsell", "Post-trip review"],
+  restaurants: ["Promotional offer", "New-menu announcement", "Reservation / event invite", "Loyalty reward", "Win-back", "Catering / group offer"],
+  automotive: ["Sales / incentive offer", "Test-drive invite", "Trade-in appraisal", "Service reminder", "Lease-end / renewal", "New-model announcement"],
+  media: ["Subscription offer", "Paywall / trial nudge", "Newsletter", "Renewal reminder", "Win-back", "Premium upsell"],
+  telecom: ["Plan / upgrade offer", "New-line / device promo", "Retention / win-back", "Bill / autopay nudge", "Service announcement", "Add-on cross-sell"],
+  energy: ["Plan / rate offer", "Renewal / contract reminder", "Efficiency program", "Enrollment invite", "Outage / service notice", "Referral ask"],
+  legal: ["Consultation invite", "Case follow-up", "Practice announcement", "Client check-in", "Referral request", "Retainer / next steps"],
+  homeservices: ["Seasonal service offer", "Free-estimate invite", "Maintenance reminder", "Post-job review request", "Membership / plan offer", "Win-back"],
+  b2b: ["Demo / meeting invite", "Case-study / proof share", "Free trial / pilot offer", "Follow-up / nurture", "Renewal / expansion", "Re-engagement"],
+  recruiting: ["Cold outreach", "Follow-up", "Re-engagement", "Interview invite", "Offer nudge", "Referral ask"],
+  government: ["Program enrollment", "Deadline reminder", "Service announcement", "Benefits / eligibility notice", "Survey / feedback", "Public-safety notice"],
+  gaming: ["New-release / launch", "Event / season announcement", "Lapsed-player win-back", "In-game offer / bundle", "Beta / early-access invite", "Community update"],
+  crypto: ["Product / listing announcement", "Fee / promo offer", "Security notice", "Onboarding nudge", "Re-engagement", "Market update"],
+};
+
+/** Message types for an industry, falling back to the generic set. */
+export function messageTypesFor(key: string): string[] {
+  return MESSAGE_TYPES_BY_INDUSTRY[key] ?? MESSAGE_TYPES;
+}
 
 // Bespoke email A/B samples for the marquee verticals. Version A = story/benefit-led,
 // Version B = offer/number-led, so the two are a real strategic contrast.
