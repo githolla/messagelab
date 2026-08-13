@@ -145,6 +145,13 @@ export default function Home() {
   }
   // Whether the current copy came from Auto-craft (vs a sample or the user's own).
   const [autoCrafted, setAutoCrafted] = useState(false);
+  // Auto-craft state: `copyDirty` = the user has hand-edited copy (so we stop
+  // auto-drafting over them); `autoCraftOff` latches when a draft call fails
+  // (e.g. no server key); `lastAutoKey` dedupes the industry|message|asset combo.
+  const [copyDirty, setCopyDirty] = useState(false);
+  const autoCraftOff = useRef(false);
+  const lastAutoKey = useRef("");
+  const didMountCraft = useRef(false);
 
   // Switch industries. Browsing the panel is now free and non-destructive: we
   // never auto-fire a paid re-draft — the user re-crafts explicitly. If the copy
@@ -164,20 +171,24 @@ export default function Home() {
     });
   }
 
-  async function autoCraft(overrideIndustry?: string, overrideMsgType?: string) {
-    const ind = overrideIndustry ?? industry;
-    const mt = overrideMsgType ?? messageType;
+  // Draft two contrasting versions for the current industry + message + asset.
+  // Fires automatically when those settle (see the effect below) so the user
+  // rarely needs the button; `auto` fires make it silent + non-destructive (no
+  // history spam, no scary error banner, and they disable themselves if the
+  // server has no key so demo/no-key browsing stays quiet).
+  async function autoCraft(opts?: { auto?: boolean }) {
+    const auto = opts?.auto ?? false;
     setDrafting(true);
-    setError(null);
+    if (!auto) setError(null);
     try {
       const resp = await fetch("/api/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ industry: ind, assetType: variants.assetType, messageType: mt }),
+        body: JSON.stringify({ industry, assetType: variants.assetType, messageType }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-      pushHistory("Before auto-craft", variants);
+      if (!auto) pushHistory("Before auto-craft", variants);
       setVariants((v) => ({
         ...v,
         labelA: data.labelA || v.labelA,
@@ -186,16 +197,44 @@ export default function Home() {
         copyB: data.copyB,
       }));
       setAutoCrafted(true);
+      setCopyDirty(false);
       addSpend(0.02);
     } catch (e) {
-      setError(
-        (e instanceof Error ? e.message : "Auto-craft failed") +
-          " — you can edit the sample copy or paste your own instead."
-      );
+      if (auto) {
+        // No key / draft unavailable: stop auto-firing and keep the sample copy.
+        autoCraftOff.current = true;
+      } else {
+        setError(
+          (e instanceof Error ? e.message : "Auto-craft failed") +
+            " — you can edit the sample copy or paste your own instead."
+        );
+      }
     } finally {
       setDrafting(false);
     }
   }
+
+  // Auto-craft when the audience selections settle — no button needed. Debounced
+  // so flipping through dropdowns coalesces into one draft; skips the first mount
+  // (landing on the page shouldn't fire a paid draft), website assets (no copy),
+  // hand-edited copy, in-flight/running states, and combos already drafted.
+  useEffect(() => {
+    if (variants.assetType === "website") return;
+    if (copyDirty || autoCraftOff.current || drafting) return;
+    const key = `${industry}|${messageType}|${variants.assetType}`;
+    if (!didMountCraft.current) {
+      didMountCraft.current = true;
+      lastAutoKey.current = key;
+      return;
+    }
+    if (key === lastAutoKey.current) return;
+    const t = setTimeout(() => {
+      lastAutoKey.current = key;
+      autoCraft({ auto: true });
+    }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [industry, messageType, variants.assetType, copyDirty, drafting]);
 
   // Grow a copy textarea to fit its content. useCallback gives the ref a stable
   // identity so React only calls it on mount (not every render); growth while
@@ -1021,15 +1060,20 @@ export default function Home() {
         {variants.assetType !== "website" && (
           <div className="craftbar">
             <button
-              className="btn primary"
+              className="btn ghost"
               onClick={() => autoCraft()}
               disabled={drafting || running || refining}
             >
-              {drafting ? "Crafting…" : autoCrafted ? `Re-craft for ${INDUSTRIES.find((i) => i.key === industry)?.label}` : "Auto-craft variants"}
+              {drafting ? "Drafting…" : "Draft a fresh pair"}
             </button>
             <span className="note">
-              Claude drafts two A/B versions of a {messageType.toLowerCase()} for{" "}
-              {INDUSTRIES.find((i) => i.key === industry)?.label}, or edit the sample / paste your own below.
+              {drafting
+                ? `Drafting two ${messageType.toLowerCase()} versions for ${industryLabel}…`
+                : autoCraftOff.current
+                  ? `Showing the ${industryLabel} sample copy — edit it or paste your own below.`
+                  : copyDirty
+                    ? "Using your edited copy. Click above to replace it with a fresh AI draft."
+                    : `Auto-drafted for ${industryLabel} · ${messageType.toLowerCase()}. Change the dropdowns to re-draft, click to reroll, or just edit the copy below.`}
             </span>
           </div>
         )}
@@ -1094,6 +1138,7 @@ export default function Home() {
                         const val = e.target.value;
                         setVariants((prev) => ({ ...prev, [copyKey]: val }));
                         setAutoCrafted(false);
+                        setCopyDirty(true);
                       }}
                     />
                   </>
