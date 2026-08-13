@@ -1146,3 +1146,27 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .simrecipe .sr-k { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--primary); flex-shrink: 0; }
 .simrecipe .sr-body { font-size: 14px; line-height: 1.5; color: var(--ink-2); }
 .simrecipe .sr-body b { color: var(--ink); font-weight: 600; }
+
+/* --- A/B panel builder: editable audience segments --- */
+.panelbuilder { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.pb-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.segeditor { display: flex; flex-direction: column; gap: 8px; }
+.segrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
+.segrow .ico { width: 30px; height: 30px; border-radius: 7px; background: var(--ink); color: var(--paper, #fff); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.segmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.segname { font-weight: 600; font-size: 14px; border: 1px solid transparent; border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--ink); }
+.seghow { font-size: 12.5px; color: var(--ink-2); border: 1px solid transparent; border-radius: 6px; padding: 4px 7px; background: transparent; }
+.segname:hover, .segname:focus, .seghow:hover, .seghow:focus { border-color: var(--line); background: var(--paper, #fff); outline: none; }
+.segcount { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; flex-shrink: 0; }
+.segcount button { border: none; background: var(--card); color: var(--ink); font-size: 16px; font-weight: 600; width: 30px; height: 34px; cursor: pointer; line-height: 1; }
+.segcount button:disabled { opacity: .4; cursor: default; }
+.segcount input { width: 58px; height: 34px; border: none; border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center; font: inherit; font-weight: 600; font-size: 14px; background: var(--paper, #fff); color: var(--ink); border-radius: 0; padding: 0; -moz-appearance: textfield; }
+.segcount input::-webkit-outer-spin-button, .segcount input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.segpct { font-size: 12px; font-weight: 700; color: var(--ink-2); width: 38px; text-align: right; flex-shrink: 0; }
+.pb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.pb-actions .note { margin-left: auto; }
+@media (max-width: 620px) {
+  .segrow { flex-wrap: wrap; }
+  .segmain { flex-basis: 100%; order: -1; }
+  .pb-actions .note { margin-left: 0; flex-basis: 100%; }
+}

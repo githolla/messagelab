@@ -291,3 +291,58 @@ export function panelFor(industryKey?: string, messageType?: string): Archetype[
 export function instancesPer(archetypeCount: number): number {
   return Math.max(3, Math.round(20 / Math.max(1, archetypeCount)));
 }
+
+// An editable audience segment in the panel builder: an archetype plus a chosen
+// headcount (how many simulated people of this type are in the panel).
+export interface PanelSegment {
+  id: string;
+  name: string;
+  how: string;
+  base: number;
+  count: number;
+}
+
+// Auto-fill the panel for an industry + message type, distributing `total`
+// people across the archetypes (the lead audience gets the largest share).
+export function autoSegments(industryKey: string | undefined, messageType: string | undefined, total: number): PanelSegment[] {
+  const arch = panelFor(industryKey, messageType);
+  const segs: PanelSegment[] = arch.map((a, i) => ({
+    id: `${a.name}-${i}`,
+    name: a.name,
+    how: a.how,
+    base: a.base,
+    count: 0,
+  }));
+  return distribute(segs, Math.max(arch.length, Math.round(total)));
+}
+
+// Re-distribute a total headcount across existing segments, weighted to their
+// current shares (used by the size presets + the "resize" control). Every
+// non-empty segment keeps at least one person.
+export function scaleSegments(segs: PanelSegment[], total: number): PanelSegment[] {
+  if (!segs.length) return segs;
+  const cur = segs.reduce((t, s) => t + s.count, 0);
+  const base = cur > 0 ? segs.map((s) => s.count) : segs.map(() => 1);
+  const sum = base.reduce((t, n) => t + n, 0) || 1;
+  const out = segs.map((s, i) => ({ ...s, count: Math.max(1, Math.round((base[i] / sum) * total)) }));
+  return fix(out, total);
+}
+
+function distribute(segs: PanelSegment[], total: number): PanelSegment[] {
+  const n = segs.length;
+  const per = Math.floor(total / n);
+  const out = segs.map((s, i) => ({ ...s, count: per + (i === 0 ? total - per * n : 0) }));
+  return out.map((s) => ({ ...s, count: Math.max(1, s.count) }));
+}
+
+// Nudge counts so they sum exactly to `total` after rounding.
+function fix(segs: PanelSegment[], total: number): PanelSegment[] {
+  const out = segs.map((s) => ({ ...s }));
+  let diff = total - out.reduce((t, s) => t + s.count, 0);
+  for (let i = 0; diff !== 0 && i < out.length * 6; i++) {
+    const s = out[i % out.length];
+    if (diff > 0) { s.count += 1; diff -= 1; }
+    else if (s.count > 1) { s.count -= 1; diff += 1; }
+  }
+  return out;
+}

@@ -30,9 +30,15 @@ a segment-level results dashboard. "Message Lab" is a working title.
   audience archetypes (e.g. e-commerce: Bargain Hunter, Brand Loyalist, …), a few
   instances each (~20 reactions), plus a shared team of analyst bots (Conversion,
   Trust, Accessibility, Copy, Brand). Picking an industry (`lib/industries.ts`) swaps
-  the archetype panel and both are previewed as cards before running. The panel
-  size (Small/Standard/Large) and the message type (which audience state leads the
-  panel) are explicit controls in Step 1.
+  the archetype panel. Step 1 is an interactive "Meet your panel" builder: the
+  archetypes auto-fill as editable **segments** (`PanelSegment`: name/how/base/count
+  via `autoSegments`/`scaleSegments`), each with a headcount the user can dial,
+  rename, remove, or add to. A size preset (Focus group 12 / Panel 48 / Audience
+  250 / Big panel 1000) scales the whole panel proportionally and a live recipe
+  banner reads "This is a {N}-person {industry} panel…". `buildPanelFromSegments`
+  turns the segments into the fan-out. Live model runs simulate a representative
+  sample capped at LIVE_MAX (120); demo simulates the whole panel deterministically
+  (the reactions list renders at most DISPLAY_MAX). Results break down per segment.
 - `lib/samples.ts`: per-industry A/B sample copy (`sampleFor`), industry message-type
   lists, and `isPristineCopy` (guards live runs against untouched sample copy and
   safely refills on industry switch). `app/api/draft/route.ts` powers Auto-craft:

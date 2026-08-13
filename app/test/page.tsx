@@ -7,7 +7,7 @@ import { demoResult } from "@/lib/demo";
 import { tally, GIVE_INTENTS, type RoundSummary } from "@/lib/refine";
 import { wilson, shareWithCI } from "@/lib/stats";
 import { INDUSTRIES } from "@/lib/industries";
-import { ANALYSTS, panelFor, monogram, messageAudienceKey, personaName, memberNo } from "@/lib/archetypes";
+import { ANALYSTS, monogram, messageAudienceKey, personaName, memberNo, autoSegments, scaleSegments, type PanelSegment } from "@/lib/archetypes";
 import { demoAnalysis, VERDICT_LABEL, type Analysis } from "@/lib/analysis";
 import { sampleFor, isPristineCopy, MESSAGE_TYPES, messageTypesFor } from "@/lib/samples";
 import { estimateRunCost, formatCost } from "@/lib/util";
@@ -29,12 +29,19 @@ const MAX_REFINE_ROUNDS = 10;
 
 // Panel size presets — a lever for the "too close to call" state (finding: the
 // tool used to diagnose insufficient power with no way to add power).
-const PANEL_PRESETS = {
-  small: { label: "Small", target: 12 },
-  standard: { label: "Standard", target: 20 },
-  large: { label: "Large", target: 36 },
-} as const;
-type PanelPreset = keyof typeof PANEL_PRESETS;
+// Panel-size presets for the audience builder. The number is the panel you're
+// modelling; live model runs simulate a representative sample capped at LIVE_MAX
+// (cost/time), while demo mode simulates the whole panel instantly.
+const PANEL_SIZES = [
+  { label: "Focus group", n: 12 },
+  { label: "Panel", n: 48 },
+  { label: "Audience", n: 250 },
+  { label: "Big panel", n: 1000 },
+] as const;
+const DEFAULT_TOTAL = 48;
+const LIVE_MAX = 120; // most reactions a live (API) run will actually simulate
+const DEMO_MAX = 1000; // hard cap on a modelled panel
+const DISPLAY_MAX = 120; // cap on how many individual reactions the list renders
 
 const ASSET_HINTS: Record<AssetType, string> = {
   email: "Paste the two versions you want to test. Replace the sample copy with your own — subject line and body.",
@@ -48,36 +55,28 @@ const ASSET_HINTS: Record<AssetType, string> = {
 
 type PanelMember = { persona: Persona; base: number };
 
-// Per-archetype instances so each segment carries a usable sample; target total
-// is set by the panel-size preset.
-function perFor(count: number, target: number): number {
-  return Math.max(2, Math.round(target / Math.max(1, count)));
-}
-
-function buildPanel(
-  industryKey: string,
-  messageType: string | undefined,
-  target: number,
+// Build the fan-out list from the user's audience segments: `count` individuals
+// per segment, each conditioned on that segment's archetype + description.
+function buildPanelFromSegments(
+  segs: PanelSegment[],
   facets: CohortFacets,
   cohortText: string
 ): PanelMember[] {
-  const arch = panelFor(industryKey, messageType);
-  const per = perFor(arch.length, target);
   const out: PanelMember[] = [];
-  for (const a of arch) {
-    for (let i = 0; i < per; i++) {
-      const id = `${industryKey}:${a.name}:${i}`;
+  for (const s of segs) {
+    for (let i = 0; i < s.count; i++) {
+      const id = `${s.id}:${i}`;
       const demo = personaDemographics(id, facets);
       out.push({
-        base: a.base,
+        base: s.base,
         persona: {
           id,
           name: personaName(id),
-          giving: a.name,
+          giving: s.name,
           age: demo.age,
           dimensions: {
-            archetype: a.name,
-            how_they_judge: a.how,
+            archetype: s.name,
+            how_they_judge: s.how,
             ...cohortConditioning(demo, cohortText),
             note: "You are one specific individual of this type — bring your own quirks, mood, and priorities. Do not answer as a generic average.",
           },
@@ -130,7 +129,6 @@ export default function Home() {
     return { assetType: "email", labelA: s.labelA, labelB: s.labelB, copyA: s.copyA, copyB: s.copyB };
   });
   const [messageType, setMessageType] = useState(MESSAGE_TYPES[0]);
-  const [panelPreset, setPanelPreset] = useState<PanelPreset>("standard");
   const [cohort, setCohort] = useState<CohortFacets>(emptyCohort);
   const [cohortText, setCohortText] = useState("");
   // The cohort actually used for the shown run (so displayed demographics stay
@@ -255,13 +253,38 @@ export default function Home() {
   }
   const stopRef = useRef(false);
 
-  const archetypes = useMemo(() => panelFor(industry, messageType), [industry, messageType]);
+  // The editable audience panel — auto-filled from industry + message type, then
+  // adjustable (counts, names, add/remove) by the user before running.
+  const [segments, setSegments] = useState<PanelSegment[]>(() => autoSegments(industry, messageType, DEFAULT_TOTAL));
+  const [ranSegments, setRanSegments] = useState<PanelSegment[]>([]);
+  // Re-auto-fill when the audience context changes, preserving the chosen total.
+  useEffect(() => {
+    setSegments((prev) => autoSegments(industry, messageType, prev.reduce((t, s) => t + s.count, 0) || DEFAULT_TOTAL));
+  }, [industry, messageType]);
+
   const msgTypes = useMemo(() => messageTypesFor(industry), [industry]);
-  const target = PANEL_PRESETS[panelPreset].target;
-  const plannedSize = useMemo(
-    () => archetypes.length * perFor(archetypes.length, target),
-    [archetypes, target]
-  );
+  const plannedSize = segments.reduce((t, s) => t + s.count, 0);
+  const liveSize = Math.min(plannedSize, LIVE_MAX);
+  const industryLabel = INDUSTRIES.find((i) => i.key === industry)?.label ?? "your market";
+
+  function resizePanel(total: number) {
+    setSegments((prev) => scaleSegments(prev, Math.max(prev.length, Math.min(DEMO_MAX, total))));
+  }
+  function setSegCount(id: string, n: number) {
+    setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, count: Math.max(0, Math.min(DEMO_MAX, Math.round(n) || 0)) } : s)));
+  }
+  function editSeg(id: string, patch: Partial<PanelSegment>) {
+    setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+  function removeSeg(id: string) {
+    setSegments((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
+  }
+  function addSeg() {
+    setSegments((prev) => [
+      ...prev,
+      { id: `custom-${prev.length}-${prev.reduce((t, s) => t + s.count, 0)}`, name: "New segment", how: "Describe who they are and what they care about", base: 0.5, count: Math.max(1, Math.round((prev.reduce((t, s) => t + s.count, 0) || DEFAULT_TOTAL) / (prev.length + 1))) },
+    ]);
+  }
 
   // One member reaction: real API call, with a deterministic demo fallback on
   // failure so a partial outage still fills the panel.
@@ -321,11 +344,14 @@ export default function Home() {
   }
 
   async function runPanel(v: Variants): Promise<PersonaResult[]> {
-    const members = buildPanel(industry, messageType, target, cohort, cohortText);
+    // Live runs simulate a representative sample of the panel, capped for cost.
+    const liveSegs = scaleSegments(segments, liveSize);
+    const members = buildPanelFromSegments(liveSegs, cohort, cohortText);
     setRunning(true);
     setResultsAsset(v.assetType);
     setRanVariants(v);
     setRanIndustry(industry);
+    setRanSegments(segments);
     setRanFacets(cohort);
     setRanCohortText(cohortText);
     setError(null);
@@ -413,12 +439,15 @@ export default function Home() {
   function runDemo() {
     setError(null);
     setIsDemo(true);
-    const members = buildPanel(industry, messageType, target, cohort, cohortText);
+    // Demo is deterministic + free, so it simulates the whole modelled panel.
+    const demoSegs = plannedSize > DEMO_MAX ? scaleSegments(segments, DEMO_MAX) : segments;
+    const members = buildPanelFromSegments(demoSegs, cohort, cohortText);
     const leanKey = `${variants.copyA}|${variants.copyB}`;
     const res = members.map((m) => demoResult(m.persona, m.base, leanKey));
     setResultsAsset(variants.assetType);
     setRanVariants(variants);
     setRanIndustry(industry);
+    setRanSegments(segments);
     setRanFacets(cohort);
     setRanCohortText(cohortText);
     setResults(res);
@@ -437,7 +466,8 @@ export default function Home() {
   async function addMoreReactions() {
     const v = ranVariants ?? variants;
     if (isDemo) return;
-    const members = buildPanel(ranIndustry, messageType, PANEL_PRESETS.standard.target, ranFacets, ranCohortText);
+    const topUp = scaleSegments(ranSegments.length ? ranSegments : segments, Math.min(LIVE_MAX, 24));
+    const members = buildPanelFromSegments(topUp, ranFacets, ranCohortText);
     setRunning(true);
     setError(null);
     setDone(0);
@@ -764,7 +794,8 @@ export default function Home() {
     };
   }, [openP]);
 
-  const estCost = estimateRunCost(plannedSize, true);
+  const estCost = estimateRunCost(liveSize, true);
+  const liveCapped = plannedSize > LIVE_MAX;
 
   return (
     <>
@@ -782,11 +813,11 @@ export default function Home() {
       <div className="simrecipe">
         <span className="sr-k">Simulation</span>
         <span className="sr-body">
-          Test <b>2 versions</b> of{" "}
-          <b>{variants.assetType === "website" ? "a website screen" : `a ${messageType.toLowerCase()}`}</b> for{" "}
-          <b>{INDUSTRIES.find((i) => i.key === industry)?.label ?? "your market"}</b> against{" "}
-          <b>{plannedSize}</b> simulated {variants.assetType === "website" ? "visitor" : "audience"} reactions,
-          interpreted by {archetypes.length} audience bots + {ANALYSTS.length} analysts.
+          This is a <b>{plannedSize.toLocaleString()}-person {industryLabel.toLowerCase()} panel</b> across{" "}
+          {segments.length} segment{segments.length === 1 ? "" : "s"}. You&apos;ll <b>meet them below</b> and adjust who&apos;s
+          in the room, then each reacts to both versions of{" "}
+          <b>{variants.assetType === "website" ? "your website screen" : `your ${messageType.toLowerCase()}`}</b> — and you&apos;ll
+          hear <b>how each segment responded</b> and which version wins for whom.
         </span>
       </div>
 
@@ -848,19 +879,23 @@ export default function Home() {
           <div>
             <label className="fld" id="panelsize-label">Panel size</label>
             <div className="seg" role="group" aria-labelledby="panelsize-label">
-              {(Object.keys(PANEL_PRESETS) as PanelPreset[]).map((p) => (
+              {PANEL_SIZES.map((p) => (
                 <button
-                  key={p}
-                  className={panelPreset === p ? "on" : ""}
-                  aria-pressed={panelPreset === p}
-                  onClick={() => setPanelPreset(p)}
+                  key={p.n}
+                  className={plannedSize === p.n ? "on" : ""}
+                  aria-pressed={plannedSize === p.n}
+                  onClick={() => resizePanel(p.n)}
                   disabled={running || refining}
+                  title={`${p.n.toLocaleString()} people`}
                 >
-                  {PANEL_PRESETS[p].label}
+                  {p.label}
                 </button>
               ))}
             </div>
-            <p className="projn">≈ {plannedSize} reactions · larger panels tighten the confidence interval</p>
+            <p className="projn">
+              <b>{plannedSize.toLocaleString()}</b>-person panel · {segments.length} segments
+              {liveCapped && <> · live run samples {LIVE_MAX}, demo runs all</>}
+            </p>
           </div>
         </div>
 
@@ -924,36 +959,47 @@ export default function Home() {
           </p>
         </div>
 
-        <details className="method" style={{ marginTop: 16 }}>
-          <summary>Preview the {archetypes.length} audience bots + {ANALYSTS.length} analysts</summary>
-          <div style={{ marginTop: 12 }}>
-            <p className="sub" style={{ margin: "4px 0 8px" }}>
-              <strong>Audience bots</strong> — {archetypes.length} archetypes react as your panel
-              ({plannedSize} reactions total)
-              {variants.assetType !== "website" && messageAudienceKey(messageType) ? (
-                <>
-                  , led by a <b style={{ color: "var(--ink)" }}>{archetypes[0].name}</b> for a{" "}
-                  {messageType.toLowerCase()}
-                </>
-              ) : null}
-              :
-            </p>
-            <div className="botgrid">
-              {archetypes.map((a) => (
-                <div className="botcard" key={a.name}>
-                  <div className="bt">
-                    <span className="ico">{monogram(a.name)}</span>
-                    {a.name}
-                  </div>
-                  <div className="bh">{a.how}</div>
-                </div>
-              ))}
+        {/* Meet your panel — editable audience segments (the "potentials") */}
+        <div className="panelbuilder">
+          <div className="pb-head">
+            <div>
+              <div className="fld" style={{ margin: 0 }}>Meet your panel</div>
+              <p className="projn" style={{ margin: "3px 0 0" }}>
+                Auto-filled for {industryLabel}
+                {variants.assetType !== "website" && messageAudienceKey(messageType) ? <> · a {messageType.toLowerCase()}</> : null}.
+                Adjust who&apos;s in the room, how many of each, rename them, or add your own.
+              </p>
             </div>
+          </div>
 
-            <p className="sub" style={{ margin: "16px 0 8px" }}>
-              <strong>Analyst bots</strong> — specialists that interpret the reactions into your report:
-            </p>
-            <div className="botgrid">
+          <div className="segeditor">
+            {segments.map((s) => (
+              <div className="segrow" key={s.id}>
+                <span className="ico" title={s.name}>{monogram(s.name)}</span>
+                <div className="segmain">
+                  <input className="segname" value={s.name} onChange={(e) => editSeg(s.id, { name: e.target.value })} disabled={running || refining} aria-label="Segment name" />
+                  <input className="seghow" value={s.how} onChange={(e) => editSeg(s.id, { how: e.target.value })} disabled={running || refining} aria-label="Who they are" />
+                </div>
+                <div className="segcount" role="group" aria-label={`${s.name} count`}>
+                  <button onClick={() => setSegCount(s.id, s.count - 1)} disabled={running || refining} aria-label="Fewer">−</button>
+                  <input type="number" min={0} value={s.count} onChange={(e) => setSegCount(s.id, Number(e.target.value))} disabled={running || refining} />
+                  <button onClick={() => setSegCount(s.id, s.count + 1)} disabled={running || refining} aria-label="More">+</button>
+                </div>
+                <span className="segpct">{Math.round((s.count / (plannedSize || 1)) * 100)}%</span>
+                <button className="xbtn" onClick={() => removeSeg(s.id)} disabled={segments.length <= 1 || running || refining} title="Remove segment" aria-label="Remove segment">×</button>
+              </div>
+            ))}
+          </div>
+
+          <div className="pb-actions">
+            <button className="btn ghost" onClick={addSeg} disabled={running || refining}>+ Add segment</button>
+            <button className="btn ghost" onClick={() => setSegments(autoSegments(industry, messageType, plannedSize))} disabled={running || refining}>Auto-fill for this message</button>
+            <span className="note">Panel total: <b>{plannedSize.toLocaleString()}</b> people</span>
+          </div>
+
+          <details className="method" style={{ marginTop: 12 }}>
+            <summary>The {ANALYSTS.length} analyst bots that read the reactions</summary>
+            <div className="botgrid" style={{ marginTop: 10 }}>
               {ANALYSTS.map((a) => (
                 <div className="botcard analyst" key={a.key}>
                   <div className="bt">
@@ -964,8 +1010,8 @@ export default function Home() {
                 </div>
               ))}
             </div>
-          </div>
-        </details>
+          </details>
+        </div>
       </section>
 
       {/* Variants */}
@@ -1075,7 +1121,9 @@ export default function Home() {
                 ? isDemo
                   ? "Demo data (deterministic, no API calls)"
                   : `${results.length} reactions completed`
-                : `~1–2 min · ${plannedSize} reactions · approx ${formatCost(estCost)} in API usage`}
+                : liveCapped
+                  ? `Run test simulates a representative ${LIVE_MAX} of your ${plannedSize.toLocaleString()}-person panel (~1–2 min · approx ${formatCost(estCost)}). Load demo runs all ${plannedSize.toLocaleString()} instantly, free.`
+                  : `~1–2 min · ${plannedSize} reactions · approx ${formatCost(estCost)} in API usage`}
           </span>
           {sessionSpend > 0 && (
             <span className="costmeter" title="Approximate API spend this session">
@@ -1234,7 +1282,7 @@ export default function Home() {
             const filtered = results.filter(
               (r) => (reactVote === "all" || r.winner === reactVote) && (reactSeg === "all" || r.giving === reactSeg)
             );
-            const visible = filtered;
+            const visible = filtered.slice(0, DISPLAY_MAX);
             return (
               <section className="card">
                 <h2 className="step">The focus group</h2>
@@ -1380,6 +1428,9 @@ export default function Home() {
                   </div>
                 )}
                 {filtered.length === 0 && <p className="note">No participants match this filter.</p>}
+                {filtered.length > DISPLAY_MAX && (
+                  <p className="note">Showing {DISPLAY_MAX} of {filtered.length} — the metrics above use the full panel.</p>
+                )}
 
                 <p className="caveat" style={{ margin: "20px 0 0" }}>
                   Directional signal from {results.length} simulated participants — persona-agent estimates, not a
@@ -1533,7 +1584,7 @@ export default function Home() {
 
           {/* Participant detail — full read on one person */}
           {openP && (() => {
-            const how = archetypes.find((a) => a.name === openP.giving)?.how;
+            const how = (ranSegments.length ? ranSegments : segments).find((a) => a.name === openP.giving)?.how;
             const resPct = (v: number) => Math.max(4, (v / 5) * 100);
             return (
               <div className="pmodal-bg" onClick={() => setOpenP(null)}>
