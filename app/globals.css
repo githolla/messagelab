@@ -1219,3 +1219,16 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .cmprow.win .cmpnum, .cmprow.win .cmplbl { color: var(--ink); }
 .cmprow.win .cmplbl { font-weight: 600; }
 .cmpci { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--line); }
+
+/* --- Predicted social engagement (social asset) --- */
+.sengage { align-items: stretch; }
+.spost { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--bg-2); display: flex; flex-direction: column; gap: 12px; }
+.spost.win { border-color: var(--series-b); box-shadow: 0 0 0 1px var(--series-b) inset; }
+.spost-h { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.spost-h .abdot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.spost-h .winpill { margin-left: auto; }
+.spost-metrics { display: flex; align-items: center; gap: 22px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--ink-2); }
+.spost-metrics .sm { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; }
+.spost-metrics .sm svg { color: var(--ink-3); }
+.spost-metrics .sm b { font-family: var(--serif); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.cmpk svg { vertical-align: -2px; margin-right: 4px; color: var(--ink-3); }

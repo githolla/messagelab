@@ -20,8 +20,17 @@ function coerce15(v: unknown): number {
 function coerceEnum(v: unknown, set: Set<string>, fallback: string): string {
   return typeof v === "string" && set.has(v) ? v : fallback;
 }
+function coerceBool(v: unknown): boolean {
+  return v === true || v === "true" || v === 1 || v === "yes";
+}
 
-const SCHEMA_HINT = `Respond with ONLY a JSON object, no markdown fences, matching:
+function schemaHint(social: boolean): string {
+  const extra = social
+    ? `,
+  "likeA": true | false, "commentA": true | false, "shareA": true | false,
+  "likeB": true | false, "commentB": true | false, "shareB": true | false`
+    : "";
+  return `Respond with ONLY a JSON object, no markdown fences, matching:
 {
   "intentA": "dismiss" | "engage_no_gift" | "save_for_later" | "give_small" | "give_suggested" | "give_more",
   "intentB": same options as intentA,
@@ -30,8 +39,9 @@ const SCHEMA_HINT = `Respond with ONLY a JSON object, no markdown fences, matchi
   "trust": "version_a" | "version_b" | "both_equal" | "neither",
   "winner": "send_a" | "send_b" | "either" | "neither",
   "rationale": "1-2 sentences quoting or describing the specific line or element that moved you or put you off",
-  "baselineIntent": 1-5
+  "baselineIntent": 1-5${extra}
 }`;
+}
 
 const CHANNELS: Record<
   AssetType,
@@ -87,7 +97,12 @@ function personaBlock(p: Persona): string {
   return `You are answering as this person. Stay fully in character — react the way THIS person would, not the way an average or agreeable person would.\n\nname: ${p.name}\n${dims}`;
 }
 
-function questionnaire(ch: (typeof CHANNELS)[AssetType]): string {
+function questionnaire(ch: (typeof CHANNELS)[AssetType], social: boolean): string {
+  const socialQs = social
+    ? `
+9. likeA, commentA, shareA — For Version A specifically, would YOU personally react on it? Answer each true/false, honestly for how you actually behave: likeA = tap like/react; commentA = leave a comment (only if it genuinely provoked a reaction); shareA = share/repost to your own feed (rare — only for a post you'd put your name behind). A post usually earns a like at most; comments are less common; shares are rarest.
+10. likeB, commentB, shareB — The same three, for Version B.`
+    : "";
   return `## Questionnaire
 
 1. intentA — ${ch.intentQ}
@@ -98,9 +113,9 @@ function questionnaire(ch: (typeof CHANNELS)[AssetType]): string {
 5. trust — Which version made the organization feel more trustworthy?
 6. winner — ${ch.winnerQ}
 7. rationale — What most drove your winner choice? Quote or describe the specific line or element.
-8. baselineIntent — How likely are you to take this kind of action at all right now, regardless of these versions? (1-5)
+8. baselineIntent — How likely are you to take this kind of action at all right now, regardless of these versions? (1-5)${socialQs}
 
-${SCHEMA_HINT}`;
+${schemaHint(social)}`;
 }
 
 type ContentBlock =
@@ -139,6 +154,7 @@ export async function POST(req: NextRequest) {
   }
 
   const ch = CHANNELS[variants.assetType] ?? CHANNELS.email;
+  const social = variants.assetType === "social";
   const preamble = `${ch.intro} React to both, then answer the questionnaire honestly as yourself. "I would ignore this" and low ratings are valid answers. Judge each version on its own merits — there is no expected "right" answer, and preferring neither is fine.`;
   const order = presentationOrder(persona.id);
 
@@ -161,7 +177,7 @@ export async function POST(req: NextRequest) {
       imgFirst,
       { type: "text", text: second.label },
       imgSecond,
-      { type: "text", text: questionnaire(ch) },
+      { type: "text", text: questionnaire(ch, social) },
     ];
   } else {
     content = `${preamble}
@@ -174,7 +190,7 @@ ${second.label}
 
 ${second.copy}
 
-${questionnaire(ch)}`;
+${questionnaire(ch, social)}`;
   }
 
   const model = process.env.MESSAGE_LAB_MODEL || "claude-sonnet-4-6";
@@ -212,6 +228,16 @@ ${questionnaire(ch)}`;
     winner: coerceEnum(parsed.winner, WINNER, "either"),
     rationale: typeof parsed.rationale === "string" ? parsed.rationale : "",
     baselineIntent: coerce15(parsed.baselineIntent),
+    ...(social
+      ? {
+          likeA: coerceBool(parsed.likeA),
+          commentA: coerceBool(parsed.commentA),
+          shareA: coerceBool(parsed.shareA),
+          likeB: coerceBool(parsed.likeB),
+          commentB: coerceBool(parsed.commentB),
+          shareB: coerceBool(parsed.shareB),
+        }
+      : {}),
     personaId: persona.id,
     personaName: persona.name,
     giving: persona.giving,

@@ -65,7 +65,13 @@ a segment-level results dashboard. "Message Lab" is a working title.
   channel-neutral (dismiss, engage_no_gift, save_for_later, give_*) with per-channel
   display labels and per-channel questionnaire wording in the route. Website tests
   send two screenshots as vision inputs; the client downscales uploads to ≤1568px
-  long edge JPEG before the fan-out so payloads stay small.
+  long edge JPEG before the fan-out so payloads stay small. Social posts add
+  per-version engagement (`likeA/B`, `commentA/B`, `shareA/B` booleans on
+  `PersonaResult`): the run route asks each persona whether they'd like/comment/
+  share each version (schema + coercion only when social), demo derives them
+  deterministically (likes common → comments → shares rarest), and the results
+  show a social-only "Predicted social engagement" card — a mock post footer
+  (♥/💬/↗ counts per version) plus per-metric A-vs-B comparison bars.
 - Requires `ANTHROPIC_API_KEY` env var (Vercel project settings). Optional
   `MESSAGE_LAB_MODEL` override; defaults to claude-sonnet-4-6.
 - `lib/personas.json`: 24 personas exported from the MatrAIx dev sample

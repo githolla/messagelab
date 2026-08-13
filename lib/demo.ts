@@ -73,6 +73,12 @@ export function demoResult(p: Persona, baseOverride?: number, leanKey?: string):
   const bank = RATIONALE_BANK[winner];
   const pick = bank[fnv1a(p.id + "r") % bank.length];
 
+  // Social engagement (only surfaced for the social asset): likes are common,
+  // comments rarer, shares rarest — a strong post earns more of each. Blends the
+  // version score with a per-persona hash so it isn't a hard cutoff.
+  const eng = (score: number, v: string, metric: string, thr: number) =>
+    score * 0.8 + fnv1aFloat(`${p.id}|${v}|${metric}`) * 0.25 > thr;
+
   return {
     personaId: p.id,
     personaName: p.name,
@@ -92,5 +98,11 @@ export function demoResult(p: Persona, baseOverride?: number, leanKey?: string):
     winner,
     rationale: pick,
     baselineIntent: clamp(Math.round(base * 5 + fnv1aFloat(p.id + "c")), 1, 5),
+    likeA: eng(scoreA, "a", "like", 0.42),
+    commentA: eng(scoreA, "a", "comment", 0.66),
+    shareA: eng(scoreA, "a", "share", 0.76),
+    likeB: eng(scoreB, "b", "like", 0.42),
+    commentB: eng(scoreB, "b", "comment", 0.66),
+    shareB: eng(scoreB, "b", "share", 0.76),
   };
 }

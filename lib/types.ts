@@ -38,6 +38,13 @@ export interface PersonaResult {
   winner: "send_a" | "send_b" | "either" | "neither";
   rationale: string;
   baselineIntent: number; // 1-5
+  // Social-post engagement per version — only populated for the social asset.
+  likeA?: boolean;
+  likeB?: boolean;
+  commentA?: boolean;
+  commentB?: boolean;
+  shareA?: boolean;
+  shareB?: boolean;
   model?: string; // persona-agent model this trial ran under
   order?: "ab" | "ba"; // presentation order shown to this persona
   error?: string;

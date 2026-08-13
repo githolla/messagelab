@@ -1455,6 +1455,82 @@ export default function Home() {
             </section>
           ) : null}
 
+          {/* Predicted social engagement — social asset only */}
+          {resultsAsset === "social" && results.length > 0 ? (() => {
+            const cnt = (k: keyof PersonaResult) => results.filter((r) => r[k]).length;
+            const heart = <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z" /></svg>;
+            const bubble = <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-12 7.6L3 21l1.9-6A8.4 8.4 0 1 1 21 11.5z" /></svg>;
+            const share = <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" /><path d="M16 6l-4-4-4 4" /><path d="M12 2v13" /></svg>;
+            const metrics = [
+              { key: "like", label: "Likes", icon: heart, a: cnt("likeA"), b: cnt("likeB") },
+              { key: "comment", label: "Comments", icon: bubble, a: cnt("commentA"), b: cnt("commentB") },
+              { key: "share", label: "Shares", icon: share, a: cnt("shareA"), b: cnt("shareB") },
+            ];
+            const totalA = metrics.reduce((t, m) => t + m.a, 0);
+            const totalB = metrics.reduce((t, m) => t + m.b, 0);
+            return (
+              <section className="card">
+                <h2 className="step">Predicted social engagement</h2>
+                <p className="sub">
+                  If this post went to your {results.length}-person panel, here&apos;s how each version would perform —
+                  likes are common, comments rarer, shares rarest.
+                </p>
+
+                {/* Mock post engagement footers */}
+                <div className="grid2 sengage">
+                  {(["A", "B"] as const).map((V) => {
+                    const isA = V === "A";
+                    const win = isA ? totalA > totalB : totalB > totalA;
+                    return (
+                      <div className={`spost ${win ? "win" : ""}`} key={V}>
+                        <div className="spost-h">
+                          <span className={`abdot ${isA ? "a" : "b"}`} />
+                          <b>Version {V}</b> · {isA ? shown.labelA : shown.labelB}
+                          {win && <span className="winpill">Most engaging</span>}
+                        </div>
+                        <div className="spost-metrics">
+                          {metrics.map((m) => (
+                            <span key={m.key} className="sm">{m.icon} <b>{isA ? m.a : m.b}</b></span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Per-metric A vs B comparison */}
+                <div className="cmptiles" style={{ marginTop: 16 }}>
+                  {metrics.map((m) => {
+                    const aWin = m.a > m.b;
+                    const bWin = m.b > m.a;
+                    const pct = (v: number) => Math.round((v / n) * 100);
+                    return (
+                      <div className="cmptile" key={m.key}>
+                        <div className="cmpk">{m.icon} {m.label}</div>
+                        {(["a", "b"] as const).map((side) => {
+                          const val = side === "a" ? m.a : m.b;
+                          const win = side === "a" ? aWin : bWin;
+                          return (
+                            <div className={`cmprow ${win ? "win" : ""}`} key={side}>
+                              <span className="cmplbl"><span className={`abdot ${side}`} />{side.toUpperCase()}</span>
+                              <span className="cmpbar"><span className={side} style={{ width: `${Math.max(2, pct(val))}%` }} /></span>
+                              <span className="cmpnum">{val}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="cmpci">A {pct(m.a)}% · B {pct(m.b)}% of the panel</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="smalln" style={{ marginTop: 14 }}>
+                  Simulated engagement intent, not a forecast of real reach — impressions, timing, and the
+                  algorithm dominate actual numbers. Use it to compare the two versions, not to predict totals.
+                </p>
+              </section>
+            );
+          })() : null}
+
           {/* The focus group — how the room split, then representative participants */}
           {(() => {
             const eitherCount = results.filter((r) => r.winner === "either").length;
