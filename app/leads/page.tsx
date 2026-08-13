@@ -10,15 +10,40 @@ import {
   recommendedNextStep,
   strategyById,
   type Lead,
+  type Webinar,
+  type Seniority,
+  type Relationship,
 } from "@/lib/leads";
 import { recommend, ACTION_LABEL, FACTORS, type Action, type StrategyResult } from "@/lib/leadsim";
 import type { Strategy } from "@/lib/leads";
 import { draftEmail } from "@/lib/leademail";
 
-const webinar = SAMPLE_WEBINAR;
-
 // Actions worth surfacing in the compact funnel readout, hot → cold.
 const FUNNEL: Action[] = ["meeting", "continue", "reply", "click", "read", "skim", "ignore", "unsubscribe"];
+
+const SENIORITIES: Seniority[] = ["C-suite", "VP", "Director", "Manager", "Individual"];
+const RELATIONSHIPS: Relationship[] = ["none", "opportunity", "client"];
+const REL_LABEL: Record<Relationship, string> = { none: "No prior relationship", opportunity: "Open opportunity", client: "Existing client" };
+
+function blankLead(n: number): Lead {
+  return {
+    id: `l-custom-${n}`,
+    name: "New Attendee",
+    title: "Director of Development",
+    seniority: "Director",
+    company: "Your Organization",
+    targetAccount: false,
+    relationship: "none",
+    attended: true,
+    pctAttended: 70,
+    stayedToEnd: true,
+    questionsAsked: 1,
+    surveyCompleted: false,
+    resourcesDownloaded: 1,
+    priorWebinars: 0,
+    topicSignal: "general retention",
+  };
+}
 
 function signalChips(l: Lead): string[] {
   const c: string[] = [];
@@ -38,8 +63,24 @@ export default function LeadsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [approved, setApproved] = useState<Record<string, string>>({}); // leadId -> strategyId
 
-  const leads = useMemo(() => prioritizedLeads(SAMPLE_LEADS), []);
+  // Editable: swap the nonprofit sample for your own audience, or dial each lead
+  // to run focus-group scenarios and watch the recommendation change.
+  const [leads, setLeads] = useState<Lead[]>(SAMPLE_LEADS);
+  const [webinar, setWebinar] = useState<Webinar>(SAMPLE_WEBINAR);
+  const [editingWebinar, setEditingWebinar] = useState(false);
+  const nextId = useRef(1);
+
+  const ordered = useMemo(() => prioritizedLeads(leads), [leads]);
   const selected = leads.find((l) => l.id === selectedId) ?? null;
+
+  function editLead(id: string, patch: Partial<Lead>) {
+    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  }
+  function addAttendee() {
+    const l = blankLead(nextId.current++);
+    setLeads((ls) => [...ls, l]);
+    openLead(l.id);
+  }
 
   // The winning strategy per lead, from the full simulation — so the list's
   // "Recommended next step" matches what the detail view will recommend.
@@ -80,14 +121,38 @@ export default function LeadsPage() {
 
           <section className="card">
             <div className="wb-head">
-              <div>
+              <div style={{ flex: 1 }}>
                 <div className="wb-kicker">Webinar</div>
-                <h2 className="wb-title">{webinar.title}</h2>
-                <div className="wb-meta">
-                  {new Date(webinar.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}{" "}
-                  · {webinar.attendees} registered · {leads.length} in this work queue
-                </div>
+                {editingWebinar ? (
+                  <div className="wb-edit">
+                    <div className="scenariogrid">
+                      <label className="fld">Title
+                        <input type="text" value={webinar.title} onChange={(e) => setWebinar((w) => ({ ...w, title: e.target.value }))} />
+                      </label>
+                      <label className="fld">Topic (used in copy)
+                        <input type="text" value={webinar.topic} onChange={(e) => setWebinar((w) => ({ ...w, topic: e.target.value }))} />
+                      </label>
+                      <label className="fld">Date
+                        <input type="date" value={webinar.date} onChange={(e) => setWebinar((w) => ({ ...w, date: e.target.value }))} />
+                      </label>
+                      <label className="fld">Registered
+                        <input type="number" min={0} value={webinar.attendees} onChange={(e) => setWebinar((w) => ({ ...w, attendees: Math.max(0, Number(e.target.value) || 0) }))} />
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="wb-title">{webinar.title}</h2>
+                    <div className="wb-meta">
+                      {new Date(webinar.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}{" "}
+                      · {webinar.attendees} registered · {ordered.length} in this work queue
+                    </div>
+                  </>
+                )}
               </div>
+              <button className="btn ghost" onClick={() => setEditingWebinar((v) => !v)}>
+                {editingWebinar ? "Done" : "Edit webinar"}
+              </button>
             </div>
             <div className="stepstrip">
               {stepCounts.map(([id, n]) => (
@@ -97,12 +162,17 @@ export default function LeadsPage() {
               ))}
             </div>
             <p className="note" style={{ marginTop: 10 }}>
-              Prioritized as a work queue — strongest opportunities first. Group follow-up creation
-              and cadence simulation are the next phase.
+              Sample audience is nonprofit fundraising — edit the webinar, dial any attendee&apos;s
+              signals to run a scenario, or add your own. Prioritized as a work queue, strongest
+              opportunities first.
             </p>
           </section>
 
           <section className="card">
+            <div className="fgh" style={{ marginTop: 0 }}>
+              <h2 className="step" style={{ margin: 0 }}>Attendees</h2>
+              <button className="btn ghost" onClick={addAttendee}>+ Add attendee</button>
+            </div>
             <div className="leadtablewrap">
               <table className="leadtable">
                 <thead>
@@ -115,7 +185,7 @@ export default function LeadsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {leads.map((l) => {
+                  {ordered.map((l) => {
                     const tier = tierOf(l);
                     const score = engagementScore(l);
                     const step = winnerByLead.get(l.id) ?? recommendedNextStep(l);
@@ -153,7 +223,9 @@ export default function LeadsPage() {
         <LeadDetail
           key={selected.id}
           lead={selected}
+          webinar={webinar}
           approvedStrategy={approved[selected.id]}
+          onEdit={(patch) => editLead(selected.id, patch)}
           onBack={() => setView("list")}
           onApprove={(strategyId) => {
             setApproved((a) => ({ ...a, [selected.id]: strategyId }));
@@ -168,19 +240,26 @@ export default function LeadsPage() {
 
 function LeadDetail({
   lead,
+  webinar,
   approvedStrategy,
+  onEdit,
   onBack,
   onApprove,
 }: {
   lead: Lead;
+  webinar: Webinar;
   approvedStrategy?: string;
+  onEdit: (patch: Partial<Lead>) => void;
   onBack: () => void;
   onApprove: (strategyId: string) => void;
 }) {
-  const rec = useMemo(() => recommend(lead), [lead]);
+  const [cohortSize, setCohortSize] = useState(16);
+  const rec = useMemo(() => recommend(lead, cohortSize), [lead, cohortSize]);
   const [chosen, setChosen] = useState(rec.winner.id);
+  const [overridden, setOverridden] = useState(false);
   const [showWhy, setShowWhy] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [showScenario, setShowScenario] = useState(false);
   const [email, setEmail] = useState(() => draftEmail(lead, strategyById(rec.winner.id), webinar));
   const [aiModel, setAiModel] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
@@ -190,17 +269,24 @@ function LeadDetail({
   const chosenStrategy = strategyById(chosen);
   const isRecommended = chosen === rec.winner.id;
 
-  // Redraft (deterministically) whenever the chosen strategy changes.
+  // While the user hasn't manually overridden, the chosen strategy tracks the
+  // live recommendation — so dialing a scenario updates the email too.
+  useEffect(() => {
+    if (!overridden) setChosen(rec.winner.id);
+  }, [rec.winner.id, overridden]);
+
+  // Redraft (deterministically) whenever the chosen strategy, lead, or webinar changes.
   useEffect(() => {
     setEmail(draftEmail(lead, chosenStrategy, webinar));
     setAiModel(null);
     setNotice(null);
-  }, [chosen, lead, chosenStrategy]);
+  }, [chosen, lead, chosenStrategy, webinar]);
 
   const tier = tierOf(lead);
   const maxScore = Math.max(1, ...rec.results.map((r) => r.score));
 
   function useRecommendation() {
+    setOverridden(false);
     setChosen(rec.winner.id);
     setTimeout(() => emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }
@@ -253,7 +339,65 @@ function LeadDetail({
               ))}
             </div>
           </div>
+          <button className="btn ghost" style={{ marginLeft: "auto", alignSelf: "flex-start" }} onClick={() => setShowScenario((v) => !v)} aria-pressed={showScenario}>
+            {showScenario ? "Done adjusting" : "Adjust scenario"}
+          </button>
         </div>
+
+        {showScenario && (
+          <div className="scenario">
+            <p className="note" style={{ marginBottom: 14 }}>
+              Dial this attendee&apos;s behavior to run a what-if. The recommendation, confidence,
+              funnel, and email below update live.
+            </p>
+            <div className="scenariogrid">
+              <label className="fld">Name
+                <input type="text" value={lead.name} onChange={(e) => onEdit({ name: e.target.value })} />
+              </label>
+              <label className="fld">Title
+                <input type="text" value={lead.title} onChange={(e) => onEdit({ title: e.target.value })} />
+              </label>
+              <label className="fld">Company
+                <input type="text" value={lead.company} onChange={(e) => onEdit({ company: e.target.value })} />
+              </label>
+              <label className="fld">Seniority
+                <select value={lead.seniority} onChange={(e) => onEdit({ seniority: e.target.value as Seniority })}>
+                  {SENIORITIES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </label>
+              <label className="fld">Relationship
+                <select value={lead.relationship} onChange={(e) => onEdit({ relationship: e.target.value as Relationship })}>
+                  {RELATIONSHIPS.map((r) => <option key={r} value={r}>{REL_LABEL[r]}</option>)}
+                </select>
+              </label>
+              <label className="fld">Topic they engaged with
+                <input type="text" value={lead.topicSignal} onChange={(e) => onEdit({ topicSignal: e.target.value })} />
+              </label>
+              <label className="fld">Attended {lead.pctAttended}%
+                <input type="range" min={0} max={100} value={lead.pctAttended}
+                  onChange={(e) => onEdit({ pctAttended: Number(e.target.value), attended: Number(e.target.value) > 0 })} />
+              </label>
+              <label className="fld">Questions asked: {lead.questionsAsked}
+                <input type="range" min={0} max={6} value={lead.questionsAsked} onChange={(e) => onEdit({ questionsAsked: Number(e.target.value) })} />
+              </label>
+              <label className="fld">Resources downloaded: {lead.resourcesDownloaded}
+                <input type="range" min={0} max={6} value={lead.resourcesDownloaded} onChange={(e) => onEdit({ resourcesDownloaded: Number(e.target.value) })} />
+              </label>
+              <label className="fld">Prior webinars: {lead.priorWebinars}
+                <input type="range" min={0} max={6} value={lead.priorWebinars} onChange={(e) => onEdit({ priorWebinars: Number(e.target.value) })} />
+              </label>
+              <label className="fld">Cohort size: {cohortSize}
+                <input type="range" min={8} max={40} step={2} value={cohortSize} onChange={(e) => setCohortSize(Number(e.target.value))} />
+              </label>
+              <div className="scentoggles">
+                <label className="scentoggle"><input type="checkbox" checked={lead.attended} onChange={(e) => onEdit({ attended: e.target.checked })} /> Attended live</label>
+                <label className="scentoggle"><input type="checkbox" checked={lead.stayedToEnd} onChange={(e) => onEdit({ stayedToEnd: e.target.checked })} /> Stayed to end</label>
+                <label className="scentoggle"><input type="checkbox" checked={lead.surveyCompleted} onChange={(e) => onEdit({ surveyCompleted: e.target.checked })} /> Completed survey</label>
+                <label className="scentoggle"><input type="checkbox" checked={lead.targetAccount} onChange={(e) => onEdit({ targetAccount: e.target.checked })} /> Target account</label>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Recommendation card */}
@@ -312,6 +456,7 @@ function LeadDetail({
                 isWinner={r.strategyId === rec.winner.id}
                 isChosen={r.strategyId === chosen}
                 onPick={() => {
+                  setOverridden(true);
                   setChosen(r.strategyId);
                   setTimeout(() => emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
                 }}
