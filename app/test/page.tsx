@@ -965,7 +965,7 @@ export default function Home() {
                 id="msgtype-select"
                 value={messageType}
                 onChange={(e) => setMessageType(e.target.value)}
-                disabled={drafting || running || refining}
+                disabled={running || refining}
               >
                 {msgTypes.map((m) => (
                   <option key={m} value={m}>
