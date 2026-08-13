@@ -1411,49 +1411,110 @@ export default function Home() {
             );
           })()}
 
-          {/* The messages tested — reveal the copy so the verdict is actionable */}
-          {resultsAsset !== "website" && (shown.copyA?.trim() || shown.copyB?.trim()) ? (
-            <section className="card">
-              <h2 className="step">The messages tested</h2>
-              <p className="sub">
-                The two versions your panel reacted to
-                {analysis && (analysis.verdict === "ship_a" || analysis.verdict === "ship_b")
-                  ? " — the winner is highlighted, ready to copy and send."
-                  : "."}
-              </p>
-              <div className="grid2 msgtested">
-                {(["A", "B"] as const).map((V) => {
-                  const isA = V === "A";
-                  const win = analysis?.verdict === (isA ? "ship_a" : "ship_b");
-                  const label = isA ? shown.labelA : shown.labelB;
-                  const copy = isA ? shown.copyA : shown.copyB;
-                  const gives = isA ? gA : gB;
-                  return (
-                    <div key={V} className={`msgcard ${win ? "win" : ""}`}>
-                      <div className="msgcard-h">
-                        <span className={`abdot ${isA ? "a" : "b"}`} />
-                        <b>Version {V}</b> · {label}
-                        {win && <span className="winpill">Winner</span>}
-                      </div>
-                      <div className="msgcard-stat">{shareWithCI(gives, n)} would act on it</div>
-                      <pre className="msgcard-copy">{copy}</pre>
-                      <button
-                        className="copybtn"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(`${label}\n\n${copy}`).then(
-                            () => { setCopiedV(V); setTimeout(() => setCopiedV(null), 2000); },
-                            () => {}
-                          );
-                        }}
-                      >
-                        {copiedV === V ? "Copied ✓" : "Copy this version"}
-                      </button>
+          {/* The messages tested — why one won, then the copy */}
+          {resultsAsset !== "website" && (shown.copyA?.trim() || shown.copyB?.trim()) ? (() => {
+            const winSide = analysis?.verdict === "ship_a" ? "a" : analysis?.verdict === "ship_b" ? "b" : null;
+            const winV = winSide === "a" ? "A" : winSide === "b" ? "B" : null;
+            const loseV = winV === "A" ? "B" : winV === "B" ? "A" : null;
+            const winLabel = winV === "A" ? shown.labelA : shown.labelB;
+            const loseLabel = winV === "A" ? shown.labelB : shown.labelA;
+            const wAct = winSide === "a" ? gA : gB;
+            const lAct = winSide === "a" ? gB : gA;
+            const wRes = mean(winSide === "a" ? "resonanceA" : "resonanceB");
+            const lRes = mean(winSide === "a" ? "resonanceB" : "resonanceA");
+            const wTrust = winSide === "a" ? trustA : trustB;
+            const lTrust = winSide === "a" ? trustB : trustA;
+            const pct = (v: number) => Math.round((v / n) * 100);
+            const mult = lAct > 0 ? (wAct / lAct) : wAct;
+
+            const winReasons: string[] = [];
+            if (wAct > lAct) winReasons.push(`${pct(wAct)}% of the panel would act on it vs ${pct(lAct)}% for ${loseLabel}${lAct > 0 && mult >= 1.5 ? ` — ${mult.toFixed(mult >= 10 ? 0 : 1)}× more people` : ""}.`);
+            if (wRes > lRes + 0.1) winReasons.push(`It landed harder emotionally — ${wRes.toFixed(1)}/5 resonance vs ${lRes.toFixed(1)}.`);
+            if (wTrust > lTrust) winReasons.push(`Read as more trustworthy — ${wTrust} of ${n} picked it on trust vs ${lTrust}.`);
+
+            const dismissKey = winSide === "a" ? "intentB" : "intentA";
+            const dismissLose = results.filter((r) => r[dismissKey] === "dismiss").length;
+            const barriers: string[] = [];
+            if (lAct < wAct) barriers.push(`Only ${pct(lAct)}% said they'd act on it.`);
+            if (dismissLose > 0) barriers.push(`${dismissLose} of ${n} would ${INTENT_LABELS[resultsAsset].dismiss.toLowerCase()}.`);
+            if (lRes < wRes - 0.1) barriers.push(`Weaker emotional pull — ${lRes.toFixed(1)}/5 resonance.`);
+
+            const winWinner = winSide === "a" ? "send_a" : "send_b";
+            const quote = [...results]
+              .filter((r) => r.winner === winWinner && r.rationale && r.rationale.length > 30)
+              .sort((a, b) => b.rationale.length - a.rationale.length)[0];
+
+            return (
+              <section className="card">
+                <h2 className="step">{winV ? `Why Version ${winV} wins` : "The messages tested"}</h2>
+
+                {winV && analysis ? (
+                  <div className="whywin">
+                    <div className="whywin-head">
+                      <span className={`abdot ${winSide}`} />
+                      <b>Version {winV} — “{winLabel}”</b> won. {pct(wAct)}% would act vs {pct(lAct)}% for Version {loseV}.
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          ) : null}
+                    <div className="whygrid">
+                      <div className="whycol good">
+                        <div className="whyh">Why it won</div>
+                        <ul>{winReasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                        {quote && <blockquote className="whyquote">“{quote.rationale}” <cite>— {quote.personaName}, {segmentLabel(quote.giving)}</cite></blockquote>}
+                      </div>
+                      <div className="whycol bad">
+                        <div className="whyh">What held Version {loseV} back</div>
+                        <ul>{barriers.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                        {analysis.keyPoints?.find((k) => /proof|concrete|specific|skeptic|vague|call-to-action|cta/i.test(k.point + k.why)) ? (
+                          <p className="whyfix">{analysis.keyPoints.find((k) => /proof|concrete|specific|skeptic|vague|call-to-action|cta/i.test(k.point + k.why))!.why}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="sub">
+                    {analysis && analysis.verdict === "tie"
+                      ? `Too close to call — ${pct(gA)}% would act on A vs ${pct(gB)}% on B. Refine the weaker version and re-test.`
+                      : "The two versions your panel reacted to."}
+                  </p>
+                )}
+
+                <div className="grid2 msgtested" style={{ marginTop: winV ? 18 : 4 }}>
+                  {(["A", "B"] as const).map((V) => {
+                    const isA = V === "A";
+                    const win = winV === V;
+                    const label = isA ? shown.labelA : shown.labelB;
+                    const copy = isA ? shown.copyA : shown.copyB;
+                    const gives = isA ? gA : gB;
+                    return (
+                      <div key={V} className={`msgcard ${win ? "win" : ""}`}>
+                        <div className="msgcard-h">
+                          <span className={`abdot ${isA ? "a" : "b"}`} />
+                          <b>Version {V}</b> · {label}
+                          {win && <span className="winpill">Winner</span>}
+                        </div>
+                        <div className="msgstats">
+                          <span><b>{shareWithCI(gives, n)}</b> would act</span>
+                          <span><b>{mean(isA ? "resonanceA" : "resonanceB").toFixed(1)}/5</b> resonance</span>
+                          <span><b>{isA ? trustA : trustB}</b> trust</span>
+                        </div>
+                        <pre className="msgcard-copy">{copy}</pre>
+                        <button
+                          className="copybtn"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(`${label}\n\n${copy}`).then(
+                              () => { setCopiedV(V); setTimeout(() => setCopiedV(null), 2000); },
+                              () => {}
+                            );
+                          }}
+                        >
+                          {copiedV === V ? "Copied ✓" : "Copy this version"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })() : null}
 
           {/* Predicted social engagement — social asset only */}
           {resultsAsset === "social" && results.length > 0 ? (() => {

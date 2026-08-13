@@ -1232,3 +1232,20 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .spost-metrics .sm svg { color: var(--ink-3); }
 .spost-metrics .sm b { font-family: var(--serif); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
 .cmpk svg { vertical-align: -2px; margin-right: 4px; color: var(--ink-3); }
+
+/* --- "Why Version X wins" panel --- */
+.whywin { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--bg-2); }
+.whywin-head { display: flex; align-items: center; gap: 9px; font-size: 15px; color: var(--ink); padding-bottom: 13px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.whywin-head .abdot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.whygrid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+@media (max-width: 640px) { .whygrid { grid-template-columns: 1fr; gap: 16px; } }
+.whyh { font-family: var(--mono); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 9px; }
+.whycol.good .whyh { color: #3f7a2e; }
+.whycol.bad .whyh { color: #b23b3b; }
+.whycol ul { margin: 0; padding-left: 18px; }
+.whycol li { font-size: 13.5px; line-height: 1.55; margin-bottom: 6px; color: var(--ink); }
+.whyquote { margin: 12px 0 0; padding: 10px 13px; border-left: 3px solid var(--series-b); background: var(--card); border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); font-style: italic; }
+.whyquote cite { display: block; margin-top: 6px; font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+.whyfix { margin: 12px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+.msgstats { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 11px; }
+.msgstats b { font-family: var(--serif); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
