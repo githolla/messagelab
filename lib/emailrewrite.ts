@@ -91,13 +91,39 @@ const GRAMMAR: Array<[RegExp, string, string]> = [
 // Urgency / promotional phrasing — FLAGGED, never auto-removed (positioning is
 // a content decision, per the CTA / sales-positioning rules).
 const URGENCY = ["act now", "limited time", "don't miss", "offer expires", "buy now", "risk-free", "100% risk-free", "exclusive deal", "last chance", "hurry", "once in a lifetime", "don't wait"];
-// Classic wordiness — flagged as an optional tighten, not auto-applied.
+
+// Classic wordiness → shorter, meaning-preserving. In "active" mode these are
+// APPLIED (Readability); in "strict" mode they are flagged only.
 const WORDY: Array<[string, string]> = [
+  ["in order to", "to"],
   ["at this point in time", "now"],
   ["the reason is because", "because"],
-  ["in the event that", "if"],
   ["due to the fact that", "because"],
+  ["in the event that", "if"],
   ["in spite of the fact that", "although"],
+  ["in the near future", "soon"],
+  ["with regard to", "regarding"],
+  ["in regards to", "regarding"],
+  ["for the purpose of", "for"],
+  ["the majority of", "most"],
+];
+
+// Redundant pairs that say the same thing twice — applied in "active" mode.
+const REDUNDANT: Array<[string, string]> = [
+  ["each and every", "every"],
+  ["past history", "history"],
+  ["end result", "result"],
+  ["final outcome", "outcome"],
+  ["free gift", "gift"],
+  ["close proximity", "proximity"],
+  ["basic fundamentals", "fundamentals"],
+  ["advance planning", "planning"],
+  ["absolutely essential", "essential"],
+  ["collaborate together", "collaborate"],
+  ["very unique", "unique"],
+  ["added bonus", "bonus"],
+  ["future plans", "plans"],
+  ["true fact", "fact"],
 ];
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -117,10 +143,29 @@ function tidy(text: string): string {
     .trim();
 }
 
+export type RewriteMode = "active" | "strict";
 type Rec = (c: Omit<Change, "count">) => void;
 
-function applyEdits(text: string, rec: Rec): string {
+function applyEdits(text: string, rec: Rec, mode: RewriteMode): string {
   let out = text;
+
+  // Active mode also tightens wordiness and cuts redundancy (meaning preserved).
+  if (mode === "active") {
+    for (const [phrase, shorter] of WORDY) {
+      out = out.replace(new RegExp(`\\b${esc(phrase)}\\b`, "gi"), (m) => {
+        const after = matchCase(m, shorter);
+        rec({ before: m, after, category: "Readability", confidence: "Medium", reason: `Wordy — "${m}" shortens to "${after}" with no change in meaning.`, applied: true, kind: "replace" });
+        return after;
+      });
+    }
+    for (const [phrase, shorter] of REDUNDANT) {
+      out = out.replace(new RegExp(`\\b${esc(phrase)}\\b`, "gi"), (m) => {
+        const after = matchCase(m, shorter);
+        rec({ before: m, after, category: "Consistency", confidence: "Medium", reason: `Redundant — "${m}" says the same thing twice; "${after}" is enough.`, applied: true, kind: "replace" });
+        return after;
+      });
+    }
+  }
 
   // Spelling.
   for (const [wrong, right] of MISSPELL) {
@@ -180,7 +225,7 @@ function applyEdits(text: string, rec: Rec): string {
   return tidy(out);
 }
 
-function scanFlags(subject: string, body: string, rec: Rec) {
+function scanFlags(subject: string, body: string, rec: Rec, mode: RewriteMode) {
   const text = `${subject}\n${body}`;
   const lower = text.toLowerCase();
   const seen = new Set<string>();
@@ -199,8 +244,10 @@ function scanFlags(subject: string, body: string, rec: Rec) {
   if (/\bclick here\b/i.test(text))
     flagPhrase("click here", "Deliverability", '"Click here" is vague, non-descriptive link text — consider describing the destination. The link itself is left unchanged.');
 
-  for (const [phrase, shorter] of WORDY)
-    flagPhrase(phrase, "Readability", `Wordy — "${phrase}" could tighten to "${shorter}" with no change in meaning. Left as-is; conversational phrasing may be intentional.`);
+  // In strict mode wordiness is flagged; in active mode it's already applied above.
+  if (mode === "strict")
+    for (const [phrase, shorter] of WORDY)
+      flagPhrase(phrase, "Readability", `Wordy — "${phrase}" could tighten to "${shorter}" with no change in meaning. Left as-is; conversational phrasing may be intentional.`);
 
   // Multiple links / CTAs.
   const links = (text.match(/https?:\/\/|\bclick here\b/gi) || []).length;
@@ -223,7 +270,7 @@ function scanFlags(subject: string, body: string, rec: Rec) {
     rec({ before: "", after: "", category: "Deliverability", confidence: "Low", reason: `${bangs} exclamation points across the email create high intensity — consider easing off. Individual "!"s are left as written.`, applied: false, kind: "flag" });
 }
 
-export function rewriteEmail(_agents: unknown, e: PastEmail): EmailRewrite {
+export function rewriteEmail(_agents: unknown, e: PastEmail, mode: RewriteMode = "active"): EmailRewrite {
   const map = new Map<string, Change>();
   const rec: Rec = (c) => {
     const key = `${c.kind}|${c.category}|${c.before.toLowerCase()}|${c.after.toLowerCase()}|${c.reason}`;
@@ -232,9 +279,9 @@ export function rewriteEmail(_agents: unknown, e: PastEmail): EmailRewrite {
     else map.set(key, { ...c, count: 1 });
   };
 
-  const revisedSubject = applyEdits(e.subject, rec);
-  const revisedBody = applyEdits(e.body, rec);
-  scanFlags(e.subject, e.body, rec);
+  const revisedSubject = applyEdits(e.subject, rec, mode);
+  const revisedBody = applyEdits(e.body, rec, mode);
+  scanFlags(e.subject, e.body, rec, mode);
 
   const confRank: Record<Confidence, number> = { High: 3, Medium: 2, Low: 1 };
   const changes = [...map.values()].sort(
@@ -262,6 +309,6 @@ export function rewriteEmail(_agents: unknown, e: PastEmail): EmailRewrite {
   };
 }
 
-export function rewriteAll(agents: unknown, emails: PastEmail[]): EmailRewrite[] {
-  return emails.map((e) => rewriteEmail(agents, e));
+export function rewriteAll(agents: unknown, emails: PastEmail[], mode: RewriteMode = "active"): EmailRewrite[] {
+  return emails.map((e) => rewriteEmail(agents, e, mode));
 }

@@ -801,6 +801,7 @@ function EmailReviewLab({
   }
 
   const [collapsedRw, setCollapsedRw] = useState<Set<string>>(new Set());
+  const [rwMode, setRwMode] = useState<"active" | "strict">("active");
   const MAX_EMAILS = 300;
   const usableCount = pastEmails.filter((e) => (e.body || "").trim()).length;
   const summary = useMemo(() => summarizeReviews(reviews), [reviews]);
@@ -812,10 +813,10 @@ function EmailReviewLab({
     if (!reviews.length) return m;
     for (const r of reviews) {
       const e = pastEmails.find((x) => x.id === r.emailId);
-      if (e) m.set(r.emailId, rewriteEmail(agents, e));
+      if (e) m.set(r.emailId, rewriteEmail(agents, e, rwMode));
     }
     return m;
-  }, [reviews, agents, pastEmails]);
+  }, [reviews, agents, pastEmails, rwMode]);
 
   function toggleRw(id: string) {
     setCollapsedRw((s) => {
@@ -1104,6 +1105,19 @@ function EmailReviewLab({
               </p>
             </section>
           )}
+
+          <div className="rwmodebar">
+            <span className="rwmode-label">Proofreading</span>
+            <div className="rwmode-seg">
+              <button className={rwMode === "active" ? "on" : ""} onClick={() => setRwMode("active")}>Active — fix &amp; tighten</button>
+              <button className={rwMode === "strict" ? "on" : ""} onClick={() => setRwMode("strict")}>Strict — errors only</button>
+            </div>
+            <span className="note" style={{ margin: 0 }}>
+              {rwMode === "active"
+                ? "Applies safe improvements (wordiness, redundancy) on top of error fixes — voice, tone, CTAs, brand and facts still protected."
+                : "Only objective corrections (spelling, grammar, punctuation, promo ALL-CAPS). A clean email is returned unchanged."}
+            </span>
+          </div>
 
           {reviews.map((r) => (
             <section className="card reviewcard" key={r.emailId}>

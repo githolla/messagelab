@@ -1131,3 +1131,12 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .conf-high { background: #dff2e0; color: #2f7a3a; }
 .conf-medium { background: #fdf0d5; color: #9a6a00; }
 .conf-low { background: var(--line); color: var(--ink-2); }
+
+/* --- Proofreading mode toggle --- */
+.rwmodebar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 6px 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
+.rwmode-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); }
+.rwmode-seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+.rwmode-seg button { border: none; background: var(--card); color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; cursor: pointer; }
+.rwmode-seg button + button { border-left: 1px solid var(--line); }
+.rwmode-seg button.on { background: var(--ink); color: var(--paper, #fff); }
+.rwmodebar .note { flex: 1; min-width: 220px; }
