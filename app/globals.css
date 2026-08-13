@@ -1182,3 +1182,8 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .winpill { margin-left: auto; background: var(--series-b, #65a30d); color: #fff; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; }
 .msgcard-stat { font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
 .msgcard-copy { white-space: pre-wrap; font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--card-2, var(--paper, #fafafa)); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 11px 12px; margin: 0 0 10px; max-height: 320px; overflow: auto; }
+
+/* --- A/B message source toggle --- */
+.msgmode { display: inline-flex; margin-bottom: 2px; }
+.autocopy .filebtn { position: relative; overflow: hidden; cursor: pointer; display: inline-flex; align-items: center; }
+.autocopy .filebtn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }

@@ -46,10 +46,13 @@ a segment-level results dashboard. "Message Lab" is a working title.
   type. The message is now drafted **behind the scenes** — a debounced effect
   auto-crafts when industry/message/asset settle (skips first mount, dedupes the
   combo, latches off silently on no-key, never clobbers hand-edited copy via a
-  `copyDirty` flag). Step 2 hides the copy editor behind a collapsed "Preview or
-  write your own" escape hatch (website assets keep their screenshot upload); the
-  two tested versions' full copy is revealed in the results ("The messages tested"
-  card, winner highlighted, copy-to-clipboard).
+  `copyDirty` flag). Step 2 ("The message") has a source toggle: "Draft it for me"
+  (auto, behind the scenes, with a collapsed read-only preview) or "Write, paste
+  or upload" — per-version label + textarea + file upload (.txt/.eml/.md/.html,
+  `parseEmailText` strips headers/markup and lifts the subject into the label).
+  Website assets keep their screenshot upload. Either way the two tested versions'
+  full copy is revealed in the results ("The messages tested" card, winner
+  highlighted, copy-to-clipboard).
 - Analysis: `app/api/analyze/route.ts` takes the panel results + industry and returns
   a decision-ready report (verdict, headline, exec summary, per-segment drivers,
   prioritized actions, per-analyst reads). `lib/analysis.ts` has the type + a

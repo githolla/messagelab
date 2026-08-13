@@ -88,6 +88,32 @@ function buildPanelFromSegments(
 }
 
 // Downscale to Claude's vision sweet spot (long edge ≤ 1568px), re-encode JPEG.
+// Parse an uploaded email file into { subject, body } — strips .eml headers and
+// .html markup so the pasted/uploaded copy is clean plain text to test.
+function parseEmailText(text: string, name: string): { subject: string; body: string } {
+  const subj = text.match(/^subject:\s*(.*)$/im);
+  const looksHtml = name.toLowerCase().endsWith(".html") || name.toLowerCase().endsWith(".htm") || /<html|<body|<table|<div|<p[ >]/i.test(text.slice(0, 500));
+  if (looksHtml) {
+    const body = text
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<(br|\/p|\/div|\/tr|\/h[1-6])\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/[ \t]{2,}/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    return { subject: subj ? subj[1].trim() : "", body };
+  }
+  let body = text;
+  if (/^(from|to|subject|date|reply-to|cc):/im.test(text.slice(0, 400))) {
+    const idx = text.search(/\r?\n\r?\n/);
+    if (idx > -1) body = text.slice(idx);
+  }
+  return { subject: subj ? subj[1].trim() : "", body: body.trim() };
+}
+
 // 0.8 quality for screenshots keeps text legible while trimming the payload
 // that gets re-sent once per persona in the fan-out.
 function fileToDataUrl(file: File): Promise<string> {
@@ -148,6 +174,8 @@ export default function Home() {
   // auto-drafting over them); `autoCraftOff` latches when a draft call fails
   // (e.g. no server key); `lastAutoKey` dedupes the industry|message|asset combo.
   const [copyDirty, setCopyDirty] = useState(false);
+  // Message source: 'auto' drafts behind the scenes; 'own' = write/paste/upload.
+  const [msgMode, setMsgMode] = useState<"auto" | "own">("auto");
   const autoCraftOff = useRef(false);
   const lastAutoKey = useRef("");
   const didMountCraft = useRef(false);
@@ -233,6 +261,39 @@ export default function Home() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [industry, messageType, variants.assetType, copyDirty, drafting]);
+
+  // Message-source switches. "Draft it for me" hands control back to auto-craft;
+  // "Write, paste or upload" freezes it so the user's copy is never overwritten.
+  function chooseAuto() {
+    setMsgMode("auto");
+    setCopyDirty(false);
+    if (!autoCraftOff.current) {
+      lastAutoKey.current = "";
+      autoCraft({ auto: true });
+    }
+  }
+  function chooseOwn() {
+    setMsgMode("own");
+    setCopyDirty(true);
+  }
+  async function uploadCopy(which: "A" | "B", file: File) {
+    try {
+      const text = await file.text();
+      const { subject, body } = parseEmailText(text, file.name);
+      const copyKey = which === "A" ? "copyA" : "copyB";
+      const labelKey = which === "A" ? "labelA" : "labelB";
+      setVariants((v) => ({
+        ...v,
+        [copyKey]: body || text,
+        ...(subject ? { [labelKey]: subject.slice(0, 60) } : {}),
+      }));
+      setCopyDirty(true);
+      setMsgMode("own");
+      setError(null);
+    } catch {
+      setError(`Could not read the Version ${which} file.`);
+    }
+  }
 
   // Grow a copy textarea to fit its content. useCallback gives the ref a stable
   // identity so React only calls it on mount (not every render); growth while
@@ -1102,58 +1163,93 @@ export default function Home() {
           </>
         ) : (
           <div className="autocopy">
-            <p className="sub">
-              {drafting
-                ? `Drafting two contrasting ${messageType.toLowerCase()} versions for ${industryLabel}…`
-                : copyDirty
-                  ? "Testing your own copy — expand below to review or edit it. The winning version appears in your results."
-                  : `We draft two contrasting ${messageType.toLowerCase()} versions for ${industryLabel} and test them head-to-head. You don't have to write anything — the winning copy appears in your results.`}
-            </p>
-            <details className="method">
-              <summary>Preview or write your own copy</summary>
-              <div className="craftbar" style={{ marginTop: 12 }}>
-                <button className="btn ghost" onClick={() => autoCraft()} disabled={drafting || running || refining}>
-                  {drafting ? "Drafting…" : "Draft a fresh pair"}
-                </button>
-                <span className="note">
-                  {copyDirty ? "Using your copy — it'll be tested as Version A vs B." : "Or edit either version below to test your own copy instead."}
-                </span>
-              </div>
-              <div className="grid2">
-                {(["A", "B"] as const).map((v) => {
-                  const labelKey = v === "A" ? "labelA" : "labelB";
-                  const copyKey = v === "A" ? "copyA" : "copyB";
-                  const isSample = isPristineCopy(variants[copyKey]) && variants[copyKey].trim() !== "";
-                  return (
-                    <div key={v}>
-                      <label className="fld" htmlFor={`label-${v}`}>
-                        Version {v} label
-                        {isSample && <span className="demotag" style={{ marginLeft: 8 }}>Sample</span>}
-                      </label>
-                      <input
-                        id={`label-${v}`}
-                        type="text"
-                        value={variants[labelKey]}
-                        onChange={(e) => setVariants((prev) => ({ ...prev, [labelKey]: e.target.value }))}
-                      />
-                      <label className="fld" style={{ marginTop: 10 }} htmlFor={`copy-${v}`}>Version {v} copy</label>
-                      <textarea
-                        id={`copy-${v}`}
-                        className="grow"
-                        ref={autoSize}
-                        value={variants[copyKey]}
-                        onChange={(e) => {
-                          resizeTa(e.target);
-                          const val = e.target.value;
-                          setVariants((prev) => ({ ...prev, [copyKey]: val }));
-                          setCopyDirty(true);
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
+            <div className="seg msgmode" role="group" aria-label="Message source">
+              <button className={msgMode === "auto" ? "on" : ""} aria-pressed={msgMode === "auto"} onClick={chooseAuto} disabled={running || refining}>
+                Draft it for me
+              </button>
+              <button className={msgMode === "own" ? "on" : ""} aria-pressed={msgMode === "own"} onClick={chooseOwn} disabled={running || refining}>
+                Write, paste or upload
+              </button>
+            </div>
+
+            {msgMode === "auto" ? (
+              <>
+                <p className="sub" style={{ marginTop: 10 }}>
+                  {drafting
+                    ? `Drafting two contrasting ${messageType.toLowerCase()} versions for ${industryLabel}…`
+                    : `We draft two contrasting ${messageType.toLowerCase()} versions for ${industryLabel} and test them head-to-head. You don't have to write anything — the winning copy appears in your results.`}
+                </p>
+                <details className="method">
+                  <summary>Preview the drafted versions</summary>
+                  <div className="grid2" style={{ marginTop: 12 }}>
+                    {(["A", "B"] as const).map((v) => {
+                      const isA = v === "A";
+                      return (
+                        <div key={v}>
+                          <div className="fld">Version {v} · {isA ? variants.labelA : variants.labelB}</div>
+                          <pre className="msgcard-copy">{(isA ? variants.copyA : variants.copyB) || "—"}</pre>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="craftbar" style={{ marginTop: 10 }}>
+                    <button className="btn ghost" onClick={() => autoCraft()} disabled={drafting || running || refining}>
+                      {drafting ? "Drafting…" : "Draft a fresh pair"}
+                    </button>
+                    <span className="note">A new pair, same industry &amp; message type.</span>
+                  </div>
+                </details>
+              </>
+            ) : (
+              <>
+                <p className="sub" style={{ marginTop: 10 }}>
+                  Add the two versions you want to test — type, paste, or upload a file (.txt, .eml, .md, .html)
+                  for each. Then build &amp; run the simulation below.
+                </p>
+                <div className="grid2">
+                  {(["A", "B"] as const).map((v) => {
+                    const labelKey = v === "A" ? "labelA" : "labelB";
+                    const copyKey = v === "A" ? "copyA" : "copyB";
+                    return (
+                      <div key={v}>
+                        <div className="fgh" style={{ marginTop: 0 }}>
+                          <label className="fld" htmlFor={`label-${v}`} style={{ margin: 0 }}>Version {v}</label>
+                          <label className="btn ghost filebtn" style={{ padding: "5px 11px", fontSize: 12 }}>
+                            Upload file
+                            <input
+                              type="file"
+                              accept=".txt,.eml,.md,.html,.htm,text/plain,text/html"
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCopy(v, f); e.currentTarget.value = ""; }}
+                            />
+                          </label>
+                        </div>
+                        <input
+                          id={`label-${v}`}
+                          type="text"
+                          placeholder={`Version ${v} label — e.g. “${v === "A" ? "Story-led" : "Offer-led"}”`}
+                          value={variants[labelKey]}
+                          onChange={(e) => { setVariants((prev) => ({ ...prev, [labelKey]: e.target.value })); setCopyDirty(true); }}
+                        />
+                        <label className="fld" style={{ marginTop: 10 }} htmlFor={`copy-${v}`}>Version {v} email</label>
+                        <textarea
+                          id={`copy-${v}`}
+                          className="grow"
+                          ref={autoSize}
+                          placeholder={`Write or paste Version ${v}…`}
+                          value={variants[copyKey]}
+                          onChange={(e) => {
+                            resizeTa(e.target);
+                            const val = e.target.value;
+                            setVariants((prev) => ({ ...prev, [copyKey]: val }));
+                            setCopyDirty(true);
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         )}
         <div className="runbar" style={{ marginTop: 16 }}>
