@@ -1,19 +1,37 @@
-// Deterministic email rewriter. After the review runs, this proposes a revised
-// version of each email and — crucially — records EVERY edit as a Change with a
-// specific, word-level reason attributed to the reviewer agent that would flag
-// it. No API key, no Math.random: the same email always yields the same rewrite,
-// so the "why each word changed" notes are stable and inspectable.
+// Conservative brand proofreader. Philosophy: the best editor knows which
+// changes NOT to make. It auto-applies only objective corrections (spelling,
+// typos, duplicate words, punctuation/spacing, excessive "!!!", promotional
+// ALL-CAPS) while PROTECTING author voice, tone, CTAs, positioning, brand terms,
+// acronyms, names, numbers, links and personalization tokens. Anything
+// subjective (urgency/promo language, wordiness, long sentences, weak link text)
+// is FLAGGED with a reason, never silently rewritten.
+//
+// Every change records Category + Confidence + a rule-tied reason. High/Medium
+// confidence edits are applied; Low-confidence items are flagged only. Fully
+// deterministic (no API key, no Math.random).
 
-import type { ReviewAgent, PastEmail, Severity } from "./reviewers";
+import type { PastEmail } from "./reviewers";
+
+export type EditCategory =
+  | "Spelling"
+  | "Grammar"
+  | "Punctuation"
+  | "Readability"
+  | "Clarity"
+  | "Consistency"
+  | "Brand"
+  | "Deliverability";
+export type Confidence = "High" | "Medium" | "Low";
 
 export interface Change {
-  before: string; // original text (empty for pure additions)
-  after: string; // replacement (empty for pure removals)
-  reason: string; // specific, word-level justification
-  agent: string; // reviewer lens the change answers to
-  severity: Severity;
-  count: number; // how many times this exact edit was applied
-  kind: "replace" | "remove" | "add" | "note";
+  before: string; // exact original text (may be "" for a general flag)
+  after: string; // replacement ("" for removals / flags)
+  category: EditCategory;
+  confidence: Confidence;
+  reason: string; // one concrete, rule-tied explanation
+  count: number;
+  applied: boolean; // whether the revised text reflects this change
+  kind: "replace" | "flag";
 }
 
 export interface EmailRewrite {
@@ -23,191 +41,212 @@ export interface EmailRewrite {
   revisedSubject: string;
   revisedBody: string;
   changes: Change[];
+  appliedCount: number;
+  flaggedCount: number;
+  unchanged: boolean;
   summary: string;
 }
 
-type RepFn = (m: string) => string;
-type ReasonFn = (m: string) => string;
-interface Rule {
-  re: RegExp;
-  rep: string | RepFn;
-  reason: string | ReasonFn;
-  lens: string; // builtin agent id, for attribution
-  fallback: string; // display name if that agent isn't in the panel
-  sev: Severity;
-  kind: "replace" | "remove";
-}
+// Protected acronyms / initialisms / titles — never case-normalized.
+const ACRONYMS = new Set([
+  "AGP", "AI", "CRM", "RFP", "KPI", "ROI", "PDF", "FAQ", "RSVP", "EOY", "USA", "URL",
+  "CEO", "COO", "CFO", "CMO", "CTO", "CIO", "EVP", "SVP", "VP", "CX", "HR", "IT", "PR",
+  "Q1", "Q2", "Q3", "Q4", "EIN", "DAF", "P2P", "SEO", "API", "SaaS", "B2B", "B2C",
+]);
+
+// Only these ALL-CAPS words read as promotional emphasis worth normalizing.
+// Anything not here (a possible brand/product/term) is left untouched.
+const PROMO_CAPS = new Set([
+  "FREE", "REGISTER", "NOW", "SIGN", "UP", "HURRY", "TODAY", "LIMITED", "TIME",
+  "ACT", "BUY", "SALE", "DEAL", "EXCLUSIVE", "AMAZING", "INCREDIBLE", "GUARANTEED",
+  "MISS", "DON'T", "DON’T", "LAST", "CHANCE", "OFFER", "URGENT", "ENDS", "SOON",
+  "CLICK", "HERE", "SAVE", "OUT", "BONUS", "WIN", "WINNER", "APPLY", "JOIN", "ORDER",
+]);
+
+// Common misspellings → correction (safe, unambiguous; no names/brands).
+const MISSPELL: Array<[string, string]> = [
+  ["foward", "forward"], ["recieve", "receive"], ["seperate", "separate"], ["definately", "definitely"],
+  ["occured", "occurred"], ["occurence", "occurrence"], ["accomodate", "accommodate"], ["acheive", "achieve"],
+  ["beleive", "believe"], ["calender", "calendar"], ["collegue", "colleague"], ["commited", "committed"],
+  ["embarass", "embarrass"], ["enviroment", "environment"], ["existance", "existence"], ["familar", "familiar"],
+  ["finaly", "finally"], ["goverment", "government"], ["greatful", "grateful"], ["happend", "happened"],
+  ["immediatly", "immediately"], ["independant", "independent"], ["maintainance", "maintenance"],
+  ["neccessary", "necessary"], ["noticable", "noticeable"], ["occassion", "occasion"], ["oppurtunity", "opportunity"],
+  ["persistant", "persistent"], ["priviledge", "privilege"], ["publically", "publicly"], ["recomend", "recommend"],
+  ["refered", "referred"], ["relevent", "relevant"], ["succesful", "successful"], ["successfull", "successful"],
+  ["tommorow", "tomorrow"], ["untill", "until"], ["writting", "writing"], ["begining", "beginning"],
+  ["occuring", "occurring"], ["alot", "a lot"], ["thier", "their"], ["teh", "the"], ["adn", "and"],
+  ["jsut", "just"], ["becuase", "because"], ["wnat", "want"], ["taht", "that"], ["hte", "the"],
+  ["wich", "which"], ["youre", "you're"], ["cant", "can't"], ["dont", "don't"], ["wont", "won't"],
+];
+
+// Grammar fixes with unambiguous corrections.
+const GRAMMAR: Array<[RegExp, string, string]> = [
+  [/\bcould of\b/gi, "could have", '"Could of" is a mishearing of "could have."'],
+  [/\bwould of\b/gi, "would have", '"Would of" is a mishearing of "would have."'],
+  [/\bshould of\b/gi, "should have", '"Should of" is a mishearing of "should have."'],
+  [/\byour welcome\b/gi, "you're welcome", 'Contraction needed: "you\'re" = "you are."'],
+];
+
+// Urgency / promotional phrasing — FLAGGED, never auto-removed (positioning is
+// a content decision, per the CTA / sales-positioning rules).
+const URGENCY = ["act now", "limited time", "don't miss", "offer expires", "buy now", "risk-free", "100% risk-free", "exclusive deal", "last chance", "hurry", "once in a lifetime", "don't wait"];
+// Classic wordiness — flagged as an optional tighten, not auto-applied.
+const WORDY: Array<[string, string]> = [
+  ["at this point in time", "now"],
+  ["the reason is because", "because"],
+  ["in the event that", "if"],
+  ["due to the fact that", "because"],
+  ["in spite of the fact that", "although"],
+];
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const rule = (
-  phrase: string,
-  rep: string | RepFn,
-  reason: string | ReasonFn,
-  lens: string,
-  fallback: string,
-  sev: Severity,
-): Rule => {
-  // Only anchor \b where the phrase edge is a word char — otherwise "100%" or
-  // "$5" never match (a non-word char has no boundary against a following space).
-  const left = /^\w/.test(phrase) ? "\\b" : "";
-  const right = /\w$/.test(phrase) ? "\\b" : "";
-  return {
-    re: new RegExp(`${left}${esc(phrase)}${right}`, "gi"),
-    rep,
-    reason,
-    lens,
-    fallback,
-    sev,
-    kind: typeof rep === "string" && rep.trim() === "" ? "remove" : "replace",
-  };
+const matchCase = (src: string, repl: string): string => {
+  if (src === src.toUpperCase() && src !== src.toLowerCase()) return repl.toUpperCase();
+  if (/^[A-Z]/.test(src)) return repl.charAt(0).toUpperCase() + repl.slice(1);
+  return repl;
 };
-
-// High-pressure / overpromise / spam-trigger phrasing.
-const SPAM_RULES: Rule[] = [
-  rule("act now", "", 'High-pressure phrase — manufactured urgency erodes trust in a relationship follow-up.', "convert", "Conversion", "medium"),
-  rule("limited time", "", "Manufactured scarcity reads as a sales gimmick, not a peer note.", "convert", "Conversion", "medium"),
-  rule("don't miss", "", "Fear-of-missing-out phrasing feels pushy in a follow-up.", "convert", "Conversion", "low"),
-  rule("offer expires", "", "Deadline pressure undercuts a trusted-advisor tone.", "convert", "Conversion", "low"),
-  rule("once in a lifetime", "", "Overstated urgency reads as hype.", "brand", "Brand Voice", "low"),
-  rule("risk-free", "", 'Overpromise — "risk-free" is a classic spam trigger and rarely true.', "deliver", "Deliverability & Trust", "high"),
-  rule("100% risk-free", "", 'Absolute overpromise ("100% risk-free") is a spam magnet — drop it.', "deliver", "Deliverability & Trust", "high"),
-  rule("100%", "", 'Absolute claims ("100%") trip spam filters and strain credibility.', "deliver", "Deliverability & Trust", "medium"),
-  rule("we guarantee", "", 'A guarantee you can\'t back is a spam trigger and overpromises.', "deliver", "Deliverability & Trust", "high"),
-  rule("i guarantee", "", 'A guarantee you can\'t back is a spam trigger and overpromises.', "deliver", "Deliverability & Trust", "high"),
-  rule("guaranteed", "", 'A guarantee you can\'t back is a spam trigger — drop it.', "deliver", "Deliverability & Trust", "high"),
-  rule("guarantee", "", 'A guarantee you can\'t back is a spam trigger — drop it.', "deliver", "Deliverability & Trust", "high"),
-  rule("exclusive deal", "", "Promo language belongs in a sales blast, not a personal note.", "brand", "Brand Voice", "medium"),
-  rule("amazing", "", 'Hype adjective ("amazing") — let specifics carry the value instead.', "brand", "Brand Voice", "low"),
-  rule("incredible", "", 'Hype adjective ("incredible") — show, don\'t tell.', "brand", "Brand Voice", "low"),
-  rule("click here", "take a look", '"Click here" is a top spam trigger and hides the destination — describe the link.', "deliver", "Deliverability & Trust", "high"),
-];
-
-// Corporate jargon → plain language.
-const JARGON_MAP: Array<[string, string]> = [
-  ["utilize", "use"],
-  ["leverage", "use"],
-  ["synergy", "a strong fit"],
-  ["circle back", "follow up"],
-  ["touch base", "check in"],
-  ["low-hanging fruit", "quick wins"],
-  ["move the needle", "make a difference"],
-  ["value-add", "benefit"],
-  ["best-in-class", "strong"],
-  ["cutting-edge", "modern"],
-  ["seamless", "smooth"],
-  ["robust", "solid"],
-  ["holistic", "complete"],
-  ["paradigm", "approach"],
-  ["bandwidth", "time"],
-  ["solutions", "help"],
-];
-const JARGON_RULES: Rule[] = JARGON_MAP.map(([from, to]) =>
-  rule(
-    from,
-    to,
-    (m) => `Corporate jargon — a plain word reads as more human than "${m}".`,
-    "copy",
-    "Copy & Clarity",
-    "low",
-  ),
-);
-
-// Generic, me-first filler → removed or personalized.
-const GENERIC_RULES: Rule[] = [
-  rule("we are excited", "", "Me-first filler — leads with the sender's feelings; reframe around the reader.", "empathy", "Empathy", "high"),
-  rule("we're excited", "", "Me-first filler — leads with the sender's feelings; reframe around the reader.", "empathy", "Empathy", "high"),
-  rule("hope this email finds you well", "", "Empty opener — say something specific to them instead.", "empathy", "Empathy", "medium"),
-  rule("valued customer", "", "Generic label — use their name or a specific reference.", "empathy", "Empathy", "high"),
-  rule("dear friend", "Hi there", "Generic salutation — personalize the greeting.", "empathy", "Empathy", "high"),
-  rule("dear sir", "Hi there", "Impersonal salutation — personalize the greeting.", "empathy", "Empathy", "high"),
-  rule("to whom it may concern", "Hi there", "Impersonal salutation — personalize the greeting.", "empathy", "Empathy", "high"),
-  rule("at our organization", "", "Sender-focused filler — center the reader.", "empathy", "Empathy", "low"),
-];
-
-const ALL_RULES = [...SPAM_RULES, ...JARGON_RULES, ...GENERIC_RULES];
-
-// Acronyms we should NOT lowercase when de-capitalizing shouting.
-const ACRONYMS = new Set(["CEO", "CTO", "CFO", "COO", "USA", "FAQ", "PDF", "URL", "ROI", "KPI", "AGP", "RSVP", "EOY"]);
-const ASK_RE = /\b(reply|schedule|book|grab|let me know|would you|are you open|can we|can you|join|register|download|call|meet|happy to|worth a)\b|\?/i;
-
-function agentName(agents: ReviewAgent[], id: string, fallback: string): string {
-  return agents.find((a) => a.id === id)?.name || fallback;
-}
-
-function record(map: Map<string, Change>, c: Omit<Change, "count">) {
-  const key = `${c.kind}|${c.before.toLowerCase()}|${c.after.toLowerCase()}`;
-  const cur = map.get(key);
-  if (cur) cur.count += 1;
-  else map.set(key, { ...c, count: 1 });
-}
 
 function tidy(text: string): string {
   return text
     .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n[ \t]+/g, "\n") // leading indentation left by a removed opener
     .replace(/[ \t]+\n/g, "\n")
-    .replace(/\s+([.,!?;:])/g, "$1")
-    .replace(/\(\s+/g, "(")
-    .replace(/\s+\)/g, ")")
-    .replace(/([.,!?;:]){2,}/g, "$1")
-    .replace(/(^|\n)\s*[—–-]\s+/g, "$1") // dangling dash at the start of a line
-    .replace(/([.!?])\s+[—–-]\s+/g, "$1 ") // dangling dash after a removed clause
     .replace(/\n{3,}/g, "\n\n")
-    .replace(/(^|[.!?]\s+|\n\s*)([a-z])/g, (_m, pre, ch) => pre + ch.toUpperCase())
     .replace(/[ \t]+$/gm, "")
+    .replace(/(^|[.!?]\s|\n)([a-z])/g, (_m, pre, ch) => pre + ch.toUpperCase())
     .trim();
 }
 
-export function rewriteEmail(agents: ReviewAgent[], e: PastEmail): EmailRewrite {
-  const changes = new Map<string, Change>();
-  const apply = (text: string): string => {
-    let out = text;
-    for (const r of ALL_RULES) {
-      out = out.replace(r.re, (m) => {
-        const after = typeof r.rep === "function" ? r.rep(m) : r.rep;
-        const reason = typeof r.reason === "function" ? r.reason(m) : r.reason;
-        record(changes, { before: m, after, reason, agent: agentName(agents, r.lens, r.fallback), severity: r.sev, kind: r.kind });
-        return after;
-      });
-    }
-    // Collapse exclamation runs to a period.
-    out = out.replace(/!+/g, (m) => {
-      record(changes, { before: m, after: ".", reason: "Exclamation points read as promotional; a period sounds calmer and more credible.", agent: agentName(agents, "brand", "Brand Voice"), severity: "medium", kind: "replace" });
-      return ".";
-    });
-    // De-shout ALL-CAPS words (keep known acronyms).
-    out = out.replace(/\b[A-Z][A-Z'’]{2,}\b/g, (m) => {
-      if (ACRONYMS.has(m.toUpperCase())) return m;
-      const after = m.charAt(0) + m.slice(1).toLowerCase();
-      record(changes, { before: m, after, reason: "ALL-CAPS trips spam filters and reads as shouting — normal case is calmer.", agent: agentName(agents, "deliver", "Deliverability & Trust"), severity: "medium", kind: "replace" });
+type Rec = (c: Omit<Change, "count">) => void;
+
+function applyEdits(text: string, rec: Rec): string {
+  let out = text;
+
+  // Spelling.
+  for (const [wrong, right] of MISSPELL) {
+    out = out.replace(new RegExp(`\\b${esc(wrong)}\\b`, "gi"), (m) => {
+      const after = matchCase(m, right);
+      if (after === m) return m;
+      rec({ before: m, after, category: "Spelling", confidence: "High", reason: `Misspelling — "${m}" should be "${after}".`, applied: true, kind: "replace" });
       return after;
     });
-    return out;
-  };
-
-  const revisedSubject = tidy(apply(e.subject));
-  let revisedBody = tidy(apply(e.body));
-
-  // Add a clear next step if the email has no ask at all.
-  if (!ASK_RE.test(e.body)) {
-    const ask = "Would a short call next week be useful?";
-    revisedBody = revisedBody.replace(/\s*$/, "") + `\n\n${ask}`;
-    record(changes, { before: "", after: ask, reason: "The email had no clear ask — added one low-friction next step so the reader knows what to do.", agent: agentName(agents, "convert", "Conversion"), severity: "high", kind: "add" });
   }
 
-  // Structural notes we flag but don't auto-apply (they need a human rewrite).
-  const words = (e.body.match(/\S+/g) || []).length;
-  if (words > 220)
-    record(changes, { before: "", after: "", reason: `At ${words} words this runs long — tighten to 120–160 so it stays skimmable.`, agent: agentName(agents, "copy", "Copy & Clarity"), severity: words > 320 ? "high" : "medium", kind: "note" });
-  const firstLine = (e.body.trim().split(/\n/)[0] || "").replace(/^(hi|hello|dear|hey)[^,]*,?\s*/i, "");
-  if (/^(i|we)\b/i.test(firstLine))
-    record(changes, { before: "", after: "", reason: 'Opens with "I/We" — lead the first line with the reader, not the sender.', agent: agentName(agents, "copy", "Copy & Clarity"), severity: "medium", kind: "note" });
+  // Grammar.
+  for (const [re, right, why] of GRAMMAR) {
+    out = out.replace(re, (m) => {
+      const after = matchCase(m, right);
+      rec({ before: m, after, category: "Grammar", confidence: "High", reason: why, applied: true, kind: "replace" });
+      return after;
+    });
+  }
 
-  const list = [...changes.values()].sort((a, b) => sev(b.severity) - sev(a.severity) || b.count - a.count);
-  const edits = list.filter((c) => c.kind !== "note").reduce((t, c) => t + c.count, 0);
-  const summary = edits
-    ? `${edits} edit${edits === 1 ? "" : "s"} across ${list.length} issue${list.length === 1 ? "" : "s"} — see why each was changed below.`
-    : "No wording changes suggested — this email already reads clean.";
+  // Duplicate words (lowercase only, to protect proper nouns / names).
+  out = out.replace(/\b([a-z]{1,15})\s+\1\b/gi, (m, w) => {
+    if (/^[A-Z]/.test(m)) return m; // starts capitalized → likely intentional / a name
+    if (["had", "that"].includes(w.toLowerCase())) return m; // legitimately repeatable
+    rec({ before: m, after: w, category: "Grammar", confidence: "High", reason: `Duplicate word — "${w}" is repeated.`, applied: true, kind: "replace" });
+    return w;
+  });
+
+  // Excessive exclamation runs → a single "!" (a lone "!" is left alone).
+  out = out.replace(/!{2,}/g, () => {
+    rec({ before: "!!", after: "!", category: "Punctuation", confidence: "Medium", reason: "Multiple exclamation points read as excessive intensity — one is enough. A single “!” is fine.", applied: true, kind: "replace" });
+    return "!";
+  });
+
+  // Space before punctuation.
+  out = out.replace(/ +([,;:!?])/g, (_m, p) => {
+    rec({ before: ` ${p}`, after: p, category: "Punctuation", confidence: "High", reason: `Removed the space before "${p}".`, applied: true, kind: "replace" });
+    return p;
+  });
+  // Missing space after a comma/semicolon.
+  out = out.replace(/([,;])([A-Za-z])/g, (_m, p, c) => {
+    rec({ before: `${p}${c}`, after: `${p} ${c}`, category: "Punctuation", confidence: "High", reason: `Added a space after "${p}".`, applied: true, kind: "replace" });
+    return `${p} ${c}`;
+  });
+
+  // Promotional ALL-CAPS → sentence case (acronyms / unknown terms preserved).
+  out = out.replace(/\b[A-Z][A-Z'’]{1,}\b/g, (m) => {
+    const u = m.toUpperCase();
+    if (ACRONYMS.has(u) || ACRONYMS.has(m)) return m; // protected acronym / title
+    if (!PROMO_CAPS.has(u)) return m; // unknown ALL-CAPS could be a brand/term — leave it
+    // Lowercase the whole token; tidy() re-capitalizes only true sentence starts.
+    const after = m.toLowerCase();
+    rec({ before: m, after, category: "Deliverability", confidence: "Medium", reason: `Promotional ALL-CAPS "${m}" set to normal case — shouting caps read as promotional. Acronyms and brand terms are preserved.`, applied: true, kind: "replace" });
+    return after;
+  });
+
+  return tidy(out);
+}
+
+function scanFlags(subject: string, body: string, rec: Rec) {
+  const text = `${subject}\n${body}`;
+  const lower = text.toLowerCase();
+  const seen = new Set<string>();
+  const flagPhrase = (phrase: string, category: EditCategory, reason: string) => {
+    if (seen.has(phrase)) return;
+    const idx = lower.indexOf(phrase);
+    if (idx < 0) return;
+    seen.add(phrase);
+    const before = text.slice(idx, idx + phrase.length);
+    rec({ before, after: "", category, confidence: "Low", reason, applied: false, kind: "flag" });
+  };
+
+  for (const p of URGENCY)
+    flagPhrase(p, "Deliverability", `Urgency/promotional phrase "${p}" — repeated urgency language can hurt tone and deliverability. Left unchanged: softening it is your call.`);
+
+  if (/\bclick here\b/i.test(text))
+    flagPhrase("click here", "Deliverability", '"Click here" is vague, non-descriptive link text — consider describing the destination. The link itself is left unchanged.');
+
+  for (const [phrase, shorter] of WORDY)
+    flagPhrase(phrase, "Readability", `Wordy — "${phrase}" could tighten to "${shorter}" with no change in meaning. Left as-is; conversational phrasing may be intentional.`);
+
+  // Multiple links / CTAs.
+  const links = (text.match(/https?:\/\/|\bclick here\b/gi) || []).length;
+  if (links > 2)
+    rec({ before: "", after: "", category: "Deliverability", confidence: "Low", reason: `${links} links/CTAs — consider consolidating to one primary next step. Left unchanged: which CTA to keep is a content decision.`, applied: false, kind: "flag" });
+
+  // Long sentences (readability only — never auto-split).
+  const sentences = body.split(/(?<=[.!?])\s+/);
+  for (const s of sentences) {
+    const n = (s.match(/\S+/g) || []).length;
+    if (n > 40) {
+      rec({ before: "", after: "", category: "Readability", confidence: "Medium", reason: `A sentence runs about ${n} words — consider splitting it for readability. Not auto-split: rewording is your call.`, applied: false, kind: "flag" });
+      break;
+    }
+  }
+
+  // Overall exclamation intensity across the email.
+  const bangs = (body.match(/!/g) || []).length;
+  if (bangs >= 3)
+    rec({ before: "", after: "", category: "Deliverability", confidence: "Low", reason: `${bangs} exclamation points across the email create high intensity — consider easing off. Individual "!"s are left as written.`, applied: false, kind: "flag" });
+}
+
+export function rewriteEmail(_agents: unknown, e: PastEmail): EmailRewrite {
+  const map = new Map<string, Change>();
+  const rec: Rec = (c) => {
+    const key = `${c.kind}|${c.category}|${c.before.toLowerCase()}|${c.after.toLowerCase()}|${c.reason}`;
+    const cur = map.get(key);
+    if (cur) cur.count += 1;
+    else map.set(key, { ...c, count: 1 });
+  };
+
+  const revisedSubject = applyEdits(e.subject, rec);
+  const revisedBody = applyEdits(e.body, rec);
+  scanFlags(e.subject, e.body, rec);
+
+  const confRank: Record<Confidence, number> = { High: 3, Medium: 2, Low: 1 };
+  const changes = [...map.values()].sort(
+    (a, b) => Number(b.applied) - Number(a.applied) || confRank[b.confidence] - confRank[a.confidence] || b.count - a.count,
+  );
+  const appliedCount = changes.filter((c) => c.applied).reduce((t, c) => t + c.count, 0);
+  const flaggedCount = changes.filter((c) => !c.applied).length;
+
+  const parts: string[] = [];
+  if (appliedCount) parts.push(`${appliedCount} correction${appliedCount === 1 ? "" : "s"} applied`);
+  if (flaggedCount) parts.push(`${flaggedCount} item${flaggedCount === 1 ? "" : "s"} flagged for review`);
+  const summary = parts.length ? parts.join(" · ") : "No issues found — this email reads clean, so nothing was changed.";
 
   return {
     emailId: e.id,
@@ -215,13 +254,14 @@ export function rewriteEmail(agents: ReviewAgent[], e: PastEmail): EmailRewrite 
     originalBody: e.body,
     revisedSubject,
     revisedBody,
-    changes: list,
+    changes,
+    appliedCount,
+    flaggedCount,
+    unchanged: appliedCount === 0,
     summary,
   };
 }
 
-const sev = (s: Severity) => (s === "high" ? 3 : s === "medium" ? 2 : 1);
-
-export function rewriteAll(agents: ReviewAgent[], emails: PastEmail[]): EmailRewrite[] {
+export function rewriteAll(agents: unknown, emails: PastEmail[]): EmailRewrite[] {
   return emails.map((e) => rewriteEmail(agents, e));
 }

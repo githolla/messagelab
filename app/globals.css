@@ -1115,3 +1115,19 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .chg-tag.note { background: var(--line); color: var(--ink-2); }
 .chg-why { font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
 .chg-agent { color: var(--ink-3, #888); font-style: italic; }
+
+/* --- Proofread: category/confidence chips, flags --- */
+.rw-badge.flag { background: #fdf0d5; color: #9a6a00; }
+.d-flag { background: #fdf0d5; color: #7a5a12; border-radius: 3px; padding: 0 2px; box-shadow: inset 0 -1px 0 #e6c476; }
+.chg-flagged { opacity: .95; }
+.chg-flagmark { font-size: 11px; font-weight: 700; color: #9a6a00; background: #fdf0d5; padding: 1px 6px; border-radius: 4px; margin-right: 4px; }
+.chg-why .cat, .chg-why .conf { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; border-radius: 4px; margin-right: 5px; }
+.cat { background: var(--line); color: var(--ink-2); }
+.cat-spelling, .cat-grammar { background: #e2eefb; color: #2c5b8f; }
+.cat-punctuation { background: #eae6fb; color: #5b4a9a; }
+.cat-deliverability { background: #fdecdf; color: #99562a; }
+.cat-readability, .cat-clarity { background: #e6f2e2; color: #3f6f2e; }
+.cat-brand, .cat-consistency { background: #fbe6f0; color: #944; }
+.conf-high { background: #dff2e0; color: #2f7a3a; }
+.conf-medium { background: #fdf0d5; color: #9a6a00; }
+.conf-low { background: var(--line); color: var(--ink-2); }

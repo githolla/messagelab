@@ -88,6 +88,15 @@ a segment-level results dashboard. "Message Lab" is a working title.
   donts/structure/subject). Saving the baseline conditions `/api/lead-email`
   drafting (`baselineToPrompt`), so new follow-ups build on what already works.
   Deterministic fallback = demo/no-key path; a key upgrades to a model read.
+  `lib/emailrewrite.ts` is a deliberately CONSERVATIVE brand proofreader (full
+  editorial policy — preserve author voice/tone/CTA/positioning; protect brand
+  terms, acronyms, names, numbers, links, personalization). Auto-applies only
+  objective fixes (spelling, grammar, duplicate words, punctuation/spacing,
+  `!!!`→`!`, promotional ALL-CAPS via a PROMO_CAPS set with an ACRONYMS allowlist
+  protected) and FLAGS everything subjective (urgency/promo phrasing, wordiness,
+  long sentences, weak link text) rather than rewriting it. Each change carries
+  Category + Confidence + a rule-tied reason; High/Medium apply, Low only flags.
+  Shown per email as an Original→Revised diff + a reasoned change/flag list.
 - `app/review` + `app/api/review/route.ts`: standalone "Review a page" tool
   (linked from the header nav). Paste a URL → the route screenshots it headless
   (puppeteer-core + @sparticuz/chromium on Vercel; a local Chromium via

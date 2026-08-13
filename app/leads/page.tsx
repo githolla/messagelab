@@ -719,23 +719,31 @@ function splitDelimited(text: string, label: string): RawEmail[] {
   return [{ label, ...stripHeaders(t) }];
 }
 
-// Escape then wrap the first occurrence of each phrase in a highlight span, for
-// the original-vs-revised diff. Content is escaped first, so the inserted markup
-// is the only HTML — safe for dangerouslySetInnerHTML.
+// Escape text, then wrap the first (non-overlapping) occurrence of each phrase
+// in a highlight span, for the original-vs-revised diff. Content is escaped, so
+// the inserted markup is the only HTML — safe for dangerouslySetInnerHTML.
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-function highlightHtml(text: string, phrases: string[], cls: string): string {
-  let html = escapeHtml(text);
-  for (const p of phrases) {
-    if (!p || !p.trim()) continue;
-    const e = escapeHtml(p);
-    const idx = html.indexOf(e);
-    if (idx > -1 && html.indexOf("<span", Math.max(0, idx - 30)) !== idx - 30) {
-      html = `${html.slice(0, idx)}<span class="${cls}">${e}</span>${html.slice(idx + e.length)}`;
+function highlightMulti(text: string, groups: { phrases: string[]; cls: string }[]): string {
+  const marks: { start: number; end: number; cls: string }[] = [];
+  for (const g of groups)
+    for (const p of g.phrases) {
+      if (!p || !p.trim()) continue;
+      const idx = text.indexOf(p);
+      if (idx < 0) continue;
+      if (marks.some((m) => idx < m.end && idx + p.length > m.start)) continue; // no overlap
+      marks.push({ start: idx, end: idx + p.length, cls: g.cls });
     }
+  marks.sort((a, b) => a.start - b.start);
+  let out = "";
+  let pos = 0;
+  for (const m of marks) {
+    if (m.start < pos) continue;
+    out += escapeHtml(text.slice(pos, m.start)) + `<span class="${m.cls}">` + escapeHtml(text.slice(m.start, m.end)) + "</span>";
+    pos = m.end;
   }
-  return html;
+  return out + escapeHtml(text.slice(pos));
 }
 
 async function parseUpload(f: File): Promise<RawEmail[]> {
@@ -1132,55 +1140,60 @@ function EmailReviewLab({
                 const rw = rewriteById.get(r.emailId);
                 if (!rw) return null;
                 const open = !collapsedRw.has(r.emailId);
-                const editCount = rw.changes.filter((c) => c.kind !== "note").reduce((t, c) => t + c.count, 0);
-                const befores = rw.changes.filter((c) => c.before).map((c) => c.before);
-                const afters = rw.changes.filter((c) => c.after).map((c) => c.after);
+                const appliedBefores = rw.changes.filter((c) => c.applied && c.before).map((c) => c.before);
+                const flaggedBefores = rw.changes.filter((c) => !c.applied && c.before).map((c) => c.before);
+                const appliedAfters = rw.changes.filter((c) => c.applied && c.after).map((c) => c.after);
                 return (
                   <div className="rewrite">
                     <button className="rw-toggle" onClick={() => toggleRw(r.emailId)} aria-expanded={open}>
                       <span className="rw-caret">{open ? "▾" : "▸"}</span>
-                      Suggested rewrite {editCount > 0 && <span className="rw-badge">{editCount} change{editCount === 1 ? "" : "s"}</span>}
+                      Proofread &amp; suggestions
+                      {rw.appliedCount > 0 && <span className="rw-badge">{rw.appliedCount} fixed</span>}
+                      {rw.flaggedCount > 0 && <span className="rw-badge flag">{rw.flaggedCount} flagged</span>}
                       <span className="rw-sum">{rw.summary}</span>
                     </button>
                     {open && (
                       <div className="rw-body">
-                        {editCount > 0 && (
+                        {rw.appliedCount > 0 ? (
                           <div className="diffgrid">
                             <div className="diffcol">
                               <div className="diff-h rem">Original</div>
-                              {rw.originalSubject && <div className="diff-subj" dangerouslySetInnerHTML={{ __html: highlightHtml(rw.originalSubject, befores, "d-rem") }} />}
-                              <div className="diff-body" dangerouslySetInnerHTML={{ __html: highlightHtml(rw.originalBody, befores, "d-rem") }} />
+                              {rw.originalSubject && <div className="diff-subj" dangerouslySetInnerHTML={{ __html: highlightMulti(rw.originalSubject, [{ phrases: appliedBefores, cls: "d-rem" }, { phrases: flaggedBefores, cls: "d-flag" }]) }} />}
+                              <div className="diff-body" dangerouslySetInnerHTML={{ __html: highlightMulti(rw.originalBody, [{ phrases: appliedBefores, cls: "d-rem" }, { phrases: flaggedBefores, cls: "d-flag" }]) }} />
                             </div>
                             <div className="diffcol">
-                              <div className="diff-h add">Revised</div>
-                              {rw.revisedSubject && <div className="diff-subj" dangerouslySetInnerHTML={{ __html: highlightHtml(rw.revisedSubject, afters, "d-add") }} />}
-                              <div className="diff-body" dangerouslySetInnerHTML={{ __html: highlightHtml(rw.revisedBody, afters, "d-add") }} />
+                              <div className="diff-h add">Revised (proofread)</div>
+                              {rw.revisedSubject && <div className="diff-subj" dangerouslySetInnerHTML={{ __html: highlightMulti(rw.revisedSubject, [{ phrases: appliedAfters, cls: "d-add" }]) }} />}
+                              <div className="diff-body" dangerouslySetInnerHTML={{ __html: highlightMulti(rw.revisedBody, [{ phrases: appliedAfters, cls: "d-add" }]) }} />
                             </div>
                           </div>
+                        ) : (
+                          <p className="note" style={{ marginTop: 0 }}>No wording was changed — voice and content left intact. Any items below are flagged for your judgment only.</p>
                         )}
-                        <div className="changehdr">Why each change was made</div>
-                        <ul className="changelist">
-                          {rw.changes.map((c, i) => (
-                            <li className={`chg chg-${c.kind}`} key={i}>
-                              <div className="chg-edit">
-                                {c.kind === "add" ? (
-                                  <span><span className="chg-tag add">added</span> <ins>{c.after}</ins></span>
-                                ) : c.kind === "note" ? (
-                                  <span className="chg-tag note">structure</span>
-                                ) : (
-                                  <span>
-                                    <del>{c.before}</del> <span className="arrow">→</span> {c.after ? <ins>{c.after}</ins> : <em className="removed">removed</em>}
-                                  </span>
-                                )}
-                                {c.count > 1 && <span className="chg-count">×{c.count}</span>}
-                              </div>
-                              <div className="chg-why">
-                                <span className={`sev sev-${c.severity}`}>{c.severity}</span>
-                                {c.reason} <span className="chg-agent">— {c.agent}</span>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
+                        {rw.changes.length > 0 && (
+                          <>
+                            <div className="changehdr">Every change, with a reason</div>
+                            <ul className="changelist">
+                              {rw.changes.map((c, i) => (
+                                <li className={`chg ${c.applied ? "" : "chg-flagged"}`} key={i}>
+                                  <div className="chg-edit">
+                                    {c.kind === "flag" ? (
+                                      <span><span className="chg-flagmark">⚑ flag</span> {c.before && <span className="d-flag">{c.before}</span>}</span>
+                                    ) : (
+                                      <span><del>{c.before}</del> <span className="arrow">→</span> <ins>{c.after}</ins></span>
+                                    )}
+                                    {c.count > 1 && <span className="chg-count">×{c.count}</span>}
+                                  </div>
+                                  <div className="chg-why">
+                                    <span className={`cat cat-${c.category.toLowerCase()}`}>{c.category}</span>
+                                    <span className={`conf conf-${c.confidence.toLowerCase()}`}>{c.confidence}</span>
+                                    {c.reason}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1192,9 +1205,10 @@ function EmailReviewLab({
       )}
 
       <p className="caveat" style={{ maxWidth: 1080, margin: "0 auto 40px" }}>
-        Reviews are a directional read from your reviewer agents, not a compliance check. Suggested
-        rewrites are a starting draft to review — the notes explain why each word changed, but read the
-        revised version before you send it. The baseline captures patterns from the emails you provide.
+        The proofread only auto-applies objective corrections — spelling, grammar, punctuation, duplicate
+        words, and promotional ALL-CAPS — and protects your voice, tone, CTAs, brand terms, acronyms,
+        names, numbers, links, and personalization. Anything about positioning or style is flagged with a
+        reason, never silently rewritten. Every change lists its category, confidence, and the reason.
       </p>
     </>
   );
