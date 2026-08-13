@@ -5,6 +5,15 @@ import { tally, GIVE_INTENTS } from "../lib/refine";
 import { messageAudienceKey } from "../lib/archetypes";
 import { demoResult } from "../lib/demo";
 import type { Persona, PersonaResult } from "../lib/types";
+import {
+  SAMPLE_LEADS,
+  engagementScore,
+  recommendedNextStep,
+  buildLeadCohort,
+  tierOf,
+  type Lead,
+} from "../lib/leads";
+import { recommend, simulateStrategy, ACTIONS } from "../lib/leadsim";
 
 describe("wilson", () => {
   it("returns [0,0] at n=0", () => {
@@ -174,5 +183,68 @@ describe("demoResult", () => {
     const meanResA = p.reduce((s, r) => s + r.resonanceA, 0) / p.length;
     const meanResB = p.reduce((s, r) => s + r.resonanceB, 0) / p.length;
     expect(Math.abs(meanResA - meanResB)).toBeLessThan(0.6);
+  });
+});
+
+describe("lead audience simulation", () => {
+  const lead = (over: Partial<Lead>): Lead => ({
+    id: "t",
+    name: "Test Lead",
+    title: "Director",
+    seniority: "Director",
+    company: "Acme",
+    targetAccount: false,
+    relationship: "none",
+    attended: true,
+    pctAttended: 80,
+    stayedToEnd: true,
+    questionsAsked: 1,
+    surveyCompleted: true,
+    resourcesDownloaded: 1,
+    priorWebinars: 1,
+    topicSignal: "retention",
+    ...over,
+  });
+
+  it("recommend() is deterministic for the same lead", () => {
+    const a = recommend(SAMPLE_LEADS[0]);
+    const b = recommend(SAMPLE_LEADS[0]);
+    expect(a.winner.id).toBe(b.winner.id);
+    expect(a.margin).toBe(b.margin);
+    expect(a.results.map((r) => r.score)).toEqual(b.results.map((r) => r.score));
+  });
+
+  it("simulateStrategy assigns every cohort member exactly one action", () => {
+    const cohort = buildLeadCohort(SAMPLE_LEADS[0], 16);
+    const res = simulateStrategy(cohort, "insight");
+    const total = [...ACTIONS, "unsubscribe" as const].reduce((s, a) => s + res.actionCounts[a], 0);
+    expect(total).toBe(16);
+    expect(res.n).toBe(16);
+  });
+
+  it("recommends waiting for a cold, no-signal attendee", () => {
+    const cold = lead({ pctAttended: 22, stayedToEnd: false, questionsAsked: 0, surveyCompleted: false, resourcesDownloaded: 0, priorWebinars: 0 });
+    expect(recommend(cold).winner.id).toBe("wait");
+    expect(recommendedNextStep(cold).id).toBe("wait");
+  });
+
+  it("prefers an engagement-first approach over an immediate meeting for a hot but cold-relationship lead", () => {
+    const hotCold = lead({ pctAttended: 95, stayedToEnd: true, questionsAsked: 3, surveyCompleted: true, resourcesDownloaded: 2, relationship: "none" });
+    const rec = recommend(hotCold);
+    expect(["insight", "conversation", "resource"]).toContain(rec.winner.id);
+    expect(rec.winner.id).not.toBe("meeting");
+  });
+
+  it("engagement score is higher for a strong attendee than a no-show", () => {
+    const strong = lead({ pctAttended: 100, stayedToEnd: true, questionsAsked: 4, surveyCompleted: true, resourcesDownloaded: 3 });
+    const noShow = lead({ attended: false, pctAttended: 0, stayedToEnd: false, questionsAsked: 0, surveyCompleted: false, resourcesDownloaded: 0 });
+    expect(engagementScore(strong)).toBeGreaterThan(engagementScore(noShow));
+    expect(tierOf(strong).key).toBe("high");
+    expect(tierOf(noShow).key).toBe("low");
+  });
+
+  it("produces a spread of recommendations across the sample list (not all identical)", () => {
+    const winners = new Set(SAMPLE_LEADS.map((l) => recommend(l).winner.id));
+    expect(winners.size).toBeGreaterThanOrEqual(3);
   });
 });

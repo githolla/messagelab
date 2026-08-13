@@ -865,3 +865,103 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .backbtn:hover { border-color: var(--ink-3); color: var(--ink); background: var(--bg-2); }
 .rh-meta { font-size: 13.5px; color: var(--ink-3); line-height: 1.4; }
 .rh-meta b { color: var(--ink); font-weight: 650; }
+
+/* ======================================================================
+   Lead Personalization
+   ====================================================================== */
+
+/* --- Webinar header + queue summary --- */
+.wb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.wb-kicker { font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary); }
+.wb-title { font-family: var(--serif); font-size: 22px; letter-spacing: -0.01em; margin: 4px 0 6px; font-weight: 600; }
+.wb-meta { font-size: 13px; color: var(--ink-3); }
+.stepstrip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.stepchip { font-size: 12.5px; color: var(--ink-2); background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+.stepchip b { color: var(--ink); font-weight: 700; margin-right: 2px; }
+.stepchip.muted { color: var(--ink-3); opacity: 0.8; }
+
+/* --- Lead list table --- */
+.leadtablewrap { overflow-x: auto; }
+.leadtable { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+.leadtable thead th {
+  text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-3); padding: 0 12px 10px; border-bottom: 1px solid var(--line);
+}
+.leadrow { cursor: pointer; transition: background 0.1s; }
+.leadrow td { padding: 13px 12px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+.leadrow:hover { background: var(--bg-2); }
+.lt-name { font-weight: 650; color: var(--ink); }
+.lt-sub { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+.lt-co { color: var(--ink-2); }
+.engcell { display: flex; align-items: center; gap: 9px; }
+.engbar { display: block; width: 74px; height: 7px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; flex-shrink: 0; }
+.engbar > span { display: block; height: 100%; border-radius: 999px; background: var(--ink-3); }
+.engcell.high .engbar > span { background: var(--good-ink); }
+.engcell.medium .engbar > span { background: var(--gold); }
+.engcell.low .engbar > span { background: var(--ink-3); }
+.englabel { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.nextstep { font-size: 13px; font-weight: 600; color: var(--primary-2); background: var(--primary-tint); border: 1px solid var(--primary-line); border-radius: 999px; padding: 4px 11px; white-space: nowrap; }
+.nextstep.wait { color: var(--ink-3); background: var(--bg-2); border-color: var(--line); }
+.lt-act { text-align: right; white-space: nowrap; }
+.opencue { font-size: 13px; font-weight: 600; color: var(--primary); }
+.approved { font-size: 12.5px; font-weight: 700; color: var(--good-ink); }
+
+/* --- Lead profile --- */
+.lead-profile { display: flex; gap: 20px; align-items: center; }
+.engring {
+  width: 78px; height: 78px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center; text-align: center;
+  border: 3px solid var(--line); background: var(--bg-2);
+}
+.engring.high { border-color: var(--good-ink); }
+.engring.medium { border-color: var(--gold); }
+.engring.low { border-color: var(--ink-3); }
+.engnum { font-family: var(--serif); font-size: 26px; font-weight: 600; line-height: 1; color: var(--ink); }
+.englabel2 { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin-top: 3px; }
+.lead-name2 { font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.lead-sub2 { font-size: 13.5px; color: var(--ink-3); margin: 2px 0 12px; }
+.sigchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sigchip { font-size: 12px; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; }
+
+/* --- Recommendation card --- */
+.reccard { border-left: 3px solid var(--primary); }
+.rec-kicker { font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary); }
+.rec-title { font-family: var(--serif); font-size: 25px; font-weight: 600; letter-spacing: -0.015em; margin: 8px 0 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.confbadge { font-family: var(--sans); font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 4px 11px; letter-spacing: 0.01em; }
+.confbadge.high { color: var(--good-ink); background: var(--good-tint); }
+.confbadge.medium { color: var(--gold); background: #f7edd6; }
+.confbadge.low { color: var(--ink-2); background: var(--bg-2); }
+.rec-explain { font-size: 15.5px; line-height: 1.6; color: var(--ink); max-width: 760px; margin: 0 0 18px; }
+.rec-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Why / factor readout */
+.why { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.why-lead { font-size: 13.5px; color: var(--ink-2); margin: 0 0 14px; max-width: 720px; }
+.factorgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 28px; }
+@media (max-width: 640px) { .factorgrid { grid-template-columns: 1fr; } }
+.factorrow { display: grid; grid-template-columns: 150px 1fr 34px; align-items: center; gap: 10px; }
+.factorlabel { font-size: 12.5px; color: var(--ink-2); }
+.factorbar { height: 8px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+.factorbar > span { display: block; height: 100%; border-radius: 999px; background: var(--primary); }
+.factorbar > span.dim { background: var(--reject-bar); }
+.factorval { font-family: var(--mono); font-size: 12px; color: var(--ink-2); text-align: right; }
+
+/* Compare approaches */
+.compare { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.approach { all: unset; cursor: pointer; display: block; border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; transition: border-color 0.12s, background 0.12s; }
+.approach:hover { border-color: var(--ink-3); background: var(--bg-2); }
+.approach.chosen { border-color: var(--primary); background: var(--primary-tint); }
+.ap-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ap-name { font-weight: 650; font-size: 14.5px; color: var(--ink); }
+.ap-win { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--primary); background: var(--card); border: 1px solid var(--primary-line); border-radius: 999px; padding: 2px 7px; margin-left: 9px; }
+.ap-score { font-family: var(--serif); font-size: 18px; font-weight: 600; color: var(--ink); }
+.ap-bar { height: 7px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; margin: 8px 0 7px; }
+.ap-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--primary); }
+.ap-bar > span.hold { background: var(--ink-3); }
+.ap-funnel { font-size: 12px; color: var(--ink-3); }
+
+/* Email draft */
+.emailtag { font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: 0.02em; }
+.emaildraft input, .emaildraft textarea { width: 100%; }
+.emaildraft textarea { font-family: var(--sans); line-height: 1.6; resize: vertical; }
+.waitbox { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; font-size: 14px; color: var(--ink-2); line-height: 1.6; }

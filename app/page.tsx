@@ -75,6 +75,21 @@ export default function Home() {
           </p>
           <span className="tlink">Open the test →</span>
         </a>
+        <a className="toolcard" href="/leads">
+          <div className="ti">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M3 12h18M3 18h11" />
+              <circle cx="19" cy="18" r="2.4" />
+            </svg>
+          </div>
+          <h2>Lead Personalization</h2>
+          <p>
+            Turn a webinar attendee list into a prioritized work queue. For each lead, a simulated
+            cohort of similar prospects decides the follow-up most likely to work — insight,
+            resource, conversation, meeting, or wait — then drafts the email to review and approve.
+          </p>
+          <span className="tlink">Open the workflow →</span>
+        </a>
         <a className="toolcard" href="/review">
           <div className="ti">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

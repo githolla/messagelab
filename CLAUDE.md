@@ -62,6 +62,21 @@ a segment-level results dashboard. "Message Lab" is a working title.
   `MAX_REFINE_ROUNDS` (10) rounds/click, with a live session cost meter and a soft
   confirm before it gets expensive,
   stopping when the champion holds. Carries the shared-backbone caveat in the UI.
+- `app/leads` (Lead Personalization — webinar follow-up): a third tool that turns a
+  webinar attendee list into a prioritized work queue. For each lead, an audience
+  simulation builds a synthetic behavioral *cohort* of similar prospects and runs
+  every follow-up strategy (insight / conversation / resource / takeaway / meeting /
+  next-webinar, plus a "wait" floor) against it, scoring each on an engagement funnel
+  (ignore→skim→read→click→reply→continue→meeting, unsubscribe as a negative exit).
+  Diane sees a recommendation card (winning strategy, confidence, plain-English why,
+  See Why factor readout, Compare Approaches) then the drafted email to review/approve.
+  `lib/leads.ts` (types, sample webinar+leads, engagement score/tier, strategy catalog,
+  `recommendedNextStep`, `buildLeadCohort`), `lib/leadsim.ts` (deterministic
+  `simulateStrategy` + `recommend`, family-based confidence), `lib/leademail.ts`
+  (per-strategy deterministic drafts) + `app/api/lead-email/route.ts` (AI draft in
+  Diane's AGP voice, deterministic fallback with no key). All simulation is
+  deterministic (fnv1a, no Math.random) so it runs with no API key. Phase 1 of a
+  larger spec; group/cadence/adaptive/results-calibration are later phases.
 - `app/review` + `app/api/review/route.ts`: standalone "Review a page" tool
   (linked from the header nav). Paste a URL → the route screenshots it headless
   (puppeteer-core + @sparticuz/chromium on Vercel; a local Chromium via
