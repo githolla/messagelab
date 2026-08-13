@@ -637,6 +637,96 @@ const SAMPLE_PAST_EMAILS: PastEmail[] = [
   },
 ];
 
+// ---- Bulk email import parsers (pure, module scope) ----
+type RawEmail = { label: string; subject: string; body: string };
+
+// Strip RFC-822 headers when a block looks like a raw message; pull the subject.
+// Handles both "headers, blank line, body" and a lone leading "Subject:" line
+// with no blank separator by dropping the contiguous run of header lines.
+const HEADER_RE = /^(from|to|subject|date|reply-to|cc|bcc|sent|delivered-to|message-id|return-path|received|mime-version|content-[\w-]+|x-[\w-]+):/i;
+function stripHeaders(text: string): { subject: string; body: string } {
+  const subj = text.match(/^subject:\s*(.*)$/im);
+  const lines = text.split(/\r?\n/);
+  let i = 0;
+  if (HEADER_RE.test(lines[0] || "")) {
+    while (i < lines.length && (HEADER_RE.test(lines[i]) || /^\s+\S/.test(lines[i]))) i++; // headers + folded continuations
+    if (lines[i] !== undefined && lines[i].trim() === "") i++; // consume one blank separator
+  }
+  const body = lines.slice(i).join("\n").trim();
+  return { subject: subj ? subj[1].trim() : "", body: body || text.trim() };
+}
+
+// mbox: messages delimited by a line beginning "From " (the mbox "From_" line).
+function splitMbox(text: string): RawEmail[] {
+  return text
+    .split(/^From .*$/m)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p, i) => ({ label: `Message ${i + 1}`, ...stripHeaders(p) }));
+}
+
+// Minimal RFC-4180 CSV reader (handles quotes, escaped quotes, embedded newlines).
+function csvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cur = "";
+  let q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cur += '"'; i++; } else q = false;
+      } else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(cur); cur = ""; }
+    else if (c === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (c !== "\r") cur += c;
+  }
+  if (cur.length || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+
+function parseCsv(text: string): RawEmail[] {
+  const rows = csvRows(text).filter((r) => r.some((c) => c.trim()));
+  if (!rows.length) return [];
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  const si = header.findIndex((h) => /subject/.test(h));
+  const bi = header.findIndex((h) => /body|content|message|text|email/.test(h));
+  const li = header.findIndex((h) => /label|name|^id$|from|recipient|to/.test(h));
+  const hasHeader = si > -1 || bi > -1;
+  const data = hasHeader ? rows.slice(1) : rows;
+  return data.map((r, i) => ({
+    label: li > -1 && r[li]?.trim() ? r[li].trim() : `Row ${i + 1}`,
+    subject: si > -1 ? (r[si] || "").trim() : (r[0] || "").trim(),
+    body: bi > -1 ? (r[bi] || "").trim() : (r[1] || r[0] || "").trim(),
+  }));
+}
+
+// Split a pasted blob or plain-text file into multiple emails. Tries, in order:
+// rule delimiters (--- === *** ###), multiple "Subject:" markers, then 2+ blank
+// lines. Falls back to a single email.
+function splitDelimited(text: string, label: string): RawEmail[] {
+  const t = text.trim();
+  if (!t) return [];
+  const wrap = (parts: string[]): RawEmail[] =>
+    parts.map((p) => p.trim()).filter(Boolean).map((p, i) => ({ label: `${label} #${i + 1}`, ...stripHeaders(p) }));
+  if (/^\s*(?:-{3,}|={3,}|\*{3,}|#{3,})\s*$/m.test(t)) return wrap(t.split(/^\s*(?:-{3,}|={3,}|\*{3,}|#{3,})\s*$/m));
+  const subj = t.match(/^subject:/gim);
+  if (subj && subj.length > 1) return wrap(t.split(/(?=^subject:)/gim));
+  const blocks = t.split(/\n\s*\n\s*\n+/);
+  if (blocks.length > 1) return wrap(blocks);
+  return [{ label, ...stripHeaders(t) }];
+}
+
+async function parseUpload(f: File): Promise<RawEmail[]> {
+  const text = await f.text();
+  const name = f.name.toLowerCase();
+  if (name.endsWith(".mbox")) return splitMbox(text);
+  if (name.endsWith(".csv")) return parseCsv(text);
+  if (name.endsWith(".eml")) return [{ label: f.name, ...stripHeaders(text) }];
+  return splitDelimited(text, f.name); // .txt / .md may hold many
+}
+
 function EmailReviewLab({
   webinar,
   agents,
@@ -669,8 +759,20 @@ function EmailReviewLab({
   const [modelUsed, setModelUsed] = useState<string | null>(null);
   const [computed, setComputed] = useState<EmailBaseline | null>(null);
   const [saved, setSaved] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  function toggleExpanded(id: string) {
+    setExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  const MAX_EMAILS = 300;
   const usableCount = pastEmails.filter((e) => (e.body || "").trim()).length;
 
   function editAgent(id: string, patch: Partial<ReviewAgent>) {
@@ -683,22 +785,32 @@ function EmailReviewLab({
     setPastEmails((e) => [...e, newPastEmail(emailSeq.current++)]);
   }
 
-  function parseEmail(text: string, name: string): PastEmail {
-    const subj = text.match(/^subject:\s*(.*)$/im);
-    let body = text;
-    // If it looks like a raw .eml (headers up top), strip to the body.
-    if (/^(from|to|subject|date|reply-to):/im.test(text.slice(0, 300))) {
-      const idx = text.indexOf("\n\n");
-      if (idx > -1) body = text.slice(idx + 2);
+  // Add a batch of parsed emails, keep only those with content, cap the total.
+  function addRaw(raws: RawEmail[]) {
+    const useful = raws.filter((r) => (r.body || "").trim() || (r.subject || "").trim());
+    if (!useful.length) {
+      setNotice("No emails found in that input.");
+      return;
     }
-    return { id: `email-${emailSeq.current++}`, label: name, subject: subj ? subj[1].trim() : "", body: body.trim() };
+    setPastEmails((prev) => {
+      const room = Math.max(0, MAX_EMAILS - prev.length);
+      const added = useful.slice(0, room).map((r) => ({ id: `email-${emailSeq.current++}`, label: r.label, subject: r.subject, body: r.body }));
+      const dropped = useful.length - added.length;
+      setNotice(`Added ${added.length} email${added.length === 1 ? "" : "s"}.${dropped > 0 ? ` (${dropped} skipped — ${MAX_EMAILS}-email cap.)` : ""}`);
+      return [...prev, ...added];
+    });
   }
+
   async function onFiles(files: FileList | null) {
     if (!files || !files.length) return;
-    const parsed = await Promise.all(
-      [...files].map(async (f) => parseEmail(await f.text(), f.name)),
-    );
-    setPastEmails((e) => [...e, ...parsed]);
+    const batches = await Promise.all([...files].map((f) => parseUpload(f)));
+    addRaw(batches.flat());
+  }
+
+  function addBulk() {
+    addRaw(splitDelimited(bulkText, "Pasted"));
+    setBulkText("");
+    setBulkOpen(false);
   }
 
   async function run() {
@@ -785,25 +897,64 @@ function EmailReviewLab({
             {!pastEmails.length && <button className="btn ghost" onClick={() => setPastEmails(SAMPLE_PAST_EMAILS)}>Load samples</button>}
             <label className="btn ghost filebtn">
               Upload files
-              <input type="file" accept=".txt,.eml,.md,text/plain" multiple onChange={(e) => { onFiles(e.target.files); e.currentTarget.value = ""; }} />
+              <input type="file" accept=".txt,.eml,.md,.mbox,.csv,text/plain,text/csv" multiple onChange={(e) => { onFiles(e.target.files); e.currentTarget.value = ""; }} />
             </label>
-            <button className="btn ghost" onClick={addEmail}>+ Paste email</button>
+            <button className="btn ghost" onClick={() => setBulkOpen((v) => !v)} aria-pressed={bulkOpen}>Bulk paste</button>
+            {pastEmails.length > 0 && <button className="btn ghost" onClick={() => setPastEmails([])}>Clear all</button>}
+            <button className="btn ghost" onClick={addEmail}>+ One email</button>
           </div>
         </div>
-        {!pastEmails.length && (
-          <p className="note">Upload <code>.txt</code>/<code>.eml</code> files, paste emails, or load the samples to see how it works.</p>
+        {!pastEmails.length && !bulkOpen && (
+          <p className="note">
+            Bring in a batch: select <b>many files at once</b>, drop a Gmail/Outlook <code>.mbox</code> or a{" "}
+            <code>.csv</code> export (subject/body columns), or <b>Bulk paste</b> emails separated by a line of{" "}
+            <code>---</code>. Or <b>Load samples</b> to see how it works.
+          </p>
         )}
-        <div className="emaillist">
-          {pastEmails.map((e) => (
-            <div className="pastemail" key={e.id}>
-              <div className="pe-head">
-                <input className="pe-label" value={e.label} onChange={(ev) => editEmail(e.id, { label: ev.target.value })} />
-                <button className="xbtn" title="Remove email" onClick={() => setPastEmails((es) => es.filter((x) => x.id !== e.id))}>×</button>
-              </div>
-              <input className="pe-subject" value={e.subject} onChange={(ev) => editEmail(e.id, { subject: ev.target.value })} placeholder="Subject line" />
-              <textarea className="pe-body" value={e.body} onChange={(ev) => editEmail(e.id, { body: ev.target.value })} rows={6} placeholder="Paste the email body here…" />
+        {bulkOpen && (
+          <div className="bulkbox">
+            <label className="fld" htmlFor="bulk">Paste many emails — separate them with a line of <code>---</code> (or <code>Subject:</code> markers, or blank lines)</label>
+            <textarea
+              id="bulk"
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              rows={10}
+              placeholder={"Subject: First email\nHi Jordan, …\n\n---\n\nSubject: Second email\nHi Alex, …"}
+            />
+            <div className="runbar" style={{ marginTop: 10 }}>
+              <button className="btn primary" onClick={addBulk} disabled={!bulkText.trim()}>Split &amp; add</button>
+              <button className="btn ghost" onClick={() => { setBulkOpen(false); setBulkText(""); }}>Cancel</button>
             </div>
-          ))}
+          </div>
+        )}
+        <div className={`emaillist ${pastEmails.length > 8 ? "compact" : ""}`}>
+          {pastEmails.map((e) => {
+            const words = (e.body.match(/\S+/g) || []).length;
+            const isOpen = pastEmails.length <= 8 || expanded.has(e.id);
+            return (
+              <div className="pastemail" key={e.id}>
+                <div className="pe-head">
+                  <input className="pe-label" value={e.label} onChange={(ev) => editEmail(e.id, { label: ev.target.value })} />
+                  <span className="pe-words">{words} words</span>
+                  {pastEmails.length > 8 && (
+                    <button className="linklike" onClick={() => toggleExpanded(e.id)}>{isOpen ? "Collapse" : "Edit"}</button>
+                  )}
+                  <button className="xbtn" title="Remove email" onClick={() => setPastEmails((es) => es.filter((x) => x.id !== e.id))}>×</button>
+                </div>
+                {isOpen ? (
+                  <>
+                    <input className="pe-subject" value={e.subject} onChange={(ev) => editEmail(e.id, { subject: ev.target.value })} placeholder="Subject line" />
+                    <textarea className="pe-body" value={e.body} onChange={(ev) => editEmail(e.id, { body: ev.target.value })} rows={6} placeholder="Paste the email body here…" />
+                  </>
+                ) : (
+                  <div className="pe-preview">
+                    {e.subject ? <b>{e.subject}</b> : <span className="muted">(no subject)</span>}
+                    {e.body ? ` — ${e.body.replace(/\s+/g, " ").slice(0, 110)}${e.body.length > 110 ? "…" : ""}` : ""}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="runbar" style={{ marginTop: 14 }}>
           <button className="btn primary" onClick={run} disabled={running || !usableCount || !agents.length}>
