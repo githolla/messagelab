@@ -19,8 +19,10 @@ a segment-level results dashboard. "Message Lab" is a working title.
   the tally + stats, and puts server-authored identity fields after the spread.
 - Deployed on Vercel. No database in v1 — results live in client state. The A/B
   tool exports a run as JSON (with a reproducibility manifest) via `lib/export.ts`,
-  a Markdown report, and print-to-PDF; completed runs are also persisted to
-  localStorage (`lib/runstore.ts`) for a "Past runs" strip + two-run comparison.
+  a Markdown report, and print-to-PDF. The `/test` page opens as a "simulation
+  builder" (header "Build a message simulation" + a live recipe banner that
+  summarizes what will run); there is no localStorage run history (the old
+  "Past runs" strip + `lib/runstore.ts` were removed).
 - Persona simulation: `app/api/run/route.ts` is a serverless route called once per
   reaction (client fans out, concurrency 4). It conditions Claude on a persona/
   archetype's dimensions (system prompt) and returns questionnaire answers as strict JSON.

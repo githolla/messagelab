@@ -22,14 +22,6 @@ import {
   type FacetKey,
 } from "@/lib/cohort";
 import { buildRunExport, runToMarkdown, type ExportInput } from "@/lib/export";
-import {
-  listRuns,
-  saveRun,
-  getRun,
-  removeRun,
-  newRunId,
-  type StoredRun,
-} from "@/lib/runstore";
 import { DiffView } from "@/components/Diff";
 
 const CONCURRENCY = 4;
@@ -243,18 +235,12 @@ export default function Home() {
   const [detailView, setDetailView] = useState<"cards" | "table">("cards");
   const [sessionSpend, setSessionSpend] = useState(0);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [pastRuns, setPastRuns] = useState<StoredRun[]>([]);
-  const [compareIds, setCompareIds] = useState<string[]>([]);
   // Prior versions of the two messages (newest first), captured on each change.
   const [history, setHistory] = useState<{ id: number; note: string; v: Variants }[]>([]);
   const histId = useRef(0);
   // Two-screen flow: the setup screen, then a dedicated results screen the run
   // navigates to on completion (so setup and results are never one long page).
   const [view, setView] = useState<"setup" | "results">("setup");
-
-  useEffect(() => {
-    setPastRuns(listRuns());
-  }, []);
 
   const addSpend = (d: number) => setSessionSpend((s) => s + d);
 
@@ -379,33 +365,9 @@ export default function Home() {
     return out;
   }
 
-  function persistRun(v: Variants, res: PersonaResult[], a: Analysis | null, demo: boolean) {
+  function markGenerated(res: PersonaResult[]) {
     if (!res.length) return;
-    const t = tally(res);
-    const iso = new Date().toISOString();
-    setGeneratedAt(iso);
-    const run: StoredRun = {
-      id: newRunId(industry + iso),
-      createdAt: iso,
-      industryKey: industry,
-      industryLabel: INDUSTRIES.find((i) => i.key === industry)?.label ?? "General / other",
-      assetType: v.assetType,
-      isDemo: demo,
-      verdict: a?.verdict ?? null,
-      labelA: v.labelA,
-      labelB: v.labelB,
-      n: res.length,
-      gA: t.givesA,
-      gB: t.givesB,
-      confidence: null,
-      variants: v,
-      results: res,
-      analysis: a,
-      model: res[0]?.model ?? null,
-      facets: cohort,
-      cohortText,
-    };
-    setPastRuns(saveRun(run));
+    setGeneratedAt(new Date().toISOString());
   }
 
   async function runLive() {
@@ -445,7 +407,7 @@ export default function Home() {
     goToResults();
     setRounds([{ labelA: variants.labelA, labelB: variants.labelB, ...tally(res) }]);
     const a = await analyze(variants, res);
-    persistRun(variants, res, a, false);
+    markGenerated(res);
   }
 
   function runDemo() {
@@ -466,7 +428,7 @@ export default function Home() {
     setRounds([{ labelA: variants.labelA, labelB: variants.labelB, ...tally(res) }]);
     const a = demoAnalysis(variants, res);
     setAnalysis(a);
-    persistRun(variants, res, a, true);
+    markGenerated(res);
     goToResults();
   }
 
@@ -492,7 +454,7 @@ export default function Home() {
         : [{ labelA: v.labelA, labelB: v.labelB, ...tally(merged) }]
     );
     const a = await analyze(v, merged);
-    persistRun(v, merged, a, false);
+    markGenerated(merged);
   }
 
   async function refineLoop() {
@@ -584,7 +546,7 @@ export default function Home() {
     // Re-analyze the final panel so the report reflects the refined winner.
     if (ranAny) {
       const a = await analyze(v, res);
-      persistRun(v, res, a, false);
+      markGenerated(res);
     }
     setRefineNote(outcome);
     setRefining(false);
@@ -802,26 +764,6 @@ export default function Home() {
     };
   }, [openP]);
 
-  function loadPastRun(id: string) {
-    const r = getRun(id);
-    if (!r) return;
-    setIndustry(r.industryKey);
-    setRanIndustry(r.industryKey);
-    setVariants(r.variants);
-    setRanVariants(r.variants);
-    setRanFacets(r.facets ?? emptyCohort());
-    setRanCohortText(r.cohortText ?? "");
-    setResults(r.results);
-    setAnalysis(r.analysis);
-    setResultsAsset(r.assetType);
-    setIsDemo(r.isDemo);
-    setPanelSize(r.results.length);
-    setDone(r.results.length);
-    setGeneratedAt(r.createdAt);
-    setRounds([{ labelA: r.variants.labelA, labelB: r.variants.labelB, ...tally(r.results) }]);
-    goToResults();
-  }
-
   const estCost = estimateRunCost(plannedSize, true);
 
   return (
@@ -829,87 +771,24 @@ export default function Home() {
       {view === "setup" && (
       <>
       <div className="pagehead">
-        <h1>A/B message test</h1>
+        <h1>Build a message simulation</h1>
         <p>
-          Pick an industry, see the audience &amp; analyst bots that will work on it, then test two
-          versions of a message against them — with an executive read of the results, not a wall of
-          charts.
+          Set up your audience and drop in two versions of a message, then test them against a panel
+          of simulated buyers — with an executive read of the results, not a wall of charts.
         </p>
       </div>
 
-      {/* Past runs */}
-      {pastRuns.length > 0 && (
-        <section className="card">
-          <h2 className="step">Past runs</h2>
-          <p className="sub">
-            Saved in this browser — reopen a run or select two to compare their conversion rates.
-          </p>
-          <div className="pastruns">
-            {pastRuns.map((r) => {
-              const sel = compareIds.includes(r.id);
-              return (
-                <div key={r.id} className={`pastrun ${r.verdict ?? "tie"}`}>
-                  <button
-                    style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}
-                    onClick={() => loadPastRun(r.id)}
-                    title="Reopen this run"
-                  >
-                    <div className="prv">
-                      {r.verdict ? VERDICT_LABEL[r.verdict] : "Results"}
-                      {r.isDemo ? " · demo" : ""}
-                    </div>
-                    <div className="prmeta">
-                      {r.industryLabel} · {ASSET_LABELS[r.assetType]} · n={r.n}
-                      <br />A “{r.labelA}” vs B “{r.labelB}”
-                    </div>
-                  </button>
-                  <div className="prmeta" style={{ marginTop: 8, display: "flex", gap: 12 }}>
-                    <label style={{ display: "inline-flex", gap: 5, alignItems: "center", cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={sel}
-                        style={{ width: "auto" }}
-                        onChange={() =>
-                          setCompareIds((ids) =>
-                            ids.includes(r.id)
-                              ? ids.filter((x) => x !== r.id)
-                              : [...ids, r.id].slice(-2)
-                          )
-                        }
-                      />
-                      Compare
-                    </label>
-                    <button className="pastrun-x" onClick={() => setPastRuns(removeRun(r.id))}>
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {compareIds.length === 2 && (() => {
-            const [x, y] = compareIds.map((id) => pastRuns.find((r) => r.id === id)).filter(Boolean) as StoredRun[];
-            if (!x || !y) return null;
-            const overlap = (r: StoredRun) => {
-              const a = wilson(r.gA, r.n);
-              const b = wilson(r.gB, r.n);
-              return Math.min(a.high, b.high) - Math.max(a.low, b.low) <= 0;
-            };
-            return (
-              <div className="comparegrid">
-                {[x, y].map((r) => (
-                  <div className="abtile" key={r.id}>
-                    <div className="abk">{r.industryLabel} · n={r.n}</div>
-                    <div className="abrow"><span className="abdot a" /> A “{r.labelA}” <span className="abci">{shareWithCI(r.gA, r.n)}</span></div>
-                    <div className="abrow"><span className="abdot b" /> B “{r.labelB}” <span className="abci">{shareWithCI(r.gB, r.n)}</span></div>
-                    <p className="smalln">{overlap(r) ? "Clear separation (intervals don't overlap)." : "Directional — intervals overlap."}</p>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </section>
-      )}
+      {/* Live recipe — what this simulation will do, updates as you build it */}
+      <div className="simrecipe">
+        <span className="sr-k">Simulation</span>
+        <span className="sr-body">
+          Test <b>2 versions</b> of{" "}
+          <b>{variants.assetType === "website" ? "a website screen" : `a ${messageType.toLowerCase()}`}</b> for{" "}
+          <b>{INDUSTRIES.find((i) => i.key === industry)?.label ?? "your market"}</b> against{" "}
+          <b>{plannedSize}</b> simulated {variants.assetType === "website" ? "visitor" : "audience"} reactions,
+          interpreted by {archetypes.length} audience bots + {ANALYSTS.length} analysts.
+        </span>
+      </div>
 
       {/* Industry + the bots */}
       <section className="card">
