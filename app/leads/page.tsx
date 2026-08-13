@@ -26,7 +26,7 @@ import {
   type EmailReview,
   type EmailBaseline,
 } from "@/lib/reviewers";
-import { reviewAll, buildBaseline } from "@/lib/emailreview";
+import { reviewAll, buildBaseline, summarizeReviews } from "@/lib/emailreview";
 
 // Actions worth surfacing in the compact funnel readout, hot → cold.
 const FUNNEL: Action[] = ["meeting", "continue", "reply", "click", "read", "skim", "ignore", "unsubscribe"];
@@ -774,6 +774,7 @@ function EmailReviewLab({
 
   const MAX_EMAILS = 300;
   const usableCount = pastEmails.filter((e) => (e.body || "").trim()).length;
+  const summary = useMemo(() => summarizeReviews(reviews), [reviews]);
 
   function editAgent(id: string, patch: Partial<ReviewAgent>) {
     setAgents((a) => a.map((x) => (x.id === id ? { ...x, ...patch } : x)));
@@ -968,6 +969,61 @@ function EmailReviewLab({
       {/* Results */}
       {reviews.length > 0 && (
         <div ref={resultsRef}>
+          {summary && (
+            <section className="card summarycard">
+              <div className="sum-top">
+                <div className={`sum-score ${summary.avgScore >= 75 ? "hi" : summary.avgScore >= 55 ? "mid" : "lo"}`}>
+                  {summary.avgScore}<span>/100</span>
+                </div>
+                <div className="sum-lead">
+                  <h2 className="step" style={{ margin: 0 }}>Overall summary</h2>
+                  <p>{summary.headline}</p>
+                </div>
+              </div>
+
+              <div className="sum-grid">
+                <div className="sum-block">
+                  <div className="sum-h">By agent, across all {summary.emails} email{summary.emails > 1 ? "s" : ""}</div>
+                  <div className="agentbars">
+                    {summary.perAgent.map((a) => (
+                      <div className="agentbar" key={a.agentId}>
+                        <span className="ab-name">{a.agentName}</span>
+                        <span className="ab-track"><span className={a.avg >= 75 ? "hi" : a.avg >= 55 ? "mid" : "lo"} style={{ width: `${a.avg}%` }} /></span>
+                        <span className="ab-val">{a.avg}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="note" style={{ marginTop: 8 }}>
+                    Best: <b>{summary.best.label}</b> ({summary.best.score}) · Weakest: <b>{summary.worst.label}</b> ({summary.worst.score})
+                  </p>
+                </div>
+
+                <div className="sum-block">
+                  <div className="sum-h">
+                    Most common issues
+                    <span className="sevtotals">
+                      <span className="sev sev-high">{summary.severityCounts.high} high</span>
+                      <span className="sev sev-medium">{summary.severityCounts.medium} med</span>
+                      <span className="sev sev-low">{summary.severityCounts.low} low</span>
+                    </span>
+                  </div>
+                  {summary.topIssues.length ? (
+                    <ul className="issuelist">
+                      {summary.topIssues.map((iss, i) => (
+                        <li key={i}>
+                          <span className="issue-count">{iss.count}×</span>
+                          <span className={`sev sev-${iss.severity}`}>{iss.severity}</span>
+                          {iss.text}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="note">No material issues flagged — these emails are in good shape.</p>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
           {computed && (
             <section className="card baselinecard">
               <div className="fgh" style={{ marginTop: 0 }}>

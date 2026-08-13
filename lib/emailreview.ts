@@ -248,6 +248,85 @@ export function buildBaseline(reviews: EmailReview[], emails: PastEmail[]): Emai
   };
 }
 
+// A descriptive, portfolio-level read across every reviewed email (distinct
+// from the prescriptive baseline). Computed from the reviews alone.
+export interface AgentAvg {
+  agentId: string;
+  agentName: string;
+  avg: number;
+}
+export interface IssueTally {
+  text: string;
+  count: number; // how many emails hit this issue
+  severity: Severity;
+}
+export interface ReviewSummary {
+  emails: number;
+  avgScore: number;
+  headline: string;
+  perAgent: AgentAvg[]; // strongest → weakest
+  strongest: AgentAvg;
+  weakest: AgentAvg;
+  best: { label: string; score: number };
+  worst: { label: string; score: number };
+  topIssues: IssueTally[];
+  severityCounts: { high: number; medium: number; low: number };
+}
+
+export function summarizeReviews(reviews: EmailReview[]): ReviewSummary | null {
+  if (!reviews.length) return null;
+  const emails = reviews.length;
+  const avgScore = Math.round(reviews.reduce((t, r) => t + r.overall, 0) / emails);
+
+  // Per-agent averages across all emails.
+  const agg = new Map<string, { name: string; total: number; n: number }>();
+  for (const r of reviews)
+    for (const c of r.critiques) {
+      const cur = agg.get(c.agentId) || { name: c.agentName, total: 0, n: 0 };
+      cur.total += c.score;
+      cur.n += 1;
+      agg.set(c.agentId, cur);
+    }
+  const perAgent: AgentAvg[] = [...agg.entries()]
+    .map(([agentId, v]) => ({ agentId, agentName: v.name, avg: Math.round(v.total / Math.max(1, v.n)) }))
+    .sort((a, b) => b.avg - a.avg);
+  const strongest = perAgent[0];
+  const weakest = perAgent[perAgent.length - 1];
+
+  // Best / worst email by overall score.
+  const byScore = [...reviews].sort((a, b) => b.overall - a.overall);
+  const best = { label: byScore[0].label, score: byScore[0].overall };
+  const worst = { label: byScore[byScore.length - 1].label, score: byScore[byScore.length - 1].overall };
+
+  // Most common issues (by how many emails hit each), keeping the worst severity seen.
+  const sevRank: Record<Severity, number> = { high: 3, medium: 2, low: 1 };
+  const issues = new Map<string, { text: string; count: number; severity: Severity }>();
+  const severityCounts = { high: 0, medium: 0, low: 0 };
+  for (const r of reviews) {
+    const seenInEmail = new Set<string>();
+    for (const c of r.critiques)
+      for (const f of c.fixes) {
+        severityCounts[f.severity] += 1;
+        const key = f.text.replace(/"[^"]*"/g, "").replace(/\d+/g, "").trim().toLowerCase();
+        if (seenInEmail.has(key)) continue; // count each issue once per email
+        seenInEmail.add(key);
+        const cur = issues.get(key) || { text: f.text, count: 0, severity: f.severity };
+        cur.count += 1;
+        if (sevRank[f.severity] > sevRank[cur.severity]) cur.severity = f.severity;
+        issues.set(key, cur);
+      }
+  }
+  const topIssues = [...issues.values()]
+    .sort((a, b) => b.count - a.count || sevRank[b.severity] - sevRank[a.severity])
+    .slice(0, 6);
+
+  const strong = perAgent.length > 1 ? ` Strongest on ${strongest.agentName}, weakest on ${weakest.agentName}.` : "";
+  const lead = topIssues[0] ? ` Most common issue: ${topIssues[0].text.replace(/\s+—.*$/, "").replace(/\.$/, "")} (${topIssues[0].count} of ${emails}).` : "";
+  const headline = `${emails} email${emails === 1 ? "" : "s"} reviewed, averaging ${avgScore}/100.${strong}${lead}`;
+
+  return { emails, avgScore, headline, perAgent, strongest, weakest, best, worst, topIssues, severityCounts };
+}
+
 // Compact text form of the baseline, for injecting into the drafting prompt.
 export function baselineToPrompt(b: EmailBaseline): string {
   return [
