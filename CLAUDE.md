@@ -41,9 +41,15 @@ a segment-level results dashboard. "Message Lab" is a working title.
   (the reactions list renders at most DISPLAY_MAX). Results break down per segment.
 - `lib/samples.ts`: per-industry A/B sample copy (`sampleFor`), industry message-type
   lists, and `isPristineCopy` (guards live runs against untouched sample copy and
-  safely refills on industry switch). `app/api/draft/route.ts` powers Auto-craft:
+  safely refills on industry switch). `app/api/draft/route.ts` powers auto-craft:
   Claude drafts two strategically-contrasting A/B versions for the industry + message
-  type. Browsing industries never fires a paid re-draft — re-crafting is explicit.
+  type. The message is now drafted **behind the scenes** — a debounced effect
+  auto-crafts when industry/message/asset settle (skips first mount, dedupes the
+  combo, latches off silently on no-key, never clobbers hand-edited copy via a
+  `copyDirty` flag). Step 2 hides the copy editor behind a collapsed "Preview or
+  write your own" escape hatch (website assets keep their screenshot upload); the
+  two tested versions' full copy is revealed in the results ("The messages tested"
+  card, winner highlighted, copy-to-clipboard).
 - Analysis: `app/api/analyze/route.ts` takes the panel results + industry and returns
   a decision-ready report (verdict, headline, exec summary, per-segment drivers,
   prioritized actions, per-analyst reads). `lib/analysis.ts` has the type + a

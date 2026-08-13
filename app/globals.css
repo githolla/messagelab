@@ -1170,3 +1170,15 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
   .segmain { flex-basis: 100%; order: -1; }
   .pb-actions .note { margin-left: 0; flex-basis: 100%; }
 }
+
+/* --- A/B: behind-the-scenes message + results reveal --- */
+.autocopy { margin-top: 4px; }
+.autocopy .method summary { font-size: 13.5px; }
+.msgtested { align-items: start; }
+.msgcard { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; background: var(--card); }
+.msgcard.win { border-color: var(--series-b, #65a30d); box-shadow: 0 0 0 1px var(--series-b, #65a30d) inset; }
+.msgcard-h { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 4px; }
+.msgcard-h .abdot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.winpill { margin-left: auto; background: var(--series-b, #65a30d); color: #fff; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; }
+.msgcard-stat { font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
+.msgcard-copy { white-space: pre-wrap; font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--card-2, var(--paper, #fafafa)); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 11px 12px; margin: 0 0 10px; max-height: 320px; overflow: auto; }

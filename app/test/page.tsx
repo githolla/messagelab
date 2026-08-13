@@ -144,7 +144,6 @@ export default function Home() {
     });
   }
   // Whether the current copy came from Auto-craft (vs a sample or the user's own).
-  const [autoCrafted, setAutoCrafted] = useState(false);
   // Auto-craft state: `copyDirty` = the user has hand-edited copy (so we stop
   // auto-drafting over them); `autoCraftOff` latches when a draft call fails
   // (e.g. no server key); `lastAutoKey` dedupes the industry|message|asset combo.
@@ -196,7 +195,6 @@ export default function Home() {
         labelB: data.labelB || v.labelB,
         copyB: data.copyB,
       }));
-      setAutoCrafted(true);
       setCopyDirty(false);
       addSpend(0.02);
     } catch (e) {
@@ -266,6 +264,7 @@ export default function Home() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedV, setCopiedV] = useState<string | null>(null);
   const [reactVote, setReactVote] = useState<"all" | "send_a" | "send_b" | "either" | "neither">("all");
   const [reactSeg, setReactSeg] = useState<string>("all");
   const [openP, setOpenP] = useState<PersonaResult | null>(null);
@@ -288,7 +287,7 @@ export default function Home() {
   function restoreVariant(entry: { v: Variants }) {
     pushHistory("Before restore", variants);
     setVariants(entry.v);
-    setAutoCrafted(false);
+    setCopyDirty(true);
   }
   const stopRef = useRef(false);
 
@@ -1055,51 +1054,25 @@ export default function Home() {
 
       {/* Variants */}
       <section className="card">
-        <h2 className="step">2 · Message variants</h2>
-        <p className="sub">{ASSET_HINTS[variants.assetType]}</p>
-        {variants.assetType !== "website" && (
-          <div className="craftbar">
-            <button
-              className="btn ghost"
-              onClick={() => autoCraft()}
-              disabled={drafting || running || refining}
-            >
-              {drafting ? "Drafting…" : "Draft a fresh pair"}
-            </button>
-            <span className="note">
-              {drafting
-                ? `Drafting two ${messageType.toLowerCase()} versions for ${industryLabel}…`
-                : autoCraftOff.current
-                  ? `Showing the ${industryLabel} sample copy — edit it or paste your own below.`
-                  : copyDirty
-                    ? "Using your edited copy. Click above to replace it with a fresh AI draft."
-                    : `Auto-drafted for ${industryLabel} · ${messageType.toLowerCase()}. Change the dropdowns to re-draft, click to reroll, or just edit the copy below.`}
-            </span>
-          </div>
-        )}
-        <div className="grid2">
-          {(["A", "B"] as const).map((v) => {
-            const labelKey = v === "A" ? "labelA" : "labelB";
-            const copyKey = v === "A" ? "copyA" : "copyB";
-            const imageKey = v === "A" ? "imageA" : "imageB";
-            const isSample = variants.assetType !== "website" && isPristineCopy(variants[copyKey]) && variants[copyKey].trim() !== "";
-            return (
-              <div key={v}>
-                <label className="fld" htmlFor={`label-${v}`}>
-                  Version {v} label
-                  {isSample && <span className="demotag" style={{ marginLeft: 8 }}>Sample</span>}
-                </label>
-                <input
-                  id={`label-${v}`}
-                  type="text"
-                  value={variants[labelKey]}
-                  onChange={(e) => setVariants((prev) => ({ ...prev, [labelKey]: e.target.value }))}
-                />
-                {variants.assetType === "website" ? (
-                  <>
-                    <label className="fld" style={{ marginTop: 10 }} htmlFor={`shot-${v}`}>
-                      Version {v} screenshot
-                    </label>
+        <h2 className="step">2 · The message</h2>
+
+        {variants.assetType === "website" ? (
+          <>
+            <p className="sub">{ASSET_HINTS.website}</p>
+            <div className="grid2">
+              {(["A", "B"] as const).map((v) => {
+                const labelKey = v === "A" ? "labelA" : "labelB";
+                const imageKey = v === "A" ? "imageA" : "imageB";
+                return (
+                  <div key={v}>
+                    <label className="fld" htmlFor={`label-${v}`}>Version {v} label</label>
+                    <input
+                      id={`label-${v}`}
+                      type="text"
+                      value={variants[labelKey]}
+                      onChange={(e) => setVariants((prev) => ({ ...prev, [labelKey]: e.target.value }))}
+                    />
+                    <label className="fld" style={{ marginTop: 10 }} htmlFor={`shot-${v}`}>Version {v} screenshot</label>
                     <div className="shot">
                       <input
                         id={`shot-${v}`}
@@ -1122,36 +1095,72 @@ export default function Home() {
                         <img src={variants[imageKey]} alt={`Version ${v} screenshot preview`} />
                       )}
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <label className="fld" style={{ marginTop: 10 }} htmlFor={`copy-${v}`}>
-                      Version {v} copy {isSample && <span className="note">· sample, replace with your own</span>}
-                    </label>
-                    <textarea
-                      id={`copy-${v}`}
-                      className="grow"
-                      ref={autoSize}
-                      value={variants[copyKey]}
-                      onChange={(e) => {
-                        resizeTa(e.target);
-                        const val = e.target.value;
-                        setVariants((prev) => ({ ...prev, [copyKey]: val }));
-                        setAutoCrafted(false);
-                        setCopyDirty(true);
-                      }}
-                    />
-                  </>
-                )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <div className="autocopy">
+            <p className="sub">
+              {drafting
+                ? `Drafting two contrasting ${messageType.toLowerCase()} versions for ${industryLabel}…`
+                : copyDirty
+                  ? "Testing your own copy — expand below to review or edit it. The winning version appears in your results."
+                  : `We draft two contrasting ${messageType.toLowerCase()} versions for ${industryLabel} and test them head-to-head. You don't have to write anything — the winning copy appears in your results.`}
+            </p>
+            <details className="method">
+              <summary>Preview or write your own copy</summary>
+              <div className="craftbar" style={{ marginTop: 12 }}>
+                <button className="btn ghost" onClick={() => autoCraft()} disabled={drafting || running || refining}>
+                  {drafting ? "Drafting…" : "Draft a fresh pair"}
+                </button>
+                <span className="note">
+                  {copyDirty ? "Using your copy — it'll be tested as Version A vs B." : "Or edit either version below to test your own copy instead."}
+                </span>
               </div>
-            );
-          })}
-        </div>
+              <div className="grid2">
+                {(["A", "B"] as const).map((v) => {
+                  const labelKey = v === "A" ? "labelA" : "labelB";
+                  const copyKey = v === "A" ? "copyA" : "copyB";
+                  const isSample = isPristineCopy(variants[copyKey]) && variants[copyKey].trim() !== "";
+                  return (
+                    <div key={v}>
+                      <label className="fld" htmlFor={`label-${v}`}>
+                        Version {v} label
+                        {isSample && <span className="demotag" style={{ marginLeft: 8 }}>Sample</span>}
+                      </label>
+                      <input
+                        id={`label-${v}`}
+                        type="text"
+                        value={variants[labelKey]}
+                        onChange={(e) => setVariants((prev) => ({ ...prev, [labelKey]: e.target.value }))}
+                      />
+                      <label className="fld" style={{ marginTop: 10 }} htmlFor={`copy-${v}`}>Version {v} copy</label>
+                      <textarea
+                        id={`copy-${v}`}
+                        className="grow"
+                        ref={autoSize}
+                        value={variants[copyKey]}
+                        onChange={(e) => {
+                          resizeTa(e.target);
+                          const val = e.target.value;
+                          setVariants((prev) => ({ ...prev, [copyKey]: val }));
+                          setCopyDirty(true);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          </div>
+        )}
         <div className="runbar" style={{ marginTop: 16 }}>
-          <button className="btn primary" onClick={runLive} disabled={running || refining}>
-            {running ? `Running… ${done}/${panelSize}` : "Run test"}
+          <button className="btn primary" onClick={runLive} disabled={running || refining || drafting}>
+            {running ? `Running… ${done}/${panelSize}` : drafting ? "Drafting message…" : "Run simulation"}
           </button>
-          <button className="btn ghost" onClick={runDemo} disabled={running || refining}>
+          <button className="btn ghost" onClick={runDemo} disabled={running || refining || drafting}>
             Load demo results
           </button>
           {running && (
@@ -1305,6 +1314,50 @@ export default function Home() {
               </section>
             );
           })()}
+
+          {/* The messages tested — reveal the copy so the verdict is actionable */}
+          {resultsAsset !== "website" && (shown.copyA?.trim() || shown.copyB?.trim()) ? (
+            <section className="card">
+              <h2 className="step">The messages tested</h2>
+              <p className="sub">
+                The two versions your panel reacted to
+                {analysis && (analysis.verdict === "ship_a" || analysis.verdict === "ship_b")
+                  ? " — the winner is highlighted, ready to copy and send."
+                  : "."}
+              </p>
+              <div className="grid2 msgtested">
+                {(["A", "B"] as const).map((V) => {
+                  const isA = V === "A";
+                  const win = analysis?.verdict === (isA ? "ship_a" : "ship_b");
+                  const label = isA ? shown.labelA : shown.labelB;
+                  const copy = isA ? shown.copyA : shown.copyB;
+                  const gives = isA ? gA : gB;
+                  return (
+                    <div key={V} className={`msgcard ${win ? "win" : ""}`}>
+                      <div className="msgcard-h">
+                        <span className={`abdot ${isA ? "a" : "b"}`} />
+                        <b>Version {V}</b> · {label}
+                        {win && <span className="winpill">Winner</span>}
+                      </div>
+                      <div className="msgcard-stat">{shareWithCI(gives, n)} would act on it</div>
+                      <pre className="msgcard-copy">{copy}</pre>
+                      <button
+                        className="copybtn"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(`${label}\n\n${copy}`).then(
+                            () => { setCopiedV(V); setTimeout(() => setCopiedV(null), 2000); },
+                            () => {}
+                          );
+                        }}
+                      >
+                        {copiedV === V ? "Copied ✓" : "Copy this version"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
 
           {/* The focus group — how the room split, then representative participants */}
           {(() => {
