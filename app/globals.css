@@ -1187,3 +1187,35 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .msgmode { display: inline-flex; margin-bottom: 2px; }
 .autocopy .filebtn { position: relative; overflow: hidden; cursor: pointer; display: inline-flex; align-items: center; }
 .autocopy .filebtn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+
+/* --- Focus-group scoreboard (redesigned) --- */
+.abdot.a { background: var(--series-a); }
+.abdot.b { background: var(--series-b); }
+.scoreboard { margin: 18px 0 0; display: flex; flex-direction: column; gap: 22px; }
+.sb-h { font-family: var(--mono); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); margin-bottom: 11px; }
+
+.prefbar { display: flex; gap: 2px; height: 24px; }
+.prefbar .pf { position: relative; border-radius: 4px; min-width: 4px; display: flex; align-items: center; justify-content: center; transition: filter .12s; }
+.prefbar .pf:hover { filter: brightness(1.06); }
+.pflabel { font-size: 11px; font-weight: 700; color: #fff; letter-spacing: .01em; text-shadow: 0 1px 1px rgba(0,0,0,.28); }
+.prefkey { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; font-size: 12.5px; color: var(--ink-2); }
+.prefkey .pk { display: inline-flex; align-items: center; gap: 7px; }
+.prefkey .pk.muted { opacity: .5; }
+.prefkey .pk i { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+.prefkey .pk b { font-family: var(--mono); color: var(--ink); }
+.prefkey .pkpct { font-family: var(--mono); color: var(--ink-3); font-size: 11px; }
+
+.cmptiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 640px) { .cmptiles { grid-template-columns: 1fr; } }
+.cmptile { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.cmpk { font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 12px; }
+.cmprow { display: grid; grid-template-columns: 32px 1fr 42px; align-items: center; gap: 10px; }
+.cmprow + .cmprow { margin-top: 8px; }
+.cmplbl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.cmplbl .abdot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.cmpbar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.cmpbar > span { display: block; height: 100%; border-radius: 5px; min-width: 3px; }
+.cmpnum { font-family: var(--serif); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-3); text-align: right; white-space: nowrap; }
+.cmprow.win .cmpnum, .cmprow.win .cmplbl { color: var(--ink); }
+.cmprow.win .cmplbl { font-weight: 600; }
+.cmpci { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--line); }

@@ -1481,47 +1481,70 @@ export default function Home() {
               <section className="card">
                 <h2 className="step">The focus group</h2>
                 <p className="sub">
-                  {results.length} simulated participants each read both versions and reacted. The bar shows{" "}
-                  <b>which version each preferred</b>; the tiles below show <b>how many would act on each</b> — two
-                  different measures.
+                  {results.length} simulated participants each read both versions and reacted. Two different
+                  measures: <b>which version each preferred</b> (head-to-head), and <b>how each version scored</b>{" "}
+                  on its own (would act, trust, resonance).
                 </p>
 
-                {/* How the room split */}
-                <div className="splitbar">
-                  {splitSegs.map((s) =>
-                    s.n2 > 0 ? (
-                      <span key={s.k} className="ss" style={{ width: `${(s.n2 / (results.length || 1)) * 100}%`, background: s.color }} title={`${s.label}: ${s.n2}`} />
-                    ) : null
-                  )}
-                </div>
-                <div className="splitkey">
-                  {splitSegs.map((s) => (
-                    <span key={s.k} className="sk">
-                      <i style={{ background: s.color }} />
-                      {s.label} <b>{s.n2}</b>
-                    </span>
-                  ))}
-                </div>
+                <div className="scoreboard">
+                  {/* Head-to-head preference split */}
+                  <div className="sb-block">
+                    <div className="sb-h">Which version they preferred</div>
+                    <div className="prefbar">
+                      {splitSegs.map((s) => {
+                        const pct = (s.n2 / (results.length || 1)) * 100;
+                        return s.n2 > 0 ? (
+                          <span key={s.k} className="pf" style={{ width: `${pct}%`, background: s.color }} title={`${s.label}: ${s.n2}`}>
+                            {pct >= 11 ? <span className="pflabel">{Math.round(pct)}%</span> : null}
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
+                    <div className="prefkey">
+                      {splitSegs.map((s) => (
+                        <span key={s.k} className={`pk ${s.n2 === 0 ? "muted" : ""}`}>
+                          <i style={{ background: s.color }} />
+                          {s.label} <b>{s.n2}</b>
+                          <span className="pkpct">{Math.round((s.n2 / (results.length || 1)) * 100)}%</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-                {/* Headline metrics as tiles */}
-                <div className="abtiles">
-                  <div className="abtile">
-                    <div className="abk">Would act on it</div>
-                    <div className="abrow"><span className="abdot a" /> A <span className="abv">{gA}</span> <span className="abci">{shareWithCI(gA, n)}</span></div>
-                    <div className="abrow"><span className="abdot b" /> B <span className="abv">{gB}</span> <span className="abci">{shareWithCI(gB, n)}</span></div>
-                  </div>
-                  <div className="abtile">
-                    <div className="abk">Rated more trustworthy</div>
-                    <div className="abrow"><span className="abdot a" /> A <span className="abv">{trustA}</span></div>
-                    <div className="abrow"><span className="abdot b" /> B <span className="abv">{trustB}</span></div>
-                  </div>
-                  <div className="abtile">
-                    <div className="abk">Avg resonance (of 5)</div>
-                    <div className="abrow"><span className="abdot a" /> A <span className="abv">{mean("resonanceA").toFixed(1)}</span></div>
-                    <div className="abrow"><span className="abdot b" /> B <span className="abv">{mean("resonanceB").toFixed(1)}</span></div>
+                  {/* Per-version scores as paired comparison bars */}
+                  <div className="sb-block">
+                    <div className="sb-h">How each version scored</div>
+                    <div className="cmptiles">
+                      {[
+                        { key: "act", label: "Would act on it", a: gA, b: gB, aw: (gA / n) * 100, bw: (gB / n) * 100, fmt: (v: number) => String(Math.round(v)), sub: [shareWithCI(gA, n), shareWithCI(gB, n)] as [string, string] },
+                        { key: "trust", label: "Rated more trustworthy", a: trustA, b: trustB, aw: (trustA / n) * 100, bw: (trustB / n) * 100, fmt: (v: number) => String(Math.round(v)) },
+                        { key: "res", label: "Avg resonance", a: mean("resonanceA"), b: mean("resonanceB"), aw: (mean("resonanceA") / 5) * 100, bw: (mean("resonanceB") / 5) * 100, fmt: (v: number) => v.toFixed(1), suffix: " / 5" },
+                      ].map((m) => {
+                        const aWin = m.a > m.b + 1e-6;
+                        const bWin = m.b > m.a + 1e-6;
+                        return (
+                          <div className="cmptile" key={m.key}>
+                            <div className="cmpk">{m.label}</div>
+                            {(["a", "b"] as const).map((side) => {
+                              const val = side === "a" ? m.a : m.b;
+                              const w = side === "a" ? m.aw : m.bw;
+                              const win = side === "a" ? aWin : bWin;
+                              return (
+                                <div className={`cmprow ${win ? "win" : ""}`} key={side}>
+                                  <span className="cmplbl"><span className={`abdot ${side}`} />{side.toUpperCase()}</span>
+                                  <span className="cmpbar"><span className={side} style={{ width: `${Math.max(2, w)}%` }} /></span>
+                                  <span className="cmpnum">{m.fmt(val)}{m.suffix ?? ""}</span>
+                                </div>
+                              );
+                            })}
+                            {"sub" in m && m.sub ? <div className="cmpci">A {m.sub[0]} · B {m.sub[1]}</div> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-                {orderCheck() && <p className="smalln">{orderCheck()}</p>}
+                {orderCheck() && <p className="smalln" style={{ marginTop: 14 }}>{orderCheck()}</p>}
 
                 {/* Participants */}
                 <div className="fgh">
