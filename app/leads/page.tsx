@@ -27,6 +27,7 @@ import {
   type EmailBaseline,
 } from "@/lib/reviewers";
 import { reviewAll, buildBaseline, summarizeReviews } from "@/lib/emailreview";
+import { rewriteEmail, type EmailRewrite } from "@/lib/emailrewrite";
 
 // Actions worth surfacing in the compact funnel readout, hot → cold.
 const FUNNEL: Action[] = ["meeting", "continue", "reply", "click", "read", "skim", "ignore", "unsubscribe"];
@@ -718,6 +719,25 @@ function splitDelimited(text: string, label: string): RawEmail[] {
   return [{ label, ...stripHeaders(t) }];
 }
 
+// Escape then wrap the first occurrence of each phrase in a highlight span, for
+// the original-vs-revised diff. Content is escaped first, so the inserted markup
+// is the only HTML — safe for dangerouslySetInnerHTML.
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function highlightHtml(text: string, phrases: string[], cls: string): string {
+  let html = escapeHtml(text);
+  for (const p of phrases) {
+    if (!p || !p.trim()) continue;
+    const e = escapeHtml(p);
+    const idx = html.indexOf(e);
+    if (idx > -1 && html.indexOf("<span", Math.max(0, idx - 30)) !== idx - 30) {
+      html = `${html.slice(0, idx)}<span class="${cls}">${e}</span>${html.slice(idx + e.length)}`;
+    }
+  }
+  return html;
+}
+
 async function parseUpload(f: File): Promise<RawEmail[]> {
   const text = await f.text();
   const name = f.name.toLowerCase();
@@ -772,9 +792,30 @@ function EmailReviewLab({
     });
   }
 
+  const [collapsedRw, setCollapsedRw] = useState<Set<string>>(new Set());
   const MAX_EMAILS = 300;
   const usableCount = pastEmails.filter((e) => (e.body || "").trim()).length;
   const summary = useMemo(() => summarizeReviews(reviews), [reviews]);
+
+  // A suggested rewrite per reviewed email, recomputed deterministically from the
+  // current agents + email text (so it stays in sync with what was reviewed).
+  const rewriteById = useMemo(() => {
+    const m = new Map<string, EmailRewrite>();
+    if (!reviews.length) return m;
+    for (const r of reviews) {
+      const e = pastEmails.find((x) => x.id === r.emailId);
+      if (e) m.set(r.emailId, rewriteEmail(agents, e));
+    }
+    return m;
+  }, [reviews, agents, pastEmails]);
+
+  function toggleRw(id: string) {
+    setCollapsedRw((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
 
   function editAgent(id: string, patch: Partial<ReviewAgent>) {
     setAgents((a) => a.map((x) => (x.id === id ? { ...x, ...patch } : x)));
@@ -1086,15 +1127,74 @@ function EmailReviewLab({
                   </div>
                 ))}
               </div>
+
+              {(() => {
+                const rw = rewriteById.get(r.emailId);
+                if (!rw) return null;
+                const open = !collapsedRw.has(r.emailId);
+                const editCount = rw.changes.filter((c) => c.kind !== "note").reduce((t, c) => t + c.count, 0);
+                const befores = rw.changes.filter((c) => c.before).map((c) => c.before);
+                const afters = rw.changes.filter((c) => c.after).map((c) => c.after);
+                return (
+                  <div className="rewrite">
+                    <button className="rw-toggle" onClick={() => toggleRw(r.emailId)} aria-expanded={open}>
+                      <span className="rw-caret">{open ? "▾" : "▸"}</span>
+                      Suggested rewrite {editCount > 0 && <span className="rw-badge">{editCount} change{editCount === 1 ? "" : "s"}</span>}
+                      <span className="rw-sum">{rw.summary}</span>
+                    </button>
+                    {open && (
+                      <div className="rw-body">
+                        {editCount > 0 && (
+                          <div className="diffgrid">
+                            <div className="diffcol">
+                              <div className="diff-h rem">Original</div>
+                              {rw.originalSubject && <div className="diff-subj" dangerouslySetInnerHTML={{ __html: highlightHtml(rw.originalSubject, befores, "d-rem") }} />}
+                              <div className="diff-body" dangerouslySetInnerHTML={{ __html: highlightHtml(rw.originalBody, befores, "d-rem") }} />
+                            </div>
+                            <div className="diffcol">
+                              <div className="diff-h add">Revised</div>
+                              {rw.revisedSubject && <div className="diff-subj" dangerouslySetInnerHTML={{ __html: highlightHtml(rw.revisedSubject, afters, "d-add") }} />}
+                              <div className="diff-body" dangerouslySetInnerHTML={{ __html: highlightHtml(rw.revisedBody, afters, "d-add") }} />
+                            </div>
+                          </div>
+                        )}
+                        <div className="changehdr">Why each change was made</div>
+                        <ul className="changelist">
+                          {rw.changes.map((c, i) => (
+                            <li className={`chg chg-${c.kind}`} key={i}>
+                              <div className="chg-edit">
+                                {c.kind === "add" ? (
+                                  <span><span className="chg-tag add">added</span> <ins>{c.after}</ins></span>
+                                ) : c.kind === "note" ? (
+                                  <span className="chg-tag note">structure</span>
+                                ) : (
+                                  <span>
+                                    <del>{c.before}</del> <span className="arrow">→</span> {c.after ? <ins>{c.after}</ins> : <em className="removed">removed</em>}
+                                  </span>
+                                )}
+                                {c.count > 1 && <span className="chg-count">×{c.count}</span>}
+                              </div>
+                              <div className="chg-why">
+                                <span className={`sev sev-${c.severity}`}>{c.severity}</span>
+                                {c.reason} <span className="chg-agent">— {c.agent}</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </section>
           ))}
         </div>
       )}
 
       <p className="caveat" style={{ maxWidth: 1080, margin: "0 auto 40px" }}>
-        Reviews are a directional read from your reviewer agents, not a compliance check. The baseline
-        captures patterns from the emails you provide — the more representative your samples, the better
-        the house style it learns.
+        Reviews are a directional read from your reviewer agents, not a compliance check. Suggested
+        rewrites are a starting draft to review — the notes explain why each word changed, but read the
+        revised version before you send it. The baseline captures patterns from the emails you provide.
       </p>
     </>
   );
