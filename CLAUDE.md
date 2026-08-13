@@ -77,6 +77,17 @@ a segment-level results dashboard. "Message Lab" is a working title.
   Diane's AGP voice, deterministic fallback with no key). All simulation is
   deterministic (fnv1a, no Math.random) so it runs with no API key. Phase 1 of a
   larger spec; group/cadence/adaptive/results-calibration are later phases.
+  Both the webinar and each attendee are editable in-app (scenario dials + Add
+  attendee) so it doubles as a what-if / focus-group sandbox; nothing is
+  nonprofit-specific but the seed data/copy.
+- Email Review Agents (`lib/reviewers.ts`, `lib/emailreview.ts`,
+  `app/api/email-review/route.ts`): an editable preset panel of reviewer agents
+  (Brand Voice, Copy, Deliverability, Conversion, Empathy) critiques uploaded/
+  pasted PAST emails (heuristic scoring — spam/jargon/generic/links/you-vs-we
+  density, no Math.random) and distills a reusable `EmailBaseline` (voice/dos/
+  donts/structure/subject). Saving the baseline conditions `/api/lead-email`
+  drafting (`baselineToPrompt`), so new follow-ups build on what already works.
+  Deterministic fallback = demo/no-key path; a key upgrades to a model read.
 - `app/review` + `app/api/review/route.ts`: standalone "Review a page" tool
   (linked from the header nav). Paste a URL → the route screenshots it headless
   (puppeteer-core + @sparticuz/chromium on Vercel; a local Chromium via

@@ -17,6 +17,16 @@ import {
 import { recommend, ACTION_LABEL, FACTORS, type Action, type StrategyResult } from "@/lib/leadsim";
 import type { Strategy } from "@/lib/leads";
 import { draftEmail } from "@/lib/leademail";
+import {
+  DEFAULT_AGENTS,
+  newAgent,
+  newPastEmail,
+  type ReviewAgent,
+  type PastEmail,
+  type EmailReview,
+  type EmailBaseline,
+} from "@/lib/reviewers";
+import { reviewAll, buildBaseline } from "@/lib/emailreview";
 
 // Actions worth surfacing in the compact funnel readout, hot → cold.
 const FUNNEL: Action[] = ["meeting", "continue", "reply", "click", "read", "skim", "ignore", "unsubscribe"];
@@ -59,7 +69,7 @@ function signalChips(l: Lead): string[] {
 }
 
 export default function LeadsPage() {
-  const [view, setView] = useState<"list" | "lead">("list");
+  const [view, setView] = useState<"list" | "lead" | "review">("list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [approved, setApproved] = useState<Record<string, string>>({}); // leadId -> strategyId
 
@@ -69,6 +79,19 @@ export default function LeadsPage() {
   const [webinar, setWebinar] = useState<Webinar>(SAMPLE_WEBINAR);
   const [editingWebinar, setEditingWebinar] = useState(false);
   const nextId = useRef(1);
+
+  // Email Review Agents: critique past emails → a baseline that conditions drafting.
+  const [agents, setAgents] = useState<ReviewAgent[]>(DEFAULT_AGENTS);
+  const [pastEmails, setPastEmails] = useState<PastEmail[]>([]);
+  const [reviews, setReviews] = useState<EmailReview[]>([]);
+  const [baseline, setBaseline] = useState<EmailBaseline | null>(null);
+  const emailSeq = useRef(1);
+  const agentSeq = useRef(1);
+
+  function openReview() {
+    setView("review");
+    setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 60);
+  }
 
   const ordered = useMemo(() => prioritizedLeads(leads), [leads]);
   const selected = leads.find((l) => l.id === selectedId) ?? null;
@@ -150,10 +173,22 @@ export default function LeadsPage() {
                   </>
                 )}
               </div>
-              <button className="btn ghost" onClick={() => setEditingWebinar((v) => !v)}>
-                {editingWebinar ? "Done" : "Edit webinar"}
-              </button>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <button className="btn ghost" onClick={openReview}>Email review agents</button>
+                <button className="btn ghost" onClick={() => setEditingWebinar((v) => !v)}>
+                  {editingWebinar ? "Done" : "Edit webinar"}
+                </button>
+              </div>
             </div>
+            {baseline && (
+              <div className="baselinebanner">
+                <span className="bl-dot" />
+                <b>Baseline active</b> — drafts follow the house style learned from {baseline.emailsReviewed} reviewed
+                email{baseline.emailsReviewed > 1 ? "s" : ""} (avg {baseline.avgScore}/100).
+                <button className="linklike" onClick={openReview}>Review</button>
+                <button className="linklike" onClick={() => setBaseline(null)}>Clear</button>
+              </div>
+            )}
             <div className="stepstrip">
               {stepCounts.map(([id, n]) => (
                 <span key={id} className={`stepchip ${id === "wait" ? "muted" : ""}`}>
@@ -224,6 +259,7 @@ export default function LeadsPage() {
           key={selected.id}
           lead={selected}
           webinar={webinar}
+          baseline={baseline}
           approvedStrategy={approved[selected.id]}
           onEdit={(patch) => editLead(selected.id, patch)}
           onBack={() => setView("list")}
@@ -234,6 +270,23 @@ export default function LeadsPage() {
           }}
         />
       )}
+
+      {view === "review" && (
+        <EmailReviewLab
+          webinar={webinar}
+          agents={agents}
+          setAgents={setAgents}
+          pastEmails={pastEmails}
+          setPastEmails={setPastEmails}
+          reviews={reviews}
+          setReviews={setReviews}
+          baseline={baseline}
+          setBaseline={setBaseline}
+          emailSeq={emailSeq}
+          agentSeq={agentSeq}
+          onBack={() => { setView("list"); setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 60); }}
+        />
+      )}
     </>
   );
 }
@@ -241,6 +294,7 @@ export default function LeadsPage() {
 function LeadDetail({
   lead,
   webinar,
+  baseline,
   approvedStrategy,
   onEdit,
   onBack,
@@ -248,6 +302,7 @@ function LeadDetail({
 }: {
   lead: Lead;
   webinar: Webinar;
+  baseline: EmailBaseline | null;
   approvedStrategy?: string;
   onEdit: (patch: Partial<Lead>) => void;
   onBack: () => void;
@@ -298,7 +353,7 @@ function LeadDetail({
       const resp = await fetch("/api/lead-email", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lead, webinar, strategyId: chosen }),
+        body: JSON.stringify({ lead, webinar, strategyId: chosen, baseline: baseline ?? undefined }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -477,6 +532,7 @@ function LeadDetail({
           <div className="emailtag">
             {isRecommended ? "Recommended approach" : "Manual override"} · {chosenStrategy.name}
             {aiModel ? ` · AI (${aiModel})` : ""}
+            {baseline ? <span className="bl-chip" title="Draft with AI applies your reviewed-email baseline">Baseline on</span> : null}
           </div>
         </div>
 
@@ -559,5 +615,280 @@ function ApproachRow({
       </div>
       <div className="ap-funnel">{result.strategyId === "wait" ? "No individual touch — preserve the relationship" : funnel || s.blurb}</div>
     </button>
+  );
+}
+
+// Two built-in past emails (one salesy/weak, one solid) so the panel demos
+// instantly without typing. Deterministic, no key needed.
+const SAMPLE_PAST_EMAILS: PastEmail[] = [
+  {
+    id: "sample-1",
+    label: "Sample — promo follow-up",
+    subject: "DON'T MISS this AMAZING limited-time offer!!!",
+    body:
+      "Hi there,\n\nWe are excited to reach out because our best-in-class solutions can help you leverage synergy and move the needle. Act now — this exclusive deal won't last! Click here to learn more, and click here to book, and click here for pricing.\n\nWe guarantee you'll love it. 100% risk-free!\n\nThanks,\nThe Team",
+  },
+  {
+    id: "sample-2",
+    label: "Sample — webinar recap",
+    subject: "Thanks for joining — one resource for you",
+    body:
+      "Hi Jordan,\n\nGreat to have you at Thursday's session on donor retention. You asked a sharp question about second-gift timing, so I pulled the one framework we lean on for exactly that.\n\nIf it's useful, I'm happy to walk through how it maps to your program — no pitch, just a quick look. Would a 15-minute call next week work?\n\nWarmly,\nDiane Roberts\nAllegiance Group + Pursuant",
+  },
+];
+
+function EmailReviewLab({
+  webinar,
+  agents,
+  setAgents,
+  pastEmails,
+  setPastEmails,
+  reviews,
+  setReviews,
+  baseline,
+  setBaseline,
+  emailSeq,
+  agentSeq,
+  onBack,
+}: {
+  webinar: Webinar;
+  agents: ReviewAgent[];
+  setAgents: React.Dispatch<React.SetStateAction<ReviewAgent[]>>;
+  pastEmails: PastEmail[];
+  setPastEmails: React.Dispatch<React.SetStateAction<PastEmail[]>>;
+  reviews: EmailReview[];
+  setReviews: React.Dispatch<React.SetStateAction<EmailReview[]>>;
+  baseline: EmailBaseline | null;
+  setBaseline: React.Dispatch<React.SetStateAction<EmailBaseline | null>>;
+  emailSeq: React.MutableRefObject<number>;
+  agentSeq: React.MutableRefObject<number>;
+  onBack: () => void;
+}) {
+  const [running, setRunning] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [modelUsed, setModelUsed] = useState<string | null>(null);
+  const [computed, setComputed] = useState<EmailBaseline | null>(null);
+  const [saved, setSaved] = useState(false);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  const usableCount = pastEmails.filter((e) => (e.body || "").trim()).length;
+
+  function editAgent(id: string, patch: Partial<ReviewAgent>) {
+    setAgents((a) => a.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+  function editEmail(id: string, patch: Partial<PastEmail>) {
+    setPastEmails((e) => e.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+  function addEmail() {
+    setPastEmails((e) => [...e, newPastEmail(emailSeq.current++)]);
+  }
+
+  function parseEmail(text: string, name: string): PastEmail {
+    const subj = text.match(/^subject:\s*(.*)$/im);
+    let body = text;
+    // If it looks like a raw .eml (headers up top), strip to the body.
+    if (/^(from|to|subject|date|reply-to):/im.test(text.slice(0, 300))) {
+      const idx = text.indexOf("\n\n");
+      if (idx > -1) body = text.slice(idx + 2);
+    }
+    return { id: `email-${emailSeq.current++}`, label: name, subject: subj ? subj[1].trim() : "", body: body.trim() };
+  }
+  async function onFiles(files: FileList | null) {
+    if (!files || !files.length) return;
+    const parsed = await Promise.all(
+      [...files].map(async (f) => parseEmail(await f.text(), f.name)),
+    );
+    setPastEmails((e) => [...e, ...parsed]);
+  }
+
+  async function run() {
+    const usable = pastEmails.filter((e) => (e.body || "").trim());
+    if (!usable.length) {
+      setNotice("Add at least one email with body text to review.");
+      return;
+    }
+    setRunning(true);
+    setNotice(null);
+    setSaved(false);
+    try {
+      const resp = await fetch("/api/email-review", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ agents, emails: usable, webinar }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      setReviews(data.reviews);
+      setComputed(data.baseline);
+      setModelUsed(data.model);
+      if (data.demo) setNotice("No API key — deterministic review shown. Add ANTHROPIC_API_KEY for a model read.");
+      else if (data.warning) setNotice("Model review hit an error; deterministic review shown instead.");
+    } catch (e) {
+      // Never leave the user stuck — fall back to the local deterministic engine.
+      const r = reviewAll(agents, usable);
+      setReviews(r);
+      setComputed(buildBaseline(r, usable));
+      setModelUsed(null);
+      setNotice((e instanceof Error ? e.message : "Review failed") + " — showing local review.");
+    } finally {
+      setRunning(false);
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    }
+  }
+
+  return (
+    <>
+      <div className="resultshead">
+        <button className="backbtn" onClick={onBack}>← Back to lead list</button>
+        <div className="rh-meta"><b>Email Review Agents</b><span> · {webinar.title}</span></div>
+      </div>
+
+      <div className="pagehead" style={{ marginTop: 4 }}>
+        <h1>Review past emails → build a baseline</h1>
+        <p>
+          Set your reviewer agents, drop in emails you&apos;ve sent before, and let the panel critique
+          them. The distilled <b>baseline</b> then conditions every follow-up the tool drafts — so new
+          emails build on what already works for you.
+        </p>
+      </div>
+
+      {/* Agents */}
+      <section className="card">
+        <div className="fgh" style={{ marginTop: 0 }}>
+          <h2 className="step" style={{ margin: 0 }}>1 · Review agents</h2>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn ghost" onClick={() => setAgents(DEFAULT_AGENTS)}>Reset roster</button>
+            <button className="btn ghost" onClick={() => setAgents((a) => [...a, newAgent(agentSeq.current++)])}>+ Add agent</button>
+          </div>
+        </div>
+        <div className="agentgrid">
+          {agents.map((a) => (
+            <div className="agentcard" key={a.id}>
+              <div className="agenttop">
+                <span className="agentmono">{a.name.slice(0, 2).toUpperCase()}</span>
+                <input className="agentname" value={a.name} onChange={(e) => editAgent(a.id, { name: e.target.value })} />
+                <button className="xbtn" title="Remove agent" onClick={() => setAgents((ag) => ag.filter((x) => x.id !== a.id))}>×</button>
+              </div>
+              <input className="agentfocus" value={a.focus} onChange={(e) => editAgent(a.id, { focus: e.target.value })} placeholder="What it reviews" />
+              <textarea className="agentinstr" value={a.instruction} onChange={(e) => editAgent(a.id, { instruction: e.target.value })} rows={3} placeholder="Describe what this agent should critique…" />
+            </div>
+          ))}
+          {agents.length === 0 && <p className="note">No agents — add at least one to run a review.</p>}
+        </div>
+      </section>
+
+      {/* Past emails */}
+      <section className="card">
+        <div className="fgh" style={{ marginTop: 0 }}>
+          <h2 className="step" style={{ margin: 0 }}>2 · Past emails <span className="countpill">{usableCount} ready</span></h2>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {!pastEmails.length && <button className="btn ghost" onClick={() => setPastEmails(SAMPLE_PAST_EMAILS)}>Load samples</button>}
+            <label className="btn ghost filebtn">
+              Upload files
+              <input type="file" accept=".txt,.eml,.md,text/plain" multiple onChange={(e) => { onFiles(e.target.files); e.currentTarget.value = ""; }} />
+            </label>
+            <button className="btn ghost" onClick={addEmail}>+ Paste email</button>
+          </div>
+        </div>
+        {!pastEmails.length && (
+          <p className="note">Upload <code>.txt</code>/<code>.eml</code> files, paste emails, or load the samples to see how it works.</p>
+        )}
+        <div className="emaillist">
+          {pastEmails.map((e) => (
+            <div className="pastemail" key={e.id}>
+              <div className="pe-head">
+                <input className="pe-label" value={e.label} onChange={(ev) => editEmail(e.id, { label: ev.target.value })} />
+                <button className="xbtn" title="Remove email" onClick={() => setPastEmails((es) => es.filter((x) => x.id !== e.id))}>×</button>
+              </div>
+              <input className="pe-subject" value={e.subject} onChange={(ev) => editEmail(e.id, { subject: ev.target.value })} placeholder="Subject line" />
+              <textarea className="pe-body" value={e.body} onChange={(ev) => editEmail(e.id, { body: ev.target.value })} rows={6} placeholder="Paste the email body here…" />
+            </div>
+          ))}
+        </div>
+        <div className="runbar" style={{ marginTop: 14 }}>
+          <button className="btn primary" onClick={run} disabled={running || !usableCount || !agents.length}>
+            {running ? "Reviewing…" : `Review ${usableCount || ""} email${usableCount === 1 ? "" : "s"}`.trim()}
+          </button>
+          {modelUsed && <span className="note" style={{ alignSelf: "center" }}>Model: {modelUsed}</span>}
+        </div>
+        {notice && <p className="note" style={{ marginTop: 10 }}>{notice}</p>}
+      </section>
+
+      {/* Results */}
+      {reviews.length > 0 && (
+        <div ref={resultsRef}>
+          {computed && (
+            <section className="card baselinecard">
+              <div className="fgh" style={{ marginTop: 0 }}>
+                <h2 className="step" style={{ margin: 0 }}>Baseline</h2>
+                {baseline && saved ? (
+                  <span className="approved">✓ Saved — conditioning drafts</span>
+                ) : (
+                  <button className="btn primary" onClick={() => { setBaseline(computed); setSaved(true); }}>Use as baseline</button>
+                )}
+              </div>
+              <p className="bl-voice"><b>Voice.</b> {computed.voice}</p>
+              <div className="bl-cols">
+                <div className="bl-col">
+                  <div className="bl-h ok">Do</div>
+                  <ul>{computed.dos.map((d, i) => <li key={i}>{d}</li>)}</ul>
+                </div>
+                <div className="bl-col">
+                  <div className="bl-h bad">Don&apos;t</div>
+                  <ul>{computed.donts.map((d, i) => <li key={i}>{d}</li>)}</ul>
+                </div>
+                <div className="bl-col">
+                  <div className="bl-h">Structure &amp; subject</div>
+                  <ul>{[...computed.structure, ...computed.subjectTips].map((d, i) => <li key={i}>{d}</li>)}</ul>
+                </div>
+              </div>
+              <p className="note">
+                Distilled from {computed.emailsReviewed} email{computed.emailsReviewed > 1 ? "s" : ""} (avg {computed.avgScore}/100).
+                Once saved, &quot;Draft with AI&quot; on any lead follows this house style.
+              </p>
+            </section>
+          )}
+
+          {reviews.map((r) => (
+            <section className="card reviewcard" key={r.emailId}>
+              <div className="rev-head">
+                <div>
+                  <div className="rev-label">{r.label}</div>
+                  <div className="rev-subj">{r.subject || <span className="muted">(no subject)</span>}</div>
+                </div>
+                <div className={`revscore ${r.overall >= 75 ? "hi" : r.overall >= 55 ? "mid" : "lo"}`}>{r.overall}<span>/100</span></div>
+              </div>
+              <div className="critlist">
+                {r.critiques.map((c) => (
+                  <div className="crit" key={c.agentId}>
+                    <div className="crit-top">
+                      <span className="crit-name">{c.agentName}</span>
+                      <span className="crit-score">{c.score}</span>
+                    </div>
+                    <div className="crit-read">{c.read}</div>
+                    {c.strengths.length > 0 && (
+                      <ul className="crit-str">{c.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                    )}
+                    {c.fixes.length > 0 && (
+                      <ul className="crit-fix">
+                        {c.fixes.map((f, i) => (
+                          <li key={i}><span className={`sev sev-${f.severity}`}>{f.severity}</span> {f.text}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+
+      <p className="caveat" style={{ maxWidth: 1080, margin: "0 auto 40px" }}>
+        Reviews are a directional read from your reviewer agents, not a compliance check. The baseline
+        captures patterns from the emails you provide — the more representative your samples, the better
+        the house style it learns.
+      </p>
+    </>
   );
 }

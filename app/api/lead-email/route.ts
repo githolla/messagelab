@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Lead, Webinar } from "@/lib/leads";
 import { strategyById } from "@/lib/leads";
 import { draftEmail } from "@/lib/leademail";
+import type { EmailBaseline } from "@/lib/reviewers";
+import { baselineToPrompt } from "@/lib/emailreview";
 import { callModel, extractJson, ModelError } from "@/lib/anthropic";
 
 export const maxDuration = 60;
@@ -14,11 +16,13 @@ export async function POST(req: NextRequest) {
   let lead: Lead;
   let webinar: Webinar;
   let strategyId: string;
+  let baseline: EmailBaseline | undefined;
   try {
-    const parsed = (await req.json()) as { lead: Lead; webinar: Webinar; strategyId: string };
+    const parsed = (await req.json()) as { lead: Lead; webinar: Webinar; strategyId: string; baseline?: EmailBaseline };
     lead = parsed.lead;
     webinar = parsed.webinar;
     strategyId = parsed.strategyId;
+    baseline = parsed.baseline;
   } catch {
     return NextResponse.json({ error: "Malformed request body." }, { status: 400 });
   }
@@ -54,6 +58,13 @@ export async function POST(req: NextRequest) {
 
   const system = `You are Diane Roberts, a senior fundraising strategist at Allegiance Group + Pursuant (AGP), writing a personal follow-up to a nonprofit-fundraising professional who attended one of AGP's webinars. Your voice is warm, concrete, peer-to-peer, and never salesy. You write short emails (120–160 words), no jargon, no hype, one clear purpose. You never fabricate specific data, names, or commitments.`;
 
+  // If the user has reviewed their past emails, condition the draft on the
+  // distilled baseline so new emails build on what already works for them.
+  const baselineBlock =
+    baseline && (baseline.dos?.length || baseline.donts?.length)
+      ? `\n\nBASELINE — follow this house style learned from the team's own best past emails:\n${baselineToPrompt(baseline)}`
+      : "";
+
   const user = `Write ONE follow-up email using this strategy:
 STRATEGY: ${strategy.name} — ${strategy.blurb}
 
@@ -67,7 +78,7 @@ Guidance:
 - Ground the personalization in the signals above (what they engaged with), not generic flattery.
 - Match the strategy exactly: ${strategy.blurb}
 - ${strategy.pushiness >= 0.8 ? "It is a meeting request, but keep it low-friction and specific." : strategy.pushiness <= 0.15 ? "Make NO ask — this is a low-pressure touch." : "Make at most one soft ask or question."}
-- Sign as "Diane Roberts, Allegiance Group + Pursuant".
+- Sign as "Diane Roberts, Allegiance Group + Pursuant".${baselineBlock}
 
 Respond with ONLY a JSON object, no markdown fences:
 { "subject": "…", "body": "…with real line breaks…" }`;
