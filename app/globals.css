@@ -1249,3 +1249,75 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .whyfix { margin: 12px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
 .msgstats { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 11px; }
 .msgstats b { font-family: var(--serif); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* --- RFP Simulator --- */
+.rfp-deal { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .rfp-deal { grid-template-columns: 1fr; } }
+.rfp-deal .fld { text-transform: none; letter-spacing: 0; font-family: var(--sans); font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 0; }
+.rfp-deal .fld input { margin-top: 5px; font-weight: 400; }
+.rfp-ta { width: 100%; font-family: var(--sans); font-size: 13.5px; line-height: 1.55; resize: vertical; }
+.filebtn { position: relative; overflow: hidden; cursor: pointer; }
+.filebtn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+
+.evalgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 860px) { .evalgrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .evalgrid { grid-template-columns: 1fr; } }
+.evalcard { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--card); }
+.evaltop { display: flex; align-items: center; gap: 8px; }
+.evalrole { flex: 1; font-weight: 600; font-size: 14px; border: 1px solid transparent; border-radius: 6px; padding: 5px 7px; background: transparent; color: var(--ink); }
+.evalrole:hover, .evalrole:focus { border-color: var(--line); background: var(--paper, #fff); outline: none; }
+.evalfocus { font-size: 12px; color: var(--ink-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--card); }
+.evalcares { display: flex; flex-wrap: wrap; gap: 5px; }
+.carechip { font-size: 10.5px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink-2); padding: 2px 7px; border-radius: 999px; }
+.evalw { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; color: var(--ink-3); display: flex; flex-direction: column; gap: 5px; }
+.evalw input[type="range"] { accent-color: var(--primary); cursor: pointer; }
+.xbtn { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink-2); font-size: 16px; line-height: 1; cursor: pointer; flex-shrink: 0; }
+.xbtn:hover { border-color: #d33; color: #d33; }
+
+.rfp-hero { border-left: 3px solid var(--line); }
+.rfp-hero.strong { border-left-color: #3f7a2e; }
+.rfp-hero.competitive { border-left-color: #b8860b; }
+.rfp-hero.longshot { border-left-color: #c1662f; }
+.rfp-hero.rework { border-left-color: #b23b3b; }
+.rfp-herotop { display: flex; align-items: center; gap: 22px; }
+.rfp-score { font-size: 52px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.rfp-score span { font-size: 20px; font-weight: 600; color: var(--ink-2); }
+.rfp-score.hi { color: #3f7a2e; } .rfp-score.mid { color: #b8860b; } .rfp-score.lo { color: #b23b3b; }
+.rfp-verdict-k { font-family: var(--mono); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); }
+.rfp-verdict { margin-top: 6px; }
+.rfp-badge { display: inline-block; font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
+.rfp-badge.strong { background: #dff2e0; color: #2f7a3a; }
+.rfp-badge.competitive { background: #fdf0d5; color: #9a6a00; }
+.rfp-badge.longshot { background: #fbe3d3; color: #a2542a; }
+.rfp-badge.rework { background: #fde2e2; color: #b23b3b; }
+.rfp-headline { margin: 10px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink); }
+
+.scorecard { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.scorerow { display: grid; grid-template-columns: 150px 1fr 34px; grid-template-rows: auto auto; column-gap: 12px; align-items: center; }
+@media (max-width: 560px) { .scorerow { grid-template-columns: 1fr 34px; } .scorerow .score-track { grid-column: 1 / -1; } }
+.score-lbl { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.score-track { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.score-track > span { display: block; height: 100%; border-radius: 5px; }
+.score-track .hi { background: #3f7a2e; } .score-track .mid { background: #b8860b; } .score-track .lo { background: #b23b3b; }
+.score-num { font-family: var(--serif); font-size: 17px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.score-num.hi { color: #3f7a2e; } .score-num.mid { color: #b8860b; } .score-num.lo { color: #b23b3b; }
+.score-note { grid-column: 1 / -1; font-size: 12px; color: var(--ink-2); margin-top: 3px; }
+@media (max-width: 560px) { .score-note { grid-column: 1 / -1; } }
+
+.evalreads { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (max-width: 680px) { .evalreads { grid-template-columns: 1fr; } }
+.evalread { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 13px 14px; }
+.er-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+.er-role { font-weight: 600; font-size: 14px; }
+.er-score { font-family: var(--serif); font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.er-score.hi { color: #3f7a2e; } .er-score.mid { color: #b8860b; } .er-score.lo { color: #b23b3b; }
+.er-verdict { font-size: 12.5px; color: var(--ink-2); margin-bottom: 9px; font-style: italic; }
+.er-line { font-size: 12.5px; line-height: 1.5; margin-bottom: 5px; color: var(--ink); }
+.er-k { display: inline-block; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 4px; margin-right: 5px; }
+.er-k.concern { background: #fde2e2; color: #b23b3b; }
+.er-k.win { background: #dff2e0; color: #2f7a3a; }
+
+.rfp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 720px) { .rfp-cols { grid-template-columns: 1fr; gap: 18px; } }
+.gaplist { list-style: none; margin: 0; padding: 0; }
+.gaplist li { font-size: 13.5px; line-height: 1.5; margin-bottom: 9px; }

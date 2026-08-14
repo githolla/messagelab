@@ -90,6 +90,21 @@ export default function Home() {
           </p>
           <span className="tlink">Open the workflow →</span>
         </a>
+        <a className="toolcard" href="/rfp">
+          <div className="ti">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+              <path d="M14 3v5h5M9 13l2 2 4-4" />
+            </svg>
+          </div>
+          <h2>RFP Simulator</h2>
+          <p>
+            Responding to an RFP? Paste the requirements and your draft proposal, and a simulated
+            buying committee — economic buyer, technical evaluator, procurement, champion, security —
+            scores your win likelihood, where you&apos;d lose points, and what to fix before you submit.
+          </p>
+          <span className="tlink">Open the simulator →</span>
+        </a>
         <a className="toolcard" href="/review">
           <div className="ti">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

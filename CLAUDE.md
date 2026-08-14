@@ -8,9 +8,23 @@ a segment-level results dashboard. "Message Lab" is a working title.
 ## Architecture
 
 - Next.js 15 App Router, TypeScript, no CSS framework (hand-rolled `app/globals.css`).
-- Routes: `/` is a landing page explaining the product + linking the two tools;
-  `/test` is the A/B message test; `/review` is the UX page review. `components/Nav.tsx`
-  is the primary nav (A/B Message Test | UX Page Review) with active states.
+- Routes: `/` is a landing page explaining the product + linking the tools;
+  `/test` is the A/B message test; `/leads` is Lead Personalization; `/rfp` is the
+  RFP Simulator; `/review` is the UX page review. `components/Nav.tsx` is the
+  primary nav (A/B Message Test | Lead Personalization | RFP Simulator | UX Page
+  Review) with active states.
+- RFP Simulator (`lib/rfp.ts`, `lib/rfpsim.ts`, `app/api/rfp-eval/route.ts`,
+  `app/rfp/page.tsx`): sales-side "will this proposal win?" — paste the RFP + your
+  draft response + deal context, and an editable buying committee (Economic Buyer,
+  Technical Evaluator, Procurement, Champion, Security & Legal — weighted) scores
+  it. `evaluateRfp` is a deterministic engine (no Math.random): six criteria
+  (fit/differentiation/proof/value/risk/clarity) scored from proposal-text signals
+  (RFP-term coverage, differentiation/proof/pricing/security cues, structure),
+  rolled up by committee weights into a win-likelihood % + verdict, per-evaluator
+  reads (score/concern/what-would-win-them), gaps, and prioritized fixes. Deterministic
+  fallback = demo/no-key; a key upgrades to a model read (`coerce` merges it onto
+  the known criteria/evaluators). Results: win-likelihood hero, scorecard bars,
+  committee reads, gaps + fixes.
 - All five model routes call the shared `lib/anthropic.ts` `callModel()` helper,
   which retries transient failures (429/529/5xx) with backoff and enforces a
   per-attempt timeout. The client surfaces the real error (not a canned "check
