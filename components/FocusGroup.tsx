@@ -75,6 +75,8 @@ export default function FocusGroup() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [images, setImages] = useState<string[]>([]);
+  const [url, setUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
   const [segments, setSegments] = useState<PanelSegment[]>(() => autoSegments("general", undefined, DEFAULT_TOTAL));
 
   const [running, setRunning] = useState(false);
@@ -111,6 +113,29 @@ export default function FocusGroup() {
       setError(null);
     } catch {
       setError("Could not read one of those images.");
+    }
+  }
+
+  async function fetchScreenshot() {
+    const u = url.trim();
+    if (!u || fetching || images.length >= 4) return;
+    setFetching(true);
+    setError(null);
+    try {
+      const resp = await fetch("/api/screenshot", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: u }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      setImages((p) => [...p, data.dataUrl].slice(0, 4));
+      if (!body.trim()) setBody(`Reviewing the page at ${u}`);
+      setUrl("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not capture that URL.");
+    } finally {
+      setFetching(false);
     }
   }
 
@@ -229,6 +254,26 @@ export default function FocusGroup() {
         <input id="fg-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Acme Insights — real-time analytics for ops teams" disabled={running} />
         <label className="fld" htmlFor="fg-body" style={{ marginTop: 12 }}>Details</label>
         <textarea id="fg-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} placeholder={def.placeholder} disabled={running} />
+        {kind === "website" && images.length < 4 && (
+          <div className="urlfetch" style={{ marginTop: 12 }}>
+            <label className="fld" htmlFor="fg-url">Paste a link <span className="note" style={{ fontWeight: 400 }}>· we screenshot the page for the panel</span></label>
+            <div className="urlrow">
+              <input
+                id="fg-url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); fetchScreenshot(); } }}
+                placeholder="https://example.com/landing"
+                disabled={running || fetching}
+              />
+              <button className="btn ghost" onClick={fetchScreenshot} disabled={running || fetching || !url.trim()}>
+                {fetching ? "Capturing…" : "Fetch screenshot"}
+              </button>
+            </div>
+            <p className="note" style={{ marginTop: 6 }}>Some sites block headless browsers or need a login — if capture fails, add a screenshot below instead.</p>
+          </div>
+        )}
         {def.images && (
           <div style={{ marginTop: 12 }}>
             <div className="fgh" style={{ margin: 0 }}>

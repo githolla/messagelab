@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { industry } from "@/lib/industries";
-import { assertPublicUrl } from "@/lib/net";
+import { captureUrl, type Shot } from "@/lib/screenshot";
 import { callModel, extractJson, ModelError } from "@/lib/anthropic";
 
 export const runtime = "nodejs";
@@ -23,55 +23,6 @@ Order issues most severe first. Be specific to what is visible in the screenshot
 
 const SYSTEM =
   "You are a senior UI/UX designer and usability expert. You review web pages the way a design lead and usability specialist would in a crit: visual hierarchy and layout, clarity of purpose and content, navigation and information architecture, the primary call-to-action and user flow, trust and credibility, and accessibility (contrast, target sizes, legibility, and any focus/state cues that are visible). Evidence-driven, blunt, and practical — ground every point in what is actually visible in the screenshot.";
-
-type Shot = { dataUrl: string; note: string };
-
-async function capture(url: string): Promise<Shot> {
-  // SSRF guard: http(s) only AND the hostname must resolve entirely to public
-  // addresses — no loopback/private/link-local ranges or the metadata IP.
-  const safeUrl = await assertPublicUrl(url);
-  const target = new URL(safeUrl);
-
-  const isServerless = !!process.env.AWS_LAMBDA_FUNCTION_VERSION || process.env.VERCEL === "1";
-  const puppeteer = (await import("puppeteer-core")).default;
-
-  let executablePath: string;
-  let args: string[];
-  const headless = true;
-  if (isServerless) {
-    const chromium = (await import("@sparticuz/chromium")).default;
-    executablePath = await chromium.executablePath();
-    args = chromium.args;
-  } else {
-    // Local/dev: use a system Chromium (this container ships one for Playwright).
-    executablePath =
-      process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || "/opt/pw-browsers/chromium";
-    args = ["--no-sandbox", "--disable-setuid-sandbox"];
-  }
-
-  const browser = await puppeteer.launch({ executablePath, args, headless });
-  try {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
-    await page.goto(target.toString(), { waitUntil: "networkidle2", timeout: 30000 });
-    // Redirect-escape guard: a public URL can 3xx to an internal host, so
-    // re-validate where we actually landed before screenshotting it.
-    await assertPublicUrl(page.url());
-    // Above-the-fold + a bit more is what a donor first meets; cap height so the
-    // vision payload stays small.
-    const buf = (await page.screenshot({
-      type: "jpeg",
-      quality: 80,
-      clip: { x: 0, y: 0, width: 1280, height: 2200 },
-    })) as Buffer;
-    return {
-      dataUrl: `data:image/jpeg;base64,${buf.toString("base64")}`,
-      note: `Captured ${target.toString()} at 1280px wide.`,
-    };
-  } finally {
-    await browser.close();
-  }
-}
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -114,7 +65,7 @@ export async function POST(req: NextRequest) {
     shot = { dataUrl: image, note: "Reviewed an uploaded screenshot." };
   } else if (url) {
     try {
-      shot = await capture(url);
+      shot = await captureUrl(url);
     } catch (e) {
       return NextResponse.json(
         {

@@ -1341,6 +1341,12 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .proto img { width: 100%; height: 100%; object-fit: cover; }
 .proto-x { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; }
 
+.urlfetch { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2, #f8fafc); }
+.urlrow { display: flex; gap: 8px; align-items: stretch; }
+.urlrow input { flex: 1; min-width: 0; }
+.urlrow .btn { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 560px) { .urlrow { flex-direction: column; } }
+
 .fg-hero { border-left: 3px solid var(--line); }
 .fg-hero.greenlight { border-left-color: #2f7a3a; }
 .fg-hero.promising { border-left-color: #7fae3f; }
