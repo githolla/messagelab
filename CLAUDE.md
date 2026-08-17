@@ -9,10 +9,25 @@ a segment-level results dashboard. "Message Lab" is a working title.
 
 - Next.js 15 App Router, TypeScript, no CSS framework (hand-rolled `app/globals.css`).
 - Routes: `/` is a landing page explaining the product + linking the tools;
-  `/test` is the A/B message test; `/leads` is Lead Personalization; `/rfp` is the
-  RFP Simulator; `/review` is the UX page review. `components/Nav.tsx` is the
-  primary nav (A/B Message Test | Lead Personalization | RFP Simulator | UX Page
-  Review) with active states.
+  `/test` is the **Focus Group** (default) with the A/B message test as a toggle;
+  `/leads` is Lead Personalization; `/rfp` is the RFP Simulator; `/review` is the
+  UX page review. `components/Nav.tsx` is the primary nav (Focus Group | Lead
+  Personalization | RFP Simulator | UX Page Review) with active states.
+- Focus Group (`lib/focus.ts`, `app/api/focus/route.ts`, `components/FocusGroup.tsx`;
+  `app/test/page.tsx` toggles Focus Group ↔ the A/B `AbTest`): a persona-agent
+  panel reviews ONE subject and returns structured feedback. Seven kinds
+  (`FOCUS_KINDS`): new product/feature, website/landing page, GTM strategy, sales
+  strategy, social strategy, concept/positioning, brand/creative — image-accepting
+  kinds take prototype/screenshot uploads (reuses the vision path). Same core as
+  the A/B tool: it reuses the industry archetypes via `autoSegments`/`scaleSegments`,
+  builds individual persona-agents, and fans out one in-character reaction per
+  agent (`/api/focus`, concurrency 4, per-persona demo fallback). Each reaction:
+  sentiment (love→reject), likelihood 1–5, resonates/concern/question/suggestion,
+  quote. `focusDemo` is deterministic (fnv1a); `summarizeFocus` aggregates into a
+  verdict, sentiment/likelihood distributions, theme clusters, and per-segment
+  breakdown. Results: verdict hero + stat tiles, sentiment stacked bar +
+  likelihood chart, theme columns, by-segment bars, and the filterable room.
+  Stays true to the persona-agent core (individual agents, not an average).
 - RFP Simulator (`lib/rfp.ts`, `lib/rfpsim.ts`, `app/api/rfp-eval/route.ts`,
   `app/rfp/page.tsx`): sales-side "will this proposal win?" — paste the RFP + your
   draft response + deal context, and an editable buying committee (Economic Buyer,

@@ -67,13 +67,14 @@ export default function Home() {
               <path d="M7.5 14h9" />
             </svg>
           </div>
-          <h2>A/B Message Test</h2>
+          <h2>Focus Group</h2>
           <p>
-            Pick an industry, paste two versions (or auto-craft them), and run them past the
-            audience bots. Get a verdict, per-segment drivers, and a prioritized fix list — then let
-            Claude refine the weaker version until results plateau.
+            Put anything in front of a simulated panel of persona-agents — a product or prototype, a
+            website, a go-to-market / sales / social strategy, a concept. Pick the audience and size and
+            get sentiment, likelihood, the themes they raise, and the full room. (Includes the A/B message
+            test.)
           </p>
-          <span className="tlink">Open the test →</span>
+          <span className="tlink">Open the focus group →</span>
         </a>
         <a className="toolcard" href="/leads">
           <div className="ti">

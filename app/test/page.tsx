@@ -23,6 +23,7 @@ import {
 } from "@/lib/cohort";
 import { buildRunExport, runToMarkdown, type ExportInput } from "@/lib/export";
 import { DiffView } from "@/components/Diff";
+import FocusGroup from "@/components/FocusGroup";
 
 const CONCURRENCY = 4;
 const MAX_REFINE_ROUNDS = 10;
@@ -148,7 +149,7 @@ function download(filename: string, text: string, mime: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function Home() {
+function AbTest() {
   const [industry, setIndustry] = useState("general");
   const [variants, setVariants] = useState<Variants>(() => {
     const s = sampleFor("general");
@@ -2012,6 +2013,21 @@ export default function Home() {
       )}
         </>
       )}
+    </>
+  );
+}
+
+// The /test route is now a Focus Group tool with the original A/B message test
+// available as a mode. Focus Group is the default.
+export default function Home() {
+  const [tool, setTool] = useState<"focus" | "ab">("focus");
+  return (
+    <>
+      <div className="toolswitch">
+        <button className={tool === "focus" ? "on" : ""} aria-pressed={tool === "focus"} onClick={() => setTool("focus")}>Focus Group</button>
+        <button className={tool === "ab" ? "on" : ""} aria-pressed={tool === "ab"} onClick={() => setTool("ab")}>A/B Message Test</button>
+      </div>
+      {tool === "focus" ? <FocusGroup /> : <AbTest />}
     </>
   );
 }
