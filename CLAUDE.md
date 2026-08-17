@@ -28,6 +28,16 @@ a segment-level results dashboard. "Message Lab" is a working title.
   breakdown. Results: verdict hero + stat tiles, sentiment stacked bar +
   likelihood chart, theme columns, by-segment bars, and the filterable room.
   Stays true to the persona-agent core (individual agents, not an average).
+  When a run finishes, `FocusGroup` stashes the run (`reactions`, kind, industry,
+  url, isDemo) in `sessionStorage` under `fg-report` and routes to a dedicated
+  report page `app/test/report/page.tsx`, which reads it and renders
+  `components/FocusReport.tsx` — a structured report: cover (verdict badge +
+  headline + meta + stat tiles + jump-nav + Print/PDF), then collapsible
+  `<details>` sections (Sentiment & likelihood, The walkthrough, What the room
+  said, By segment, The room). Themes drill down to the persona-agents who
+  raised them; segments drill down to their reactions (stacked sentiment bar);
+  a print stylesheet expands everything and hides the chrome. Sentiment uses a
+  diverging scale with a gray neutral midpoint (`#767c85`).
   For the **website** kind there are two site modes: "React to a screenshot"
   (paste a URL → `/api/screenshot` headless-captures it, or upload one; whole
   panel reacts to that one view) and "Send the panel through the site" — a live

@@ -1367,6 +1367,8 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .walklist .wl-th { grid-column: 1 / -1; grid-row: 2; font-size: 12.5px; color: var(--muted, #475569); }
 
 /* ===== Structured report ===== */
+.reporthead { margin-bottom: 14px; }
+.reporthead .btn { padding: 6px 14px; font-size: 13px; }
 .report { display: flex; flex-direction: column; gap: 16px; }
 
 /* Cover */
@@ -1434,7 +1436,7 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 
 /* Print → a clean report, all sections expanded, controls hidden */
 @media print {
-  .nav, .pagehead, .toolswitch, .card.step, .runbar, .rc-actions, .rc-jump, .rfilters, .pmore { display: none !important; }
+  .nav, .pagehead, .toolswitch, .reporthead, .card.step, .runbar, .rc-actions, .rc-jump, .rfilters, .pmore { display: none !important; }
   section.card:not(.report-cover):not(.rsec) { display: none !important; }
   .report { gap: 10px; }
   .rsec, .report-cover { break-inside: avoid; border: 1px solid #ddd; }

@@ -1,23 +1,19 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { INDUSTRIES } from "@/lib/industries";
 import { autoSegments, scaleSegments, personaName, monogram, type PanelSegment } from "@/lib/archetypes";
 import {
   FOCUS_KINDS,
   kindDef,
   PRODUCT_TYPES,
-  SENTIMENTS,
-  SENTIMENT_LABEL,
   focusDemo,
-  summarizeFocus,
   type FocusKind,
   type FocusSubject,
   type FocusReaction,
-  type FocusSummary,
   type Sentiment,
   type WalkStep,
-  FOCUS_VERDICT_LABEL,
 } from "@/lib/focus";
 
 const SIZES = [
@@ -28,7 +24,6 @@ const SIZES = [
 ] as const;
 const LIVE_MAX = 60;
 const DEMO_MAX = 300;
-const DISPLAY_MAX = 60;
 const CONCURRENCY = 4;
 const DEFAULT_TOTAL = 24;
 const WALK_MIN = 2;
@@ -64,24 +59,6 @@ function demoJourney(id: string, sentiment: Sentiment): WalkStep[] {
   });
   return steps;
 }
-
-// The sequence of hops a persona took, for the compact card path line.
-function pathHops(journey: WalkStep[]): string[] {
-  const hops: string[] = [];
-  for (const s of journey) {
-    if (s.action === "start") hops.push(s.target || "Home");
-    else if (s.action === "click" && s.target) hops.push(s.target);
-    else if (s.action === "back") hops.push("↩ back");
-  }
-  return hops.slice(0, 6);
-}
-
-// Diverging sentiment scale (love→reject) with a true gray midpoint. Validated
-// for CVD + normal-vision adjacency; always shown with direct labels + counts.
-const SENT_COLOR: Record<Sentiment, string> = {
-  love: "#2f7a3a", like: "#7fae3f", neutral: "#767c85", skeptical: "#db7f22", reject: "#b23b3b",
-};
-const sentBand = (v: number) => (v >= 4 ? "hi" : v >= 3 ? "mid" : "lo");
 
 // Downscale an uploaded image to Claude's vision sweet spot and re-encode JPEG.
 function fileToDataUrl(file: File): Promise<string> {
@@ -130,13 +107,8 @@ export default function FocusGroup() {
 
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(0);
-  const [reactions, setReactions] = useState<FocusReaction[]>([]);
-  const [summary, setSummary] = useState<FocusSummary | null>(null);
-  const [isDemo, setIsDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openR, setOpenR] = useState<FocusReaction | null>(null);
-  const [segFilter, setSegFilter] = useState<string>("all");
-  const resultsRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const def = kindDef(kind);
   const plannedSize = segments.reduce((t, s) => t + s.count, 0);
@@ -205,12 +177,18 @@ export default function FocusGroup() {
     return { kind, industry, productType: kind === "product" ? productType : "", title, body, images: def.images ? images : [] };
   }
 
+  // Hand the completed run to the dedicated report page (no DB in v1 — the run
+  // rides across the navigation in sessionStorage).
   function finish(rs: FocusReaction[], demo: boolean) {
-    setReactions(rs);
-    setSummary(summarizeFocus(rs, kind));
-    setIsDemo(demo);
-    setSegFilter("all");
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    try {
+      sessionStorage.setItem(
+        "fg-report",
+        JSON.stringify({ reactions: rs, kind, industry, url: url.trim(), isDemo: demo }),
+      );
+    } catch {
+      /* quota/availability — navigation below still no-ops gracefully */
+    }
+    router.push("/test/report");
   }
 
   function runDemo() {
@@ -308,60 +286,6 @@ export default function FocusGroup() {
     const panel = buildPanel(scaleSegments(segments, n)).slice(0, n);
     const subject = { kind: "website" as const, industry, productType: "", title, body: body || `A ${industryLabel} website`, images: [] };
     finish(panel.map((p) => { const r = focusDemo(p, subject); return { ...r, journey: demoJourney(p.id, r.sentiment) }; }), true);
-  }
-
-  const filtered = useMemo(
-    () => (segFilter === "all" ? reactions : reactions.filter((r) => r.segment === segFilter)),
-    [reactions, segFilter],
-  );
-
-  const isWalkReport = useMemo(() => reactions.some((r) => r.journey && r.journey.length > 1), [reactions]);
-
-  // Per-segment sentiment distribution, for the stacked by-segment chart + drill-down.
-  const segmentDetail = useMemo(
-    () =>
-      (summary?.bySegment ?? []).map((s) => {
-        const rs = reactions.filter((r) => r.segment === s.segment);
-        return {
-          ...s,
-          dist: SENTIMENTS.map((k) => ({ key: k, count: rs.filter((r) => r.sentiment === k).length })),
-          reactions: rs,
-        };
-      }),
-    [summary, reactions],
-  );
-
-  // Aggregate walkthrough analytics from the journeys the persona-agents took.
-  const walkStats = useMemo(() => {
-    if (!isWalkReport) return null;
-    const withJ = reactions.filter((r) => r.journey && r.journey.length > 1);
-    if (!withJ.length) return null;
-    const stepCounts = withJ.map((r) => r.journey!.filter((s) => s.action === "click").length);
-    const avgSteps = stepCounts.reduce((a, b) => a + b, 0) / withJ.length;
-    const pageMap = new Map<string, number>();
-    for (const r of withJ)
-      for (const s of r.journey!)
-        if ((s.action === "start" || s.action === "click") && s.target) {
-          const key = s.target.trim();
-          if (key) pageMap.set(key, (pageMap.get(key) || 0) + 1);
-        }
-    const pages = [...pageMap.entries()]
-      .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-    const wouldAct = withJ.filter((r) => r.likelihood >= 4).length;
-    const wavered = withJ.filter((r) => r.likelihood === 3).length;
-    const left = withJ.length - wouldAct - wavered;
-    return { n: withJ.length, avgSteps, pages, maxPage: Math.max(1, ...pages.map((p) => p.count)), wouldAct, wavered, left, real: withJ.filter((r) => !r.error).length };
-  }, [reactions, isWalkReport]);
-
-  const themeCat: Record<string, keyof Pick<FocusReaction, "resonates" | "concern" | "question" | "suggestion">> = {
-    resonates: "resonates", concerns: "concern", questions: "question", suggestions: "suggestion",
-  };
-  function reactionsForTheme(catKey: string, text: string): FocusReaction[] {
-    const field = themeCat[catKey];
-    const key = text.trim().toLowerCase();
-    return reactions.filter((r) => (r[field] || "").trim().toLowerCase() === key);
   }
 
   return (
@@ -550,286 +474,6 @@ export default function FocusGroup() {
         </div>
         {error && <p className="error">{error}</p>}
       </section>
-
-      {/* Results — structured report */}
-      {summary && reactions.length > 0 && (
-        <div ref={resultsRef} className="report">
-          {/* Cover */}
-          <section className="report-cover card">
-            <div className="rc-top">
-              <span className="rc-eyebrow">Focus group report</span>
-              <div className="rc-actions">
-                {isDemo && <span className="demotag">Demo</span>}
-                <button className="btn ghost rc-print" onClick={() => window.print()}>Print / PDF</button>
-              </div>
-            </div>
-            <div className={`rc-verdict ${summary.verdict}`}>
-              <span className={`fg-badge ${summary.verdict}`}>{FOCUS_VERDICT_LABEL[summary.verdict]}</span>
-              <p className="rc-headline">{summary.headline}</p>
-            </div>
-            <p className="rc-meta">
-              <b>{summary.n.toLocaleString()} persona-agents</b> · {industryLabel} · {def.label}
-              {isWalkReport && url.trim() ? <> · walkthrough of <span className="rc-url">{url.trim()}</span></> : null}
-            </p>
-            <div className="fg-stats">
-              <div className="fg-stat"><div className="fg-stat-n">{summary.positivePct}%</div><div className="fg-stat-l">Positive</div></div>
-              <div className="fg-stat"><div className={`fg-stat-n ${sentBand(summary.avgSentiment)}`}>{summary.avgSentiment.toFixed(1)}<span>/5</span></div><div className="fg-stat-l">Avg sentiment</div></div>
-              <div className="fg-stat"><div className={`fg-stat-n ${sentBand(summary.avgLikelihood)}`}>{summary.avgLikelihood.toFixed(1)}<span>/5</span></div><div className="fg-stat-l">{def.actionLabel}</div></div>
-              <div className="fg-stat"><div className="fg-stat-n">{summary.n}</div><div className="fg-stat-l">In the room</div></div>
-            </div>
-            <nav className="rc-jump">
-              <a href="#sec-sentiment">Sentiment</a>
-              {isWalkReport && <a href="#sec-walk">The walkthrough</a>}
-              <a href="#sec-themes">What they said</a>
-              {segmentDetail.length > 1 && <a href="#sec-segments">By segment</a>}
-              <a href="#sec-room">The room</a>
-            </nav>
-          </section>
-
-          {/* Sentiment & likelihood */}
-          <details className="rsec card" id="sec-sentiment" open>
-            <summary className="rsec-sum"><span className="rsec-t">Sentiment &amp; likelihood</span><span className="rsec-hint">how the room split</span></summary>
-            <div className="rsec-body">
-              <div className="fg-charts">
-                <div>
-                  <div className="sb-h">Sentiment across the room</div>
-                  <div className="prefbar">
-                    {summary.sentimentDist.map((s) => {
-                      const pct = (s.count / summary.n) * 100;
-                      return s.count > 0 ? (
-                        <span key={s.key} className="pf" style={{ width: `${pct}%`, background: SENT_COLOR[s.key] }} title={`${SENTIMENT_LABEL[s.key]}: ${s.count} of ${summary.n} (${Math.round(pct)}%)`}>
-                          {pct >= 10 ? <span className="pflabel">{Math.round(pct)}%</span> : null}
-                        </span>
-                      ) : null;
-                    })}
-                  </div>
-                  <div className="prefkey">
-                    {summary.sentimentDist.map((s) => (
-                      <span key={s.key} className={`pk ${s.count === 0 ? "muted" : ""}`}>
-                        <i style={{ background: SENT_COLOR[s.key] }} />{SENTIMENT_LABEL[s.key]} <b>{s.count}</b>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="sb-h">{def.actionLabel} (1–5)</div>
-                  <div className="likedist">
-                    {summary.likelihoodDist.map((c, i) => {
-                      const max = Math.max(1, ...summary.likelihoodDist);
-                      return (
-                        <div className="likerow" key={i}>
-                          <span className="likelbl">{i + 1}</span>
-                          <span className="likebar" title={`${c} rated ${i + 1}/5`}><span className={sentBand(i + 1)} style={{ width: `${Math.max(2, (c / max) * 100)}%` }} /></span>
-                          <span className="likenum">{c}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </details>
-
-          {/* The walkthrough (website walk only) */}
-          {isWalkReport && walkStats && (
-            <details className="rsec card" id="sec-walk" open>
-              <summary className="rsec-sum"><span className="rsec-t">The walkthrough</span><span className="rsec-hint">how they moved through the site</span></summary>
-              <div className="rsec-body">
-                <p className="sub">
-                  {walkStats.n} persona-agent{walkStats.n > 1 ? "s" : ""} navigated the site themselves
-                  {walkStats.real < walkStats.n ? ` (${walkStats.n - walkStats.real} simulated)` : ""} — on average{" "}
-                  <b>{walkStats.avgSteps.toFixed(1)} clicks</b> each before deciding.
-                </p>
-                <div className="walkgrid">
-                  <div>
-                    <div className="sb-h">Where they ended up</div>
-                    <div className="prefbar">
-                      {([
-                        { k: "wouldAct", label: `Would ${def.verb}`, v: walkStats.wouldAct, c: "#2f7a3a" },
-                        { k: "wavered", label: "On the fence", v: walkStats.wavered, c: "#767c85" },
-                        { k: "left", label: "Would drop off", v: walkStats.left, c: "#b23b3b" },
-                      ] as const).map((o) =>
-                        o.v > 0 ? (
-                          <span key={o.k} className="pf" style={{ width: `${(o.v / walkStats.n) * 100}%`, background: o.c }} title={`${o.label}: ${o.v}`}>
-                            {o.v / walkStats.n >= 0.12 ? <span className="pflabel">{o.v}</span> : null}
-                          </span>
-                        ) : null,
-                      )}
-                    </div>
-                    <div className="prefkey">
-                      <span className="pk"><i style={{ background: "#2f7a3a" }} />Would {def.verb} <b>{walkStats.wouldAct}</b></span>
-                      <span className="pk"><i style={{ background: "#767c85" }} />On the fence <b>{walkStats.wavered}</b></span>
-                      <span className="pk"><i style={{ background: "#b23b3b" }} />Would drop off <b>{walkStats.left}</b></span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="sb-h">Most-visited pages &amp; elements</div>
-                    <div className="pagebars">
-                      {walkStats.pages.map((p) => (
-                        <div className="pagerow" key={p.label} title={`${p.label}: visited ${p.count}×`}>
-                          <span className="pagelbl">{p.label}</span>
-                          <span className="pagebar"><span style={{ width: `${(p.count / walkStats.maxPage) * 100}%` }} /></span>
-                          <span className="pagenum">{p.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <p className="note" style={{ marginTop: 10 }}>Open any persona in the room below to replay their full click-by-click path.</p>
-              </div>
-            </details>
-          )}
-
-          {/* What the room said — themes drill down to the people who said them */}
-          <details className="rsec card" id="sec-themes" open>
-            <summary className="rsec-sum"><span className="rsec-t">What the room said</span><span className="rsec-hint">click a theme to see who raised it</span></summary>
-            <div className="rsec-body">
-              <div className="themegrid">
-                {([
-                  { k: "resonates", label: "What resonates", cls: "good" },
-                  { k: "concerns", label: "Concerns", cls: "bad" },
-                  { k: "questions", label: "Questions they'd ask", cls: "" },
-                  { k: "suggestions", label: "Suggestions", cls: "" },
-                ] as const).map((col) => (
-                  <div className="themecol" key={col.k}>
-                    <div className={`theme-h ${col.cls}`}>{col.label}</div>
-                    <div className="themelist">
-                      {summary.themes[col.k].map((t, i) => {
-                        const who = reactionsForTheme(col.k, t.text);
-                        return (
-                          <details className="tdrill" key={i}>
-                            <summary>{t.count > 1 && <span className="theme-n">{t.count}×</span>}<span className="tdrill-txt">{t.text}</span></summary>
-                            <div className="tdrill-body">
-                              {who.map((r) => (
-                                <button className="tquote" key={r.personaId} onClick={() => setOpenR(r)}>
-                                  <span className="ico sm" style={{ background: SENT_COLOR[r.sentiment] }}>{monogram(r.personaName)}</span>
-                                  <span className="tq-txt"><b>{r.personaName}</b> <em>{r.segment}</em><br />&ldquo;{r.quote}&rdquo;</span>
-                                </button>
-                              ))}
-                            </div>
-                          </details>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </details>
-
-          {/* By segment — stacked sentiment + drill into each segment's room */}
-          {segmentDetail.length > 1 && (
-            <details className="rsec card" id="sec-segments" open>
-              <summary className="rsec-sum"><span className="rsec-t">By segment</span><span className="rsec-hint">click a segment to open its reactions</span></summary>
-              <div className="rsec-body">
-                <p className="sub">Which parts of your audience are most (and least) sold. Each bar is that segment&apos;s sentiment mix.</p>
-                <div className="segstack">
-                  {segmentDetail.map((s) => (
-                    <details className="segdrill" key={s.segment}>
-                      <summary>
-                        <span className="sd-name">{s.segment} <span className="note">· n={s.n}</span></span>
-                        <span className="sd-bar">
-                          {s.dist.map((d) => (d.count > 0 ? <span key={d.key} className="sd-seg" style={{ width: `${(d.count / s.n) * 100}%`, background: SENT_COLOR[d.key] }} title={`${SENTIMENT_LABEL[d.key]}: ${d.count}`} /> : null))}
-                        </span>
-                        <span className={`sd-val ${sentBand(s.avgSentiment)}`}>{s.avgSentiment.toFixed(1)} · {s.positivePct}%+</span>
-                      </summary>
-                      <div className="segdrill-body">
-                        {s.reactions.map((r) => (
-                          <button className="tquote" key={r.personaId} onClick={() => setOpenR(r)}>
-                            <span className="ico sm" style={{ background: SENT_COLOR[r.sentiment] }}>{monogram(r.personaName)}</span>
-                            <span className="tq-txt"><b>{r.personaName}</b> <em>{SENTIMENT_LABEL[r.sentiment]} · {r.likelihood}/5</em><br />&ldquo;{r.quote}&rdquo;</span>
-                          </button>
-                        ))}
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              </div>
-            </details>
-          )}
-
-          {/* The room */}
-          <details className="rsec card" id="sec-room" open>
-            <summary className="rsec-sum"><span className="rsec-t">The room</span><span className="rsec-hint">{reactions.length} individual reactions — click any card</span></summary>
-            <div className="rsec-body">
-            <div className="rfilters seg">
-              <button className={`segchip ${segFilter === "all" ? "on" : ""}`} onClick={() => setSegFilter("all")}>All</button>
-              {summary.bySegment.map((s) => (
-                <button key={s.segment} className={`segchip ${segFilter === s.segment ? "on" : ""}`} onClick={() => setSegFilter((c) => (c === s.segment ? "all" : s.segment))}>
-                  {s.segment} <em>{s.n}</em>
-                </button>
-              ))}
-            </div>
-            <div className="participants">
-              {filtered.slice(0, DISPLAY_MAX).map((r) => (
-                <button key={r.personaId} className="pcard" style={{ borderLeftColor: SENT_COLOR[r.sentiment] }} onClick={() => setOpenR(r)}>
-                  <div className="phead">
-                    <span className="ico">{monogram(r.personaName)}</span>
-                    <div className="pwho">
-                      <div className="pname">{r.personaName}</div>
-                      <div className="pseg">{r.segment}</div>
-                    </div>
-                    <span className="fg-pick" style={{ color: SENT_COLOR[r.sentiment] }}>{SENTIMENT_LABEL[r.sentiment]}</span>
-                  </div>
-                  <div className="preact">&ldquo;{r.quote}&rdquo;</div>
-                  {r.journey && r.journey.length > 1 && (
-                    <div className="walkpath">
-                      {r.error && <span className="hop sim">simulated</span>}
-                      {pathHops(r.journey).map((h, i) => (
-                        <span className="hop" key={i}>{h}</span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="pmore">Open reaction →</div>
-                </button>
-              ))}
-            </div>
-            {filtered.length > DISPLAY_MAX && <p className="note">Showing {DISPLAY_MAX} of {filtered.length} — the stats above use the full room.</p>}
-            </div>
-          </details>
-
-          <p className="caveat" style={{ maxWidth: 1080, margin: "0 auto 40px" }}>
-            Each reaction comes from an individual persona-agent conditioned on its segment — the same
-            persona-agent engine the rest of the app runs on (grounded in the MatrAIx persona-agent research;
-            model-dependent and hypothesis-generating). Use it to sharpen the concept and surface objections
-            early, not to predict the market. The more specific your description and prototypes, the sharper
-            the read.
-          </p>
-
-          {openR && (
-            <div className="pmodal-bg" onClick={() => setOpenR(null)}>
-              <div className="pmodal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-                <button className="pmodal-x" onClick={() => setOpenR(null)} aria-label="Close">×</button>
-                <div className="pm-head">
-                  <span className="ico">{monogram(openR.personaName)}</span>
-                  <div className="pwho"><div className="pm-name">{openR.personaName}</div><div className="pseg">{openR.segment}</div></div>
-                  <span className="fg-pick" style={{ color: SENT_COLOR[openR.sentiment] }}>{SENTIMENT_LABEL[openR.sentiment]}</span>
-                </div>
-                {openR.journey && openR.journey.length > 0 && (
-                  <div className="pm-sec">
-                    <div className="pm-k">The path they took through the site</div>
-                    <ol className="walklist">
-                      {openR.journey.map((s, i) => (
-                        <li key={i}>
-                          <span className={`wl-act ${s.action}`}>{s.action}</span>
-                          {s.target && <span className="wl-tgt">{s.target}</span>}
-                          <span className="wl-th">{s.thought}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                )}
-                <div className="pm-sec"><div className="pm-k">In their words</div><p className="pm-quote">&ldquo;{openR.quote}&rdquo;</p></div>
-                <div className="pm-sec"><div className="pm-k good">What resonates</div><p className="pm-p">{openR.resonates}</p></div>
-                <div className="pm-sec"><div className="pm-k bad">Biggest concern</div><p className="pm-p">{openR.concern}</p></div>
-                <div className="pm-sec"><div className="pm-k">Their question</div><p className="pm-p">{openR.question}</p></div>
-                <div className="pm-sec"><div className="pm-k">Suggestion</div><p className="pm-p">{openR.suggestion}</p></div>
-                <div className="pm-meta">{def.actionLabel}: {openR.likelihood}/5{openR.model ? ` · ${openR.model}` : ""}</div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </>
   );
 }
