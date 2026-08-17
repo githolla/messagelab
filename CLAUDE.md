@@ -28,6 +28,24 @@ a segment-level results dashboard. "Message Lab" is a working title.
   breakdown. Results: verdict hero + stat tiles, sentiment stacked bar +
   likelihood chart, theme columns, by-segment bars, and the filterable room.
   Stays true to the persona-agent core (individual agents, not an average).
+  For the **website** kind there are two site modes: "React to a screenshot"
+  (paste a URL → `/api/screenshot` headless-captures it, or upload one; whole
+  panel reacts to that one view) and "Send the panel through the site" — a live
+  **walkthrough** where a small hard-capped party (`WALK_MAX` 6) of persona-agents
+  each drives its own headless browser through the site. `lib/browser.ts` is the
+  shared Chromium launcher (serverless `@sparticuz/chromium` / local
+  `/opt/pw-browsers/chromium`); `lib/browse.ts` `BrowseSession` is the per-agent
+  session (goto with `assertPublicUrl` re-guarded on every navigation, a
+  set-of-marks clickables collector with numbered on-screen badges, click/scroll/
+  back, viewport screenshots). `app/api/focus-walk/route.ts` runs the per-persona
+  agentic loop: each step it sends the current screenshot + numbered element list
+  and the model returns `{thought, action: click|scroll|back|done, index}` in
+  character; steps capped (`WALK_STEPS` 5, time-budgeted), then it synthesizes the
+  normal focus reaction from the journey it took. Each reaction carries a
+  `journey: WalkStep[]`; the UI shows the hop path on the persona card and the full
+  click-by-click trail (action + target + in-character thought) in the modal.
+  Client fans out at `WALK_CONCURRENCY` 2; a failed walk falls back to a
+  deterministic `focusDemo` + synthesized demo journey so the room stays full.
 - RFP Simulator (`lib/rfp.ts`, `lib/rfpsim.ts`, `app/api/rfp-eval/route.ts`,
   `app/rfp/page.tsx`): sales-side "will this proposal win?" — paste the RFP + your
   draft response + deal context, and an editable buying committee (Economic Buyer,

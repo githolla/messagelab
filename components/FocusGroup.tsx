@@ -16,6 +16,7 @@ import {
   type FocusReaction,
   type FocusSummary,
   type Sentiment,
+  type WalkStep,
   FOCUS_VERDICT_LABEL,
 } from "@/lib/focus";
 
@@ -30,6 +31,50 @@ const DEMO_MAX = 300;
 const DISPLAY_MAX = 60;
 const CONCURRENCY = 4;
 const DEFAULT_TOTAL = 24;
+const WALK_MIN = 2;
+const WALK_MAX = 6; // live browser sessions are heavy — keep the walking party small
+const WALK_STEPS = 5;
+const WALK_CONCURRENCY = 2;
+
+// A short deterministic path for the no-key demo so the walkthrough UI has
+// something to show without launching a browser.
+const DEMO_HOPS = [
+  ["Home", "Pricing", "Sign up"],
+  ["Home", "Features", "Get started"],
+  ["Home", "About", "Contact"],
+  ["Home", "How it works", "Pricing", "Sign up"],
+  ["Home", "Blog", "Home"],
+];
+function demoJourney(id: string, sentiment: Sentiment): WalkStep[] {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const hops = DEMO_HOPS[h % DEMO_HOPS.length];
+  const steps: WalkStep[] = hops.map((t, i) => ({
+    n: i,
+    action: i === 0 ? "start" : "click",
+    target: t,
+    url: "#",
+    thought: i === 0 ? "Landed on the site." : `Went to ${t} to learn more.`,
+  }));
+  steps.push({
+    n: hops.length,
+    action: "done",
+    url: "#",
+    thought: sentiment === "reject" || sentiment === "skeptical" ? "Left without acting." : "Seen enough to decide.",
+  });
+  return steps;
+}
+
+// The sequence of hops a persona took, for the compact card path line.
+function pathHops(journey: WalkStep[]): string[] {
+  const hops: string[] = [];
+  for (const s of journey) {
+    if (s.action === "start") hops.push(s.target || "Home");
+    else if (s.action === "click" && s.target) hops.push(s.target);
+    else if (s.action === "back") hops.push("↩ back");
+  }
+  return hops.slice(0, 6);
+}
 
 const SENT_COLOR: Record<Sentiment, string> = {
   love: "#2f7a3a", like: "#7fae3f", neutral: "#b0873a", skeptical: "#c1662f", reject: "#b23b3b",
@@ -77,6 +122,8 @@ export default function FocusGroup() {
   const [images, setImages] = useState<string[]>([]);
   const [url, setUrl] = useState("");
   const [fetching, setFetching] = useState(false);
+  const [siteMode, setSiteMode] = useState<"walk" | "react">("walk");
+  const [walkers, setWalkers] = useState(4);
   const [segments, setSegments] = useState<PanelSegment[]>(() => autoSegments("general", undefined, DEFAULT_TOTAL));
 
   const [running, setRunning] = useState(false);
@@ -93,6 +140,8 @@ export default function FocusGroup() {
   const plannedSize = segments.reduce((t, s) => t + s.count, 0);
   const liveSize = Math.min(plannedSize, LIVE_MAX);
   const industryLabel = INDUSTRIES.find((i) => i.key === industry)?.label ?? "general";
+  const isWalk = kind === "website" && siteMode === "walk";
+  const walkCount = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
 
   function changeIndustry(k: string) {
     setIndustry(k);
@@ -200,6 +249,48 @@ export default function FocusGroup() {
     finish(rs, false);
   }
 
+  // Website walkthrough: a small party of persona-agents each drives a live
+  // browser through the site and reports back its journey + reaction.
+  async function runWalk() {
+    if (!url.trim()) { setError("Paste the URL you want the panel to walk through."); return; }
+    setError(null);
+    setRunning(true);
+    setDone(0);
+    const n = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
+    const panel = buildPanel(scaleSegments(segments, n)).slice(0, n);
+    const subject = { url: url.trim(), industry, title, body };
+    const rs = await pool<typeof panel[number], FocusReaction>(
+      panel,
+      async (p) => {
+        try {
+          const resp = await fetch("/api/focus-walk", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ persona: { id: p.id, name: p.name, segment: p.segment, how: p.how }, subject, maxSteps: WALK_STEPS }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+          return data as FocusReaction;
+        } catch {
+          const fb = focusDemo(p, { kind: "website", industry, productType: "", title, body, images: [] });
+          return { ...fb, journey: demoJourney(p.id, fb.sentiment) }; // keep the room full if a walk fails
+        }
+      },
+      WALK_CONCURRENCY,
+      () => setDone((d) => d + 1),
+    );
+    setRunning(false);
+    finish(rs, false);
+  }
+
+  function runWalkDemo() {
+    setError(null);
+    const n = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
+    const panel = buildPanel(scaleSegments(segments, n)).slice(0, n);
+    const subject = { kind: "website" as const, industry, productType: "", title, body: body || `A ${industryLabel} website`, images: [] };
+    finish(panel.map((p) => { const r = focusDemo(p, subject); return { ...r, journey: demoJourney(p.id, r.sentiment) }; }), true);
+  }
+
   const filtered = useMemo(
     () => (segFilter === "all" ? reactions : reactions.filter((r) => r.segment === segFilter)),
     [reactions, segFilter],
@@ -212,8 +303,9 @@ export default function FocusGroup() {
         <p>
           Put anything in front of a simulated focus group — a new product or prototype, a website, a
           go-to-market, sales, or social strategy, a concept or campaign. It&apos;s a panel of intelligent
-          persona-agents that each react in character; you get an overview, sentiment &amp; likelihood stats,
-          the themes they raise, and the full room.
+          persona-agents that each react in character — and for a live website, they&apos;ll each
+          <em> walk through the site themselves</em>, click by click, and report back. You get an overview,
+          sentiment &amp; likelihood stats, the themes they raise, and the full room.
         </p>
       </div>
 
@@ -254,7 +346,37 @@ export default function FocusGroup() {
         <input id="fg-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Acme Insights — real-time analytics for ops teams" disabled={running} />
         <label className="fld" htmlFor="fg-body" style={{ marginTop: 12 }}>Details</label>
         <textarea id="fg-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} placeholder={def.placeholder} disabled={running} />
-        {kind === "website" && images.length < 4 && (
+        {kind === "website" && (
+          <div className="sitemode" style={{ marginTop: 14 }}>
+            <div className="seg" role="group" aria-label="How the panel reviews the site" style={{ marginBottom: 0 }}>
+              <button className={siteMode === "walk" ? "on" : ""} onClick={() => setSiteMode("walk")} disabled={running}>Send the panel through the site</button>
+              <button className={siteMode === "react" ? "on" : ""} onClick={() => setSiteMode("react")} disabled={running}>React to a screenshot</button>
+            </div>
+            <p className="sub" style={{ marginTop: 8 }}>
+              {siteMode === "walk"
+                ? "Each persona-agent drives its own live browser through the site — clicking, scrolling, following links — then reports the path it took and its reaction. A small party goes through; live browsing is heavy."
+                : "We screenshot the page (or you upload one) and the whole panel reacts to that single view."}
+            </p>
+          </div>
+        )}
+
+        {kind === "website" && siteMode === "walk" && (
+          <div className="urlfetch" style={{ marginTop: 12 }}>
+            <label className="fld" htmlFor="fg-walkurl">Site URL <span className="note" style={{ fontWeight: 400 }}>· where the panel starts</span></label>
+            <input id="fg-walkurl" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com" disabled={running} />
+            <div className="walkctl">
+              <span className="fld" style={{ margin: 0 }}>How many go through</span>
+              <div className="segcount">
+                <button onClick={() => setWalkers((w) => Math.max(WALK_MIN, w - 1))} disabled={running} aria-label="Fewer">−</button>
+                <input type="number" min={WALK_MIN} max={WALK_MAX} value={walkers} onChange={(e) => setWalkers(Math.max(WALK_MIN, Math.min(WALK_MAX, Math.round(Number(e.target.value)) || WALK_MIN)))} disabled={running} />
+                <button onClick={() => setWalkers((w) => Math.min(WALK_MAX, w + 1))} disabled={running} aria-label="More">+</button>
+              </div>
+              <span className="note">{walkers} persona-agent{walkers > 1 ? "s" : ""} · up to {WALK_STEPS} steps each · needs an API key</span>
+            </div>
+          </div>
+        )}
+
+        {kind === "website" && siteMode === "react" && images.length < 4 && (
           <div className="urlfetch" style={{ marginTop: 12 }}>
             <label className="fld" htmlFor="fg-url">Paste a link <span className="note" style={{ fontWeight: 400 }}>· we screenshot the page for the panel</span></label>
             <div className="urlrow">
@@ -274,7 +396,7 @@ export default function FocusGroup() {
             <p className="note" style={{ marginTop: 6 }}>Some sites block headless browsers or need a login — if capture fails, add a screenshot below instead.</p>
           </div>
         )}
-        {def.images && (
+        {def.images && !(kind === "website" && siteMode === "walk") && (
           <div style={{ marginTop: 12 }}>
             <div className="fgh" style={{ margin: 0 }}>
               <label className="fld" style={{ margin: 0 }}>Prototypes / visuals <span className="note" style={{ fontWeight: 400 }}>· up to 4</span></label>
@@ -334,14 +456,29 @@ export default function FocusGroup() {
         </div>
 
         <div className="runbar" style={{ marginTop: 16 }}>
-          <button className="btn primary" onClick={runLive} disabled={running || !body.trim()}>
-            {running ? `Convening… ${done}/${liveSize}` : "Convene the focus group"}
-          </button>
-          <button className="btn ghost" onClick={runDemo} disabled={running}>Load demo</button>
-          {running && <div className="progress"><div style={{ width: `${liveSize ? (done / liveSize) * 100 : 0}%` }} /></div>}
-          <span className="note">
-            {running ? `${done}/${liveSize} reacting…` : `${plannedSize > LIVE_MAX ? `${LIVE_MAX} live · ` : ""}~1–2 min · demo is instant & free`}
-          </span>
+          {isWalk ? (
+            <>
+              <button className="btn primary" onClick={runWalk} disabled={running || !url.trim()}>
+                {running ? `Walking the site… ${done}/${walkCount}` : "Send the panel through the site"}
+              </button>
+              <button className="btn ghost" onClick={runWalkDemo} disabled={running}>Load demo</button>
+              {running && <div className="progress"><div style={{ width: `${walkCount ? (done / walkCount) * 100 : 0}%` }} /></div>}
+              <span className="note">
+                {running ? `${done}/${walkCount} browsing…` : `${walkCount} persona-agents browse live · a few min · demo is instant & free`}
+              </span>
+            </>
+          ) : (
+            <>
+              <button className="btn primary" onClick={runLive} disabled={running || !body.trim()}>
+                {running ? `Convening… ${done}/${liveSize}` : "Convene the focus group"}
+              </button>
+              <button className="btn ghost" onClick={runDemo} disabled={running}>Load demo</button>
+              {running && <div className="progress"><div style={{ width: `${liveSize ? (done / liveSize) * 100 : 0}%` }} /></div>}
+              <span className="note">
+                {running ? `${done}/${liveSize} reacting…` : `${plannedSize > LIVE_MAX ? `${LIVE_MAX} live · ` : ""}~1–2 min · demo is instant & free`}
+              </span>
+            </>
+          )}
         </div>
         {error && <p className="error">{error}</p>}
       </section>
@@ -472,6 +609,13 @@ export default function FocusGroup() {
                     <span className="fg-pick" style={{ color: SENT_COLOR[r.sentiment] }}>{SENTIMENT_LABEL[r.sentiment]}</span>
                   </div>
                   <div className="preact">&ldquo;{r.quote}&rdquo;</div>
+                  {r.journey && r.journey.length > 1 && (
+                    <div className="walkpath">
+                      {pathHops(r.journey).map((h, i) => (
+                        <span className="hop" key={i}>{h}</span>
+                      ))}
+                    </div>
+                  )}
                   <div className="pmore">Open reaction →</div>
                 </button>
               ))}
@@ -496,6 +640,20 @@ export default function FocusGroup() {
                   <div className="pwho"><div className="pm-name">{openR.personaName}</div><div className="pseg">{openR.segment}</div></div>
                   <span className="fg-pick" style={{ color: SENT_COLOR[openR.sentiment] }}>{SENTIMENT_LABEL[openR.sentiment]}</span>
                 </div>
+                {openR.journey && openR.journey.length > 0 && (
+                  <div className="pm-sec">
+                    <div className="pm-k">The path they took through the site</div>
+                    <ol className="walklist">
+                      {openR.journey.map((s, i) => (
+                        <li key={i}>
+                          <span className={`wl-act ${s.action}`}>{s.action}</span>
+                          {s.target && <span className="wl-tgt">{s.target}</span>}
+                          <span className="wl-th">{s.thought}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
                 <div className="pm-sec"><div className="pm-k">In their words</div><p className="pm-quote">&ldquo;{openR.quote}&rdquo;</p></div>
                 <div className="pm-sec"><div className="pm-k good">What resonates</div><p className="pm-p">{openR.resonates}</p></div>
                 <div className="pm-sec"><div className="pm-k bad">Biggest concern</div><p className="pm-p">{openR.concern}</p></div>

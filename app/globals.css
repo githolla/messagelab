@@ -1347,6 +1347,23 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .urlrow .btn { white-space: nowrap; flex-shrink: 0; }
 @media (max-width: 560px) { .urlrow { flex-direction: column; } }
 
+.walkctl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.walkctl .segcount { flex-shrink: 0; }
+
+/* The hop path on a persona card after a live walkthrough. */
+.walkpath { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; }
+.walkpath .hop { position: relative; font-size: 11px; color: var(--muted, #64748b); background: var(--surface-2, #f1f5f9); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.walkpath .hop:not(:last-child)::after { content: "→"; margin-left: 4px; margin-right: -3px; color: var(--muted, #94a3b8); }
+
+/* The full journey inside the reaction modal. */
+.walklist { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.walklist li { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: baseline; padding-left: 12px; border-left: 2px solid var(--line); }
+.walklist .wl-act { grid-row: 1; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #3b6ea5; }
+.walklist .wl-act.done { color: #2f7a3a; }
+.walklist .wl-act.back { color: #b8860b; }
+.walklist .wl-tgt { grid-row: 1; font-size: 12px; font-weight: 600; }
+.walklist .wl-th { grid-column: 1 / -1; grid-row: 2; font-size: 12.5px; color: var(--muted, #475569); }
+
 .fg-hero { border-left: 3px solid var(--line); }
 .fg-hero.greenlight { border-left-color: #2f7a3a; }
 .fg-hero.promising { border-left-color: #7fae3f; }

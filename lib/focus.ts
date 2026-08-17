@@ -149,6 +149,17 @@ export interface FocusReaction {
   quote: string;
   model?: string;
   error?: string;
+  /** Present when the persona-agent actually navigated a live site (website kind). */
+  journey?: WalkStep[];
+}
+
+/** One step of a persona-agent's walk through a live site. */
+export interface WalkStep {
+  n: number;
+  action: "start" | "click" | "scroll" | "back" | "done";
+  target?: string; // the label/href acted on, or the page arrived at
+  url: string;
+  thought: string; // in-character reason for the move
 }
 
 // ---- Deterministic demo feedback ----------------------------------------
