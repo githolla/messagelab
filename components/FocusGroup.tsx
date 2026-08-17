@@ -259,6 +259,8 @@ export default function FocusGroup() {
     const n = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
     const panel = buildPanel(scaleSegments(segments, n)).slice(0, n);
     const subject = { url: url.trim(), industry, title, body };
+    let realCount = 0;
+    let firstErr = "";
     const rs = await pool<typeof panel[number], FocusReaction>(
       panel,
       async (p) => {
@@ -270,17 +272,32 @@ export default function FocusGroup() {
           });
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+          realCount++;
           return data as FocusReaction;
-        } catch {
+        } catch (e) {
+          if (!firstErr) firstErr = e instanceof Error ? e.message : "the walk service failed";
           const fb = focusDemo(p, { kind: "website", industry, productType: "", title, body, images: [] });
-          return { ...fb, journey: demoJourney(p.id, fb.sentiment) }; // keep the room full if a walk fails
+          // Mark it as a simulated fallback so we never pass it off as a real walk.
+          return { ...fb, journey: demoJourney(p.id, fb.sentiment), error: firstErr };
         }
       },
       WALK_CONCURRENCY,
       () => setDone((d) => d + 1),
     );
     setRunning(false);
-    finish(rs, false);
+    if (realCount === 0) {
+      const needsKey = /API key|not configured|ANTHROPIC/i.test(firstErr);
+      setError(
+        `The panel couldn't browse the site live — ${firstErr}. ` +
+          (needsKey
+            ? "A live walkthrough needs ANTHROPIC_API_KEY set on the server (the same key the focus group uses). "
+            : "Some sites block headless browsers, need a login, or are slow to load — try another URL. ") +
+          "The results below are a simulated walkthrough, not a real one.",
+      );
+    } else if (realCount < panel.length) {
+      setError(`${panel.length - realCount} of ${panel.length} walks fell back to a simulated journey (${firstErr}). The rest are real.`);
+    }
+    finish(rs, realCount === 0);
   }
 
   function runWalkDemo() {
@@ -611,6 +628,7 @@ export default function FocusGroup() {
                   <div className="preact">&ldquo;{r.quote}&rdquo;</div>
                   {r.journey && r.journey.length > 1 && (
                     <div className="walkpath">
+                      {r.error && <span className="hop sim">simulated</span>}
                       {pathHops(r.journey).map((h, i) => (
                         <span className="hop" key={i}>{h}</span>
                       ))}

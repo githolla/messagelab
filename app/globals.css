@@ -1354,6 +1354,8 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .walkpath { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; }
 .walkpath .hop { position: relative; font-size: 11px; color: var(--muted, #64748b); background: var(--surface-2, #f1f5f9); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .walkpath .hop:not(:last-child)::after { content: "→"; margin-left: 4px; margin-right: -3px; color: var(--muted, #94a3b8); }
+.walkpath .hop.sim { color: #b23b3b; border-color: #e6c3c3; background: #fbeeee; text-transform: uppercase; font-size: 9.5px; letter-spacing: .05em; }
+.walkpath .hop.sim::after { content: "" !important; margin: 0 !important; }
 
 /* The full journey inside the reaction modal. */
 .walklist { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
