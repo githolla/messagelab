@@ -1566,6 +1566,21 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .callout.calm { border: 1px solid var(--good-tint); background: var(--good-tint); border-left: 4px solid var(--good-ink); }
 .segdrill.thin { opacity: .72; }
 
+/* Segment compare */
+.cmp-toggle { margin-bottom: 12px; }
+.cmp { border: 1px solid var(--primary-line); background: var(--primary-tint); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 14px; }
+.cmp-picks { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cmp-picks select { flex: 1; min-width: 140px; }
+.cmp-vs { font-size: 12px; font-weight: 700; color: var(--ink-3); }
+.cmp-line { margin: 12px 0; font-size: 14px; line-height: 1.5; color: var(--ink); }
+.cmp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 520px) { .cmp-cols { grid-template-columns: 1fr; } }
+.cmp-col { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; }
+.cmp-name { font-weight: 660; font-size: 13.5px; margin-bottom: 8px; }
+.cmp-cols .sd-bar { display: flex; height: 12px; border-radius: 4px; overflow: hidden; background: var(--bg-2); }
+.cmp-stats { display: flex; flex-direction: column; gap: 3px; margin-top: 9px; font-size: 12.5px; color: var(--ink-2); }
+.cmp-stats b { color: var(--ink); }
+
 /* Agent swarm dot-plot */
 .swarm { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line-2); }
 .swarm-grid { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }

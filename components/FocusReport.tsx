@@ -54,6 +54,9 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
   const [segFilter, setSegFilter] = useState<string>("all");
   const [statFilter, setStatFilter] = useState<StatFilter>("");
   const [copied, setCopied] = useState(false);
+  const [compareOn, setCompareOn] = useState(false);
+  const [cmpA, setCmpA] = useState("");
+  const [cmpB, setCmpB] = useState("");
 
   const def = kindDef(kind);
   const industryLabel = INDUSTRIES.find((i) => i.key === industry)?.label ?? "general";
@@ -180,6 +183,22 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
     const md = L.join("\n");
     navigator.clipboard?.writeText(md).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
   }
+
+  function segStats(name: string) {
+    const s = segmentDetail.find((x) => x.segment === name) || segmentDetail[0];
+    if (!s) return null;
+    const avgLike = s.reactions.reduce((t, r) => t + r.likelihood, 0) / (s.reactions.length || 1);
+    return { ...s, avgLike };
+  }
+  const A = segStats(cmpA || segmentDetail[0]?.segment || "");
+  const B = segStats(cmpB || segmentDetail[segmentDetail.length - 1]?.segment || "");
+  const compareLine = (() => {
+    if (!A || !B || A.segment === B.segment) return "";
+    const warm = A.avgSentiment >= B.avgSentiment ? A : B;
+    const cool = warm === A ? B : A;
+    const gap = Math.abs(A.positivePct - B.positivePct);
+    return `${warm.segment} are the warmer room — ${warm.positivePct}% positive vs ${cool.positivePct}% for ${cool.segment} (${gap}-pt gap), and ${Math.abs(A.avgLike - B.avgLike).toFixed(1)}/5 apart on likelihood to ${def.verb}.`;
+  })();
 
   return (
     <div className="report">
@@ -435,6 +454,38 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
               </div>
             ) : (
               <div className="callout calm">The room is <b>unusually unified</b> — every segment lands within about a point of the panel average.</div>
+            )}
+            <div className="cmp-toggle">
+              <button className={`segchip ${compareOn ? "on" : ""}`} onClick={() => setCompareOn((v) => !v)}>{compareOn ? "Hide compare" : "Compare two segments"}</button>
+            </div>
+            {compareOn && A && B && (
+              <div className="cmp">
+                <div className="cmp-picks">
+                  <select value={A.segment} onChange={(e) => setCmpA(e.target.value)}>
+                    {segmentDetail.map((s) => <option key={s.segment} value={s.segment}>{s.segment}</option>)}
+                  </select>
+                  <span className="cmp-vs">vs</span>
+                  <select value={B.segment} onChange={(e) => setCmpB(e.target.value)}>
+                    {segmentDetail.map((s) => <option key={s.segment} value={s.segment}>{s.segment}</option>)}
+                  </select>
+                </div>
+                {compareLine && <p className="cmp-line">{compareLine}</p>}
+                <div className="cmp-cols">
+                  {[A, B].map((s, i) => (
+                    <div className="cmp-col" key={i}>
+                      <div className="cmp-name">{s.segment} <span className="note">· n={s.n}</span></div>
+                      <div className="sd-bar">
+                        {s.dist.map((d) => (d.count > 0 ? <span key={d.key} className="sd-seg" style={{ width: `${(d.count / s.n) * 100}%`, background: SENT_COLOR[d.key] }} title={`${SENTIMENT_LABEL[d.key]}: ${d.count}`} /> : null))}
+                      </div>
+                      <div className="cmp-stats">
+                        <span><b>{s.positivePct}%</b> positive</span>
+                        <span><b>{s.avgSentiment.toFixed(1)}</b>/5 sentiment</span>
+                        <span><b>{s.avgLike.toFixed(1)}</b>/5 {def.actionLabel.toLowerCase()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
             <p className="sub">Which parts of your audience are most (and least) sold. Each bar is that segment&apos;s sentiment mix.</p>
             <div className="segstack">
