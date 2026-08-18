@@ -310,12 +310,23 @@ export default function FocusGroup() {
   }
 
   // Hand the completed run to the dedicated report page (no DB in v1 — the run
-  // rides across the navigation in sessionStorage).
-  function finish(rs: FocusReaction[], demo: boolean) {
+  // rides across the navigation in sessionStorage), including the panel + subject
+  // so the report can re-run refinements against the same room.
+  function finish(rs: FocusReaction[], demo: boolean, panel: { id: string; name: string; segment: string; how: string; base: number }[], subject: FocusSubject) {
     try {
       sessionStorage.setItem(
         "fg-report",
-        JSON.stringify({ reactions: rs, kind, industry, url: url.trim(), isDemo: demo, goal: goal.trim(), format }),
+        JSON.stringify({
+          round0: { title: subject.title, body: subject.body, reactions: rs },
+          subject,
+          panel,
+          kind,
+          industry,
+          url: url.trim(),
+          isDemo: demo,
+          goal: goal.trim(),
+          format,
+        }),
       );
     } catch {
       /* quota/availability — navigation below still no-ops gracefully */
@@ -328,7 +339,7 @@ export default function FocusGroup() {
     setError(null);
     const subject = subjectOf();
     const panel = buildPanel(plannedSize > DEMO_MAX ? scaleSegments(segments, DEMO_MAX) : segments);
-    finish(panel.map((p) => focusDemo(p, subject)), true);
+    finish(panel.map((p) => focusDemo(p, subject)), true, panel, subject);
   }
 
   async function runLive() {
@@ -363,7 +374,7 @@ export default function FocusGroup() {
       () => setDone((d) => d + 1),
     );
     setRunning(false);
-    finish(rs, false);
+    finish(rs, false, panel, subject);
   }
 
   // Website walkthrough: a small party of persona-agents each drives a live
@@ -419,15 +430,16 @@ export default function FocusGroup() {
     } else if (realCount < panel.length) {
       setError(`${panel.length - realCount} of ${panel.length} walks fell back to a simulated journey (${firstErr}). The rest are real.`);
     }
-    finish(rs, realCount === 0);
+    const walkSubject: FocusSubject = { kind: "website", industry, productType: "", format, goal, title, body: url.trim(), images: [] };
+    finish(rs, realCount === 0, panel, walkSubject);
   }
 
   function runWalkDemo() {
     setError(null);
     const n = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
     const panel = buildPanel(scaleSegments(segments, n)).slice(0, n);
-    const subject = { kind: "website" as const, industry, productType: "", title, body: body || `A ${industryLabel} website`, images: [] };
-    finish(panel.map((p) => { const r = focusDemo(p, subject); return { ...r, journey: demoJourney(p.id, r.sentiment) }; }), true);
+    const subject: FocusSubject = { kind: "website", industry, productType: "", format, goal, title, body: body || `A ${industryLabel} website`, images: [] };
+    finish(panel.map((p) => { const r = focusDemo(p, subject); return { ...r, journey: demoJourney(p.id, r.sentiment) }; }), true, panel, subject);
   }
 
   return (

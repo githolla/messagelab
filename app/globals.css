@@ -1609,6 +1609,33 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .fix-reach { font-size: 11.5px; font-weight: 700; color: var(--danger); white-space: nowrap; }
 @media (max-width: 560px) { .fixlist li { grid-template-columns: auto auto 1fr; } .fix-reach { grid-column: 3; text-align: right; } }
 
+/* Refine & re-test progression */
+.rounds { border-top: 3px solid var(--primary); }
+.rounds-title { font-family: var(--serif); font-size: 18px; font-weight: 600; }
+.rounds-sub { font-size: 13px; color: var(--ink-2); margin-top: 4px; max-width: 640px; line-height: 1.5; }
+.rounds-track { display: flex; align-items: stretch; flex-wrap: wrap; gap: 4px; margin: 16px 0; }
+.round-wrap { display: flex; align-items: center; gap: 4px; }
+.round-arrow { color: var(--ink-3); font-size: 16px; }
+.round { text-align: left; min-width: 130px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); padding: 10px 13px; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.round:hover { border-color: var(--primary-line); }
+.round.on { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.round-k { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+.round-score { font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--ink); margin-top: 3px; }
+.round-score span { font-family: var(--sans); font-size: 11px; font-weight: 500; color: var(--ink-3); }
+.round-sub2 { font-size: 11.5px; color: var(--ink-2); margin-top: 1px; }
+.round-delta { font-size: 11.5px; font-weight: 700; margin-top: 4px; }
+.round-delta.up { color: var(--good-ink); } .round-delta.down { color: var(--danger); }
+.rounds-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rounds-actions .note { color: var(--ink-2); }
+.copytested { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.copytested > summary { cursor: pointer; padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--ink-2); list-style: none; }
+.copytested > summary::-webkit-details-marker { display: none; }
+.copytested > summary::before { content: "▸ "; color: var(--ink-3); }
+.copytested[open] > summary::before { content: "▾ "; }
+.ct-body-wrap { padding: 0 14px 14px; }
+.ct-title { font-weight: 660; font-size: 14.5px; margin-bottom: 6px; }
+.ct-body { white-space: pre-wrap; font-family: var(--sans); font-size: 13px; line-height: 1.55; color: var(--ink); margin: 0; background: var(--bg); border: 1px solid var(--line-2); border-radius: 8px; padding: 12px; }
+
 /* Social engagement card */
 .soc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
 .soc-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }

@@ -62,6 +62,16 @@ a segment-level results dashboard. "Message Lab" is a working title.
   ("receipts"), a dissenting-segment callout, computed section takeaways, and an
   "in their words" **highlight reel** (`selectReel`). The study goal threads into
   `/api/focus` and prints as "The question we tested" on the report.
+  **Refine loop:** `finish` stores the panel + subject; `components/FocusRounds.tsx`
+  wraps the report with a round progression (Original → Refine 1 → …). "Refine"
+  calls `/api/focus-refine` (model rewrite addressing top concerns/suggestions,
+  deterministic fallback) then re-runs the same panel (`/api/focus` fan-out live;
+  `focusDemo` with a per-round base bump in demo) — every round is kept, clickable,
+  and scored, looping until the user is satisfied. **Social** (`isSocialSubject`:
+  kind `social` or format "Social post"): each reaction also carries `like`/
+  `comment`/`share`; the route asks + coerces them, `focusDemo` derives them
+  deterministically (likes>comments>shares off sentiment), and the report shows a
+  "Predicted social engagement" card (♥/💬/↗ counts + % of room).
   For the **website** kind there are two site modes: "React to a screenshot"
   (paste a URL → `/api/screenshot` headless-captures it, or upload one; whole
   panel reacts to that one view) and "Send the panel through the site" — a live
