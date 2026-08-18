@@ -1,10 +1,9 @@
 import { INDUSTRIES } from "@/lib/industries";
-import { panelFor, monogram } from "@/lib/archetypes";
 import { FOCUS_KINDS } from "@/lib/focus";
+import RoomDemo from "@/components/RoomDemo";
 
 export default function Home() {
   const industryCount = INDUSTRIES.filter((i) => i.key !== "general").length;
-  const samplePanel = panelFor("ecommerce"); // a concrete example panel for the hero strip
 
   return (
     <>
@@ -37,7 +36,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Meet the panel */}
+      {/* Meet the panel — a live demo of the room */}
       <section className="lp-panel">
         <div className="lp-eyebrow">Meet the room</div>
         <h2>A panel of persona-agents — each reacts as itself.</h2>
@@ -46,15 +45,7 @@ export default function Home() {
           rename or add segments, then send them your subject. Every agent answers individually — the
           same persona-agent engine, grounded in the MatrAIx research, that the whole app runs on.
         </p>
-        <div className="lp-botrow">
-          {samplePanel.map((a) => (
-            <span className="chip" key={a.name}>
-              <span className="e">{monogram(a.name)}</span>
-              {a.name}
-            </span>
-          ))}
-          <span className="chip muted">+ {industryCount} industries&apos; panels</span>
-        </div>
+        <RoomDemo />
       </section>
 
       {/* What you can test */}

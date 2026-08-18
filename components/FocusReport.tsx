@@ -53,6 +53,7 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
   const [openR, setOpenR] = useState<FocusReaction | null>(null);
   const [segFilter, setSegFilter] = useState<string>("all");
   const [statFilter, setStatFilter] = useState<StatFilter>("");
+  const [copied, setCopied] = useState(false);
 
   const def = kindDef(kind);
   const industryLabel = INDUSTRIES.find((i) => i.key === industry)?.label ?? "general";
@@ -157,6 +158,29 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
       .slice(0, 5);
   }, [summary, reactions]);
 
+  function copyBrief() {
+    const L: string[] = [];
+    L.push(`# Focus group brief${goal?.trim() ? `: ${goal.trim()}` : ""}`);
+    L.push("");
+    L.push(`**Panel:** ${summary.n} persona-agents · ${industryLabel} · ${def.label}${format ? ` · ${format}` : ""}${isDemo ? " · (demo data)" : ""}`);
+    L.push(`**Verdict:** ${summary.tooClose ? "Too close to call" : FOCUS_VERDICT_LABEL[summary.verdict]} — ${summary.readline}`);
+    L.push(`**Confidence:** positive ${summary.positivePct}% (95% CI ${Math.round(summary.positiveCI.low * 100)}–${Math.round(summary.positiveCI.high * 100)}%) · agreement ${Math.round(summary.agreement * 100)}% (${summary.agreementLabel}).`);
+    if (goal?.trim()) L.push(`**Question tested:** ${goal.trim()}`);
+    L.push("");
+    L.push(`## What resonated`);
+    summary.themes.resonates.slice(0, 4).forEach((t) => L.push(`- ${t.text}${t.count > 1 ? ` (${t.count})` : ""}`));
+    L.push("");
+    L.push(`## What to fix first`);
+    actionItems.forEach((a, i) => L.push(`${i + 1}. ${a.text} — ${a.count} raised${a.fix ? `. Try: ${a.fix}` : ""}`));
+    L.push("");
+    L.push(`## By segment`);
+    summary.bySegment.forEach((s) => L.push(`- ${s.segment} (n=${s.n}): ${s.avgSentiment.toFixed(1)}/5, ${s.positivePct}% positive`));
+    L.push("");
+    L.push(`_Simulated persona-agent responses — directional signal, model-dependent and hypothesis-generating, not a market prediction. Graduate high-stakes calls to the MatrAIx research harness or real people._`);
+    const md = L.join("\n");
+    navigator.clipboard?.writeText(md).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
+  }
+
   return (
     <div className="report">
       {/* Cover */}
@@ -165,6 +189,7 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
           <span className="rc-eyebrow">Focus group report</span>
           <div className="rc-actions">
             {isDemo && <span className="demotag">Demo</span>}
+            <button className="btn ghost rc-print" onClick={copyBrief}>{copied ? "Copied ✓" : "Copy brief"}</button>
             <button className="btn ghost rc-print" onClick={() => window.print()}>Print / PDF</button>
           </div>
         </div>
