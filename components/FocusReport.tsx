@@ -201,6 +201,27 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
         </nav>
       </section>
 
+      {/* Room agreement — consensus vs division */}
+      <section className="card agreecard">
+        <div className="agree-left">
+          <div className="agree-h">Room agreement</div>
+          <div className={`agree-meter ${summary.agreement >= 0.5 ? "hi" : summary.agreement >= 0.3 ? "mid" : "lo"}`}>
+            <span style={{ width: `${Math.round(summary.agreement * 100)}%` }} />
+          </div>
+          <div className="agree-label"><b>{summary.agreementLabel}</b> · {Math.round(summary.agreement * 100)}% aligned</div>
+        </div>
+        <div className="agree-right">
+          <div className="agree-point">
+            <span className="ap-k good">Where they agree</span>
+            <p>{summary.themes.resonates[0]?.text || "No single point of consensus stood out."}</p>
+          </div>
+          <div className="agree-point">
+            <span className="ap-k bad">The fault line</span>
+            <p>{dissent ? `${dissent.seg.segment} pull against the room.` : summary.themes.concerns[0]?.text || "No sharp division — objections are scattered."}</p>
+          </div>
+        </div>
+      </section>
+
       {/* Sentiment & likelihood */}
       <details className="rsec card" id="sec-sentiment" open>
         <summary className="rsec-sum"><span className="rsec-t">Sentiment &amp; likelihood</span><span className="rsec-hint">{(() => {

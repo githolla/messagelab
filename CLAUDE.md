@@ -50,6 +50,18 @@ a segment-level results dashboard. "Message Lab" is a working title.
   share bar in the segment's color, a headcount stepper, "% of the room"), an
   "Add a segment" card, and a live recipe banner — all re-derive as the user
   changes industry (`autoSegments`), size preset (`scaleSegments`), or edits.
+  A goal-first **Step 0** ("What decision are you trying to make?") calls
+  `/api/focus-plan` (model, deterministic keyword fallback with no key) to draft
+  the whole study (kind/industry/format/title/body/goal) into the builder. A live
+  **forecast** strip shows the room as a unit-chart dot grid + reach/est-time/
+  model-calls/balance. During a run a **convening loader** lights up one dot per
+  agent as each reacts. Competitive-swarm-driven report upgrades: an honest-
+  confidence **readline** + Wilson "too close to call" guard, a **room-agreement**
+  band (consensus vs fault line, from sentiment entropy), Wilson **±CI** on the
+  positive share, a **provenance chip**, clickable stat tiles that filter the room
+  ("receipts"), a dissenting-segment callout, computed section takeaways, and an
+  "in their words" **highlight reel** (`selectReel`). The study goal threads into
+  `/api/focus` and prints as "The question we tested" on the report.
   For the **website** kind there are two site modes: "React to a screenshot"
   (paste a URL → `/api/screenshot` headless-captures it, or upload one; whole
   panel reacts to that one view) and "Send the panel through the site" — a live

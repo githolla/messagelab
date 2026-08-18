@@ -1194,6 +1194,13 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .segcount input::-webkit-outer-spin-button, .segcount input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .segpct { font-size: 12px; font-weight: 700; color: var(--ink-2); width: 38px; text-align: right; flex-shrink: 0; }
 
+/* ===== Step 0 · goal-first intake ===== */
+.step0 { border-top: 3px solid var(--primary); }
+.step0-row { display: flex; gap: 10px; align-items: stretch; }
+.step0-in { flex: 1; min-width: 0; font-size: 15px; }
+.step0-row .btn { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 600px) { .step0-row { flex-direction: column; } }
+
 /* ===== Format chips ===== */
 .fmt-tag { display: inline-block; margin-left: 10px; vertical-align: middle; font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #fff; border-radius: 999px; padding: 3px 10px; }
 .fmtchips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1202,6 +1209,18 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .fmtchip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .fmtchip:disabled { opacity: .5; cursor: default; }
 
+/* ===== Live "convening" loader ===== */
+.convening { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); padding: 14px 16px; }
+.conv-h { font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.conv-h b { color: var(--ink); }
+.conv-pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); animation: convpulse 1.1s ease-in-out infinite; }
+@keyframes convpulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.75); } }
+.conv-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.conv-dot { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; border: 1px solid var(--line); transition: background .3s, border-color .3s, transform .3s; }
+.conv-dot.wait { background: var(--bg-2); color: var(--ink-3); animation: convwait 1.4s ease-in-out infinite; }
+.conv-dot.in { transform: translateY(-1px); }
+@keyframes convwait { 0%, 100% { opacity: .5; } 50% { opacity: .9; } }
+
 /* ===== Live recipe summary ===== */
 .recipe { border: 1px solid var(--primary-line); background: var(--primary-tint); border-radius: var(--radius); padding: 16px 18px; }
 .recipe-lead { font-size: 15px; line-height: 1.55; color: var(--ink); }
@@ -1209,6 +1228,20 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .recipe-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .rchip { font-size: 11.5px; font-weight: 650; color: var(--ink-2); background: var(--card); border: 1px solid var(--primary-line); border-radius: 999px; padding: 3px 11px; }
 .rchip.strong { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* ===== Live forecast (unit-chart room) ===== */
+.forecast { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); padding: 14px 16px; }
+@media (max-width: 720px) { .forecast { grid-template-columns: 1fr; } }
+.fc-h { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
+.fc-dots { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.fc-dot { width: 9px; height: 9px; border-radius: 2.5px; opacity: .9; }
+.fc-more { font-size: 11px; font-weight: 700; color: var(--ink-2); margin-left: 4px; }
+.fc-stats { display: grid; grid-template-columns: repeat(4, auto); gap: 18px; }
+@media (max-width: 460px) { .fc-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
+.fc-n { font-family: var(--serif); font-size: 19px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.fc-n.ok { color: var(--good-ink); } .fc-n.warn { color: #b8860b; }
+.fc-sub { font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--ink-3); }
+.fc-l { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
 
 /* ===== Segment persona cards ===== */
 .panelcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 12px; }
@@ -1497,6 +1530,23 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .callout.dissent { border: 1px solid var(--primary-line); background: var(--primary-tint); border-left: 4px solid var(--primary); }
 .callout.calm { border: 1px solid var(--good-tint); background: var(--good-tint); border-left: 4px solid var(--good-ink); }
 .segdrill.thin { opacity: .72; }
+
+/* Room agreement band */
+.agreecard { display: grid; grid-template-columns: 260px 1fr; gap: 24px; align-items: center; }
+@media (max-width: 680px) { .agreecard { grid-template-columns: 1fr; gap: 16px; } }
+.agree-h { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
+.agree-meter { height: 10px; border-radius: 5px; background: var(--bg-2); overflow: hidden; }
+.agree-meter > span { display: block; height: 100%; border-radius: 5px; }
+.agree-meter.hi > span { background: var(--good-ink); }
+.agree-meter.mid > span { background: #b8860b; }
+.agree-meter.lo > span { background: var(--danger); }
+.agree-label { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+.agree-label b { color: var(--ink); }
+.agree-right { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 560px) { .agree-right { grid-template-columns: 1fr; } }
+.ap-k { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.ap-k.good { color: var(--good-ink); } .ap-k.bad { color: var(--danger); }
+.agree-point p { margin: 5px 0 0; font-size: 13.5px; color: var(--ink); line-height: 1.5; }
 
 /* Collapsible report section */
 .rsec { padding: 0; }

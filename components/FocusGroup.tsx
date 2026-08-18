@@ -42,6 +42,11 @@ function segColor(id: string): string {
   return SEG_COLORS[h % SEG_COLORS.length];
 }
 
+// Sentiment dot colors for the live "convening" loader (matches the report scale).
+const SENT_DOT: Record<Sentiment, string> = {
+  love: "#2f7a3a", like: "#7fae3f", neutral: "#767c85", skeptical: "#db7f22", reject: "#b23b3b",
+};
+
 // A distinct accent per industry so switching verticals visibly re-themes the room.
 const INDUSTRY_ACCENTS = ["#2b45c4", "#0f766e", "#b45309", "#7c3aed", "#be123c", "#0369a1", "#4d7c0f", "#a21caf", "#c2410c", "#15803d", "#4338ca", "#0e7490"];
 function accentFor(key: string): string {
@@ -154,10 +159,15 @@ export default function FocusGroup() {
   const [walkers, setWalkers] = useState(4);
   const [format, setFormat] = useState<string>("");
   const [goal, setGoal] = useState<string>("");
+  const [planText, setPlanText] = useState<string>("");
+  const [planning, setPlanning] = useState(false);
+  const [planNote, setPlanNote] = useState<string>("");
   const [segments, setSegments] = useState<PanelSegment[]>(() => autoSegments("general", undefined, DEFAULT_TOTAL));
 
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(0);
+  const [roster, setRoster] = useState<{ id: string; name: string }[]>([]);
+  const [filled, setFilled] = useState<Record<string, Sentiment>>({});
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -169,6 +179,18 @@ export default function FocusGroup() {
   const walkCount = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
   const industryAccent = accentFor(industry);
   const fm = fmtMeta(format, def);
+
+  // Live forecast of the run — a unit-chart "room" + reach/time/calls.
+  const DOT_CAP = 160;
+  const roomDots: string[] = [];
+  for (const s of segments) for (let i = 0; i < s.count && roomDots.length < DOT_CAP + 1; i++) roomDots.push(segColor(s.id));
+  const dotsShown = roomDots.slice(0, DOT_CAP);
+  const dotsRest = Math.max(0, plannedSize - dotsShown.length);
+  const runCount = isWalk ? walkCount : liveSize;
+  const estSec = isWalk ? Math.ceil(walkCount / WALK_CONCURRENCY) * 45 : Math.ceil(liveSize / CONCURRENCY) * 3;
+  const estLabel = estSec < 90 ? `~${estSec}s` : `~${Math.max(1, Math.round(estSec / 60))} min`;
+  const shares = segments.map((s) => s.count / (plannedSize || 1));
+  const balanceGap = Math.round((Math.max(...shares, 0) - Math.min(...shares, 0)) * 100);
 
   function changeIndustry(k: string) {
     setIndustry(k);
@@ -239,6 +261,35 @@ export default function FocusGroup() {
     return out;
   }
 
+  // Goal-first intake: turn a plain question into a drafted study, then apply it.
+  async function designStudy() {
+    const q = planText.trim();
+    if (!q || planning) return;
+    setPlanning(true);
+    setPlanNote("");
+    try {
+      const resp = await fetch("/api/focus-plan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ goal: q }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      const p = data.plan as { kind: FocusKind; industry: string; format: string; title: string; body: string; goal: string };
+      setKind(p.kind);
+      changeIndustry(p.industry);
+      setFormat(p.format || "");
+      setTitle(p.title || "");
+      setBody(p.body || "");
+      setGoal(p.goal || q);
+      setPlanNote(data.source === "model" ? "Drafted your study below — edit anything, then run." : "Drafted a starting point below (no API key — a rough draft). Edit it, then run.");
+    } catch (e) {
+      setPlanNote(e instanceof Error ? e.message : "Couldn't design the study — set it up below instead.");
+    } finally {
+      setPlanning(false);
+    }
+  }
+
   function subjectOf(): FocusSubject {
     return { kind, industry, productType: kind === "product" ? productType : "", format, goal, title, body, images: def.images ? images : [] };
   }
@@ -272,9 +323,12 @@ export default function FocusGroup() {
     setDone(0);
     const subject = subjectOf();
     const panel = buildPanel(scaleSegments(segments, liveSize));
+    setRoster(panel.map((p) => ({ id: p.id, name: p.name })));
+    setFilled({});
     const rs = await pool<typeof panel[number], FocusReaction>(
       panel,
       async (p) => {
+        let result: FocusReaction;
         try {
           const resp = await fetch("/api/focus", {
             method: "POST",
@@ -283,10 +337,12 @@ export default function FocusGroup() {
           });
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-          return data as FocusReaction;
+          result = data as FocusReaction;
         } catch {
-          return focusDemo(p, subject); // per-persona fallback so a partial outage still fills the room
+          result = focusDemo(p, subject); // per-persona fallback so a partial outage still fills the room
         }
+        setFilled((prev) => ({ ...prev, [p.id]: result.sentiment }));
+        return result;
       },
       CONCURRENCY,
       () => setDone((d) => d + 1),
@@ -304,12 +360,15 @@ export default function FocusGroup() {
     setDone(0);
     const n = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
     const panel = buildPanel(scaleSegments(segments, n)).slice(0, n);
+    setRoster(panel.map((p) => ({ id: p.id, name: p.name })));
+    setFilled({});
     const subject = { url: url.trim(), industry, title, body };
     let realCount = 0;
     let firstErr = "";
     const rs = await pool<typeof panel[number], FocusReaction>(
       panel,
       async (p) => {
+        let result: FocusReaction;
         try {
           const resp = await fetch("/api/focus-walk", {
             method: "POST",
@@ -319,13 +378,15 @@ export default function FocusGroup() {
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
           realCount++;
-          return data as FocusReaction;
+          result = data as FocusReaction;
         } catch (e) {
           if (!firstErr) firstErr = e instanceof Error ? e.message : "the walk service failed";
           const fb = focusDemo(p, { kind: "website", industry, productType: "", title, body, images: [] });
           // Mark it as a simulated fallback so we never pass it off as a real walk.
-          return { ...fb, journey: demoJourney(p.id, fb.sentiment), error: firstErr };
+          result = { ...fb, journey: demoJourney(p.id, fb.sentiment), error: firstErr };
         }
+        setFilled((prev) => ({ ...prev, [p.id]: result.sentiment }));
+        return result;
       },
       WALK_CONCURRENCY,
       () => setDone((d) => d + 1),
@@ -366,6 +427,27 @@ export default function FocusGroup() {
           sentiment &amp; likelihood stats, the themes they raise, and the full room.
         </p>
       </div>
+
+      {/* 0 · Start from a question */}
+      <section className="card step0">
+        <h2 className="step">Start with a question <span className="note" style={{ fontWeight: 400 }}>· optional — we&apos;ll set up the study</span></h2>
+        <div className="step0-row">
+          <input
+            className="step0-in"
+            type="text"
+            value={planText}
+            onChange={(e) => setPlanText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); designStudy(); } }}
+            placeholder="What decision are you trying to make? e.g. Will a matching-gift email win back lapsed donors?"
+            disabled={planning || running}
+          />
+          <button className="btn primary" onClick={designStudy} disabled={planning || running || !planText.trim()}>
+            {planning ? "Designing…" : "Design my study →"}
+          </button>
+        </div>
+        {planNote && <p className="note" style={{ marginTop: 8 }}>{planNote}</p>}
+        <p className="sub" style={{ marginTop: planNote ? 4 : 10 }}>We&apos;ll pick the subject type, industry, format, and draft what to test — you edit everything below. Or just fill it in yourself.</p>
+      </section>
 
       {/* 1 · What are you testing */}
       <section className="card">
@@ -524,6 +606,23 @@ export default function FocusGroup() {
           </div>
         </div>
 
+        {/* Live forecast — the room as a unit chart + what the run will take */}
+        <div className="forecast" style={{ marginTop: 12 }}>
+          <div className="fc-room">
+            <div className="fc-h">The room · {plannedSize.toLocaleString()} agents</div>
+            <div className="fc-dots">
+              {dotsShown.map((c, i) => <span key={i} className="fc-dot" style={{ background: c }} />)}
+              {dotsRest > 0 && <span className="fc-more">+{dotsRest.toLocaleString()}</span>}
+            </div>
+          </div>
+          <div className="fc-stats">
+            <div className="fc-stat"><div className="fc-n">{runCount.toLocaleString()}{isWalk ? "" : plannedSize > LIVE_MAX ? <span className="fc-sub"> of {plannedSize.toLocaleString()}</span> : null}</div><div className="fc-l">{isWalk ? "browse the site" : "run live"}</div></div>
+            <div className="fc-stat"><div className="fc-n">{estLabel}</div><div className="fc-l">est. run time</div></div>
+            <div className="fc-stat"><div className="fc-n">{isWalk ? `≤${walkCount * WALK_STEPS}` : runCount}</div><div className="fc-l">model calls</div></div>
+            <div className="fc-stat"><div className={`fc-n ${balanceGap <= 30 ? "ok" : "warn"}`}>{balanceGap <= 30 ? "Balanced" : "Skewed"}</div><div className="fc-l">segment mix</div></div>
+          </div>
+        </div>
+
         {/* One live card per segment — adjusts as the user changes the group */}
         <div className="panelcards" style={{ marginTop: 14 }}>
           {segments.map((s) => {
@@ -556,6 +655,25 @@ export default function FocusGroup() {
             Add a segment
           </button>
         </div>
+
+        {/* Live "convening" — each agent lights up as it reacts */}
+        {running && roster.length > 0 && (
+          <div className="convening" style={{ marginTop: 16 }}>
+            <div className="conv-h">
+              <span className="conv-pulse" /> The room is convening — <b>{done}</b> of {roster.length} have reacted
+            </div>
+            <div className="conv-grid">
+              {roster.map((p) => {
+                const s = filled[p.id];
+                return (
+                  <span key={p.id} className={`conv-dot ${s ? "in" : "wait"}`} style={s ? { background: SENT_DOT[s], borderColor: SENT_DOT[s] } : undefined} title={s ? p.name : `${p.name} — reacting…`}>
+                    {monogram(p.name)}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="runbar" style={{ marginTop: 16 }}>
           {isWalk ? (

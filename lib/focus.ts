@@ -278,6 +278,8 @@ export interface FocusSummary {
   readline: string; // one plain sentence fusing verdict + margin + sample
   tooClose: boolean; // positive/negative Wilson intervals overlap → no true winner
   positiveCI: { low: number; high: number }; // Wilson band on the positive share
+  agreement: number; // 0-1 — how much the room converges (1 = unanimous)
+  agreementLabel: string; // "The room converges" | "Mixed views" | "The room is divided"
   themes: { resonates: Theme[]; concerns: Theme[]; questions: Theme[]; suggestions: Theme[] };
   bySegment: SegmentBreakdown[];
 }
@@ -322,6 +324,13 @@ export function summarizeFocus(reactions: FocusReaction[], kind: FocusKind): Foc
   // is modest — otherwise a clear lean at small n would be over-hedged away.
   const ciOverlap = !(positiveCI.low > negativeCI.high || negativeCI.low > positiveCI.high);
   const tooClose = ciOverlap && Math.abs(margin) <= 15;
+
+  // Room agreement — how concentrated sentiment is (1 − normalized entropy over
+  // the 5 sentiments). Remesh's consensus-vs-division read, derived deterministically.
+  const probs = sentimentDist.map((s) => s.count / n).filter((p) => p > 0);
+  const entropy = -probs.reduce((t, p) => t + p * Math.log(p), 0);
+  const agreement = clamp(1 - entropy / Math.log(SENTIMENTS.length), 0, 1);
+  const agreementLabel = agreement >= 0.5 ? "The room converges" : agreement >= 0.3 ? "Mixed views" : "The room is divided";
 
   const verdict: FocusVerdict =
     avgSentiment >= 4 && positivePct >= 55 ? "greenlight"
@@ -371,6 +380,8 @@ export function summarizeFocus(reactions: FocusReaction[], kind: FocusKind): Foc
     readline,
     tooClose,
     positiveCI,
+    agreement,
+    agreementLabel,
     themes: {
       resonates: themeCount(reactions.map((r) => r.resonates)),
       concerns: themeCount(reactions.map((r) => r.concern)),
