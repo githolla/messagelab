@@ -192,6 +192,17 @@ export default function FocusGroup() {
   const shares = segments.map((s) => s.count / (plannedSize || 1));
   const balanceGap = Math.round((Math.max(...shares, 0) - Math.min(...shares, 0)) * 100);
 
+  // Panel health — three defensibility rules with a plain read or the fix.
+  const nonZeroSegs = segments.filter((s) => s.count > 0).length;
+  const maxShare = Math.max(...shares, 0);
+  const healthRules = [
+    { ok: plannedSize >= 12, fix: `${plannedSize} agents is illustrative, not statistical — grow to 12+ for a firmer read.` },
+    { ok: maxShare <= 0.5, fix: `One segment is ${Math.round(maxShare * 100)}% of the room — it'll over-index. Even it out.` },
+    { ok: nonZeroSegs >= 3, fix: `Only ${nonZeroSegs} active segment${nonZeroSegs === 1 ? "" : "s"} — add more for coverage.` },
+  ];
+  const healthScore = healthRules.filter((r) => r.ok).length / healthRules.length;
+  const healthMsg = healthRules.find((r) => !r.ok)?.fix || "Well-balanced — a defensible read for a directional test.";
+
   function changeIndustry(k: string) {
     setIndustry(k);
     setSegments((prev) => autoSegments(k, undefined, prev.reduce((t, s) => t + s.count, 0) || DEFAULT_TOTAL));
@@ -207,6 +218,10 @@ export default function FocusGroup() {
   }
   function removeSeg(id: string) {
     setSegments((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
+  }
+  // Reset the segment mix to the industry's balanced reference at the current size.
+  function balanceToIndustry() {
+    setSegments(autoSegments(industry, undefined, plannedSize || DEFAULT_TOTAL));
   }
   function addSeg() {
     setSegments((prev) => {
@@ -621,6 +636,16 @@ export default function FocusGroup() {
             <div className="fc-stat"><div className="fc-n">{isWalk ? `≤${walkCount * WALK_STEPS}` : runCount}</div><div className="fc-l">model calls</div></div>
             <div className="fc-stat"><div className={`fc-n ${balanceGap <= 30 ? "ok" : "warn"}`}>{balanceGap <= 30 ? "Balanced" : "Skewed"}</div><div className="fc-l">segment mix</div></div>
           </div>
+        </div>
+
+        {/* Panel health — defensibility read + one-tap rebalance */}
+        <div className="panelhealth" style={{ marginTop: 12 }}>
+          <div className="ph-left">
+            <div className="ph-h">Panel health</div>
+            <div className={`ph-meter ${healthScore >= 1 ? "hi" : healthScore >= 0.66 ? "mid" : "lo"}`}><span style={{ width: `${Math.round(healthScore * 100)}%` }} /></div>
+          </div>
+          <div className="ph-msg">{healthMsg}</div>
+          <button className="btn ghost ph-btn" onClick={balanceToIndustry} disabled={running}>Balance to industry</button>
         </div>
 
         {/* One live card per segment — adjusts as the user changes the group */}
