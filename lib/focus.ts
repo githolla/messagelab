@@ -154,6 +154,15 @@ export interface FocusReaction {
   error?: string;
   /** Present when the persona-agent actually navigated a live site (website kind). */
   journey?: WalkStep[];
+  /** Social posts only — would this person like / comment / share it. */
+  like?: boolean;
+  comment?: boolean;
+  share?: boolean;
+}
+
+/** A social subject is one the room could like/comment/share. */
+export function isSocialSubject(kind: FocusKind, format?: string): boolean {
+  return kind === "social" || format === "Social post";
 }
 
 /** One step of a persona-agent's walk through a live site. */
@@ -233,7 +242,7 @@ export function focusDemo(
     score > 0.8 ? "love" : score > 0.6 ? "like" : score > 0.42 ? "neutral" : score > 0.26 ? "skeptical" : "reject";
   const likelihood = clamp(Math.round(score * 4 + 1), 1, 5);
   const quoteBank = score > 0.6 ? QUOTE_POS : score > 0.42 ? QUOTE_NEU : QUOTE_NEG;
-  return {
+  const out: FocusReaction = {
     personaId: reaction.id,
     personaName: reaction.name,
     segment: reaction.segment,
@@ -246,6 +255,14 @@ export function focusDemo(
     suggestion: pick(SUGGESTIONS, reaction.id + "s"),
     quote: pick(quoteBank, reaction.id + "u"),
   };
+  // Social engagement funnels off sentiment: likes are common, comments rarer,
+  // shares rarest — each gated a little higher than the last.
+  if (isSocialSubject(subject.kind, subject.format)) {
+    out.like = score > 0.45 && fnv1aFloat(reaction.id + "lk") < score * 0.95;
+    out.comment = score > 0.55 && fnv1aFloat(reaction.id + "cm") < score * 0.55;
+    out.share = score > 0.62 && fnv1aFloat(reaction.id + "sh") < score * 0.4;
+  }
+  return out;
 }
 
 // ---- Aggregation ---------------------------------------------------------

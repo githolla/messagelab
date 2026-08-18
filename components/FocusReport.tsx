@@ -7,6 +7,7 @@ import {
   kindDef,
   summarizeFocus,
   selectReel,
+  isSocialSubject,
   SENTIMENTS,
   SENTIMENT_LABEL,
   SENTIMENT_SCORE,
@@ -63,6 +64,12 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
   const summary = useMemo(() => summarizeFocus(reactions, kind), [reactions, kind]);
   const isWalkReport = useMemo(() => reactions.some((r) => r.journey && r.journey.length > 1), [reactions]);
   const reel = useMemo(() => selectReel(reactions, 5), [reactions]);
+  const social = isSocialSubject(kind, format);
+  const socialCounts = {
+    likes: reactions.filter((r) => r.like).length,
+    comments: reactions.filter((r) => r.comment).length,
+    shares: reactions.filter((r) => r.share).length,
+  };
 
   const filtered = useMemo(() => {
     let rs = reactions;
@@ -288,6 +295,36 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
           </div>
         </div>
       </section>
+
+      {/* Social engagement — likes / comments / shares */}
+      {social && (
+        <section className="card socialcard">
+          <div className="soc-head">
+            <h2 className="step" style={{ margin: 0 }}>Predicted social engagement</h2>
+            <span className="note">out of {summary.n} in the room</span>
+          </div>
+          <div className="soc-metrics">
+            {([
+              { k: "likes", label: "Likes", icon: "♥", color: "#e0245e", n: socialCounts.likes },
+              { k: "comments", label: "Comments", icon: "💬", color: "#1d9bf0", n: socialCounts.comments },
+              { k: "shares", label: "Shares", icon: "↗", color: "#00ba7c", n: socialCounts.shares },
+            ] as const).map((m) => {
+              const pct = Math.round((m.n / (summary.n || 1)) * 100);
+              return (
+                <div className="soc-metric" key={m.k}>
+                  <span className="soc-icon" style={{ color: m.color }}>{m.icon}</span>
+                  <div className="soc-n">{m.n} <span>· {pct}%</span></div>
+                  <div className="soc-l">{m.label}</div>
+                  <div className="soc-bar"><span style={{ width: `${pct}%`, background: m.color }} /></div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="soc-footer">
+            A mock of how the post would perform: <b style={{ color: "#e0245e" }}>♥ {socialCounts.likes}</b> · <b style={{ color: "#1d9bf0" }}>💬 {socialCounts.comments}</b> · <b style={{ color: "#00ba7c" }}>↗ {socialCounts.shares}</b> from this room of {summary.n}.
+          </div>
+        </section>
+      )}
 
       {/* Sentiment & likelihood */}
       <details className="rsec card" id="sec-sentiment" open>
