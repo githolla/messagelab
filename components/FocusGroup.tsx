@@ -42,6 +42,44 @@ function segColor(id: string): string {
   return SEG_COLORS[h % SEG_COLORS.length];
 }
 
+// A distinct accent per industry so switching verticals visibly re-themes the room.
+const INDUSTRY_ACCENTS = ["#2b45c4", "#0f766e", "#b45309", "#7c3aed", "#be123c", "#0369a1", "#4d7c0f", "#a21caf", "#c2410c", "#15803d", "#4338ca", "#0e7490"];
+function accentFor(key: string): string {
+  const idx = INDUSTRIES.findIndex((i) => i.key === key);
+  return INDUSTRY_ACCENTS[(idx < 0 ? 0 : idx) % INDUSTRY_ACCENTS.length];
+}
+
+// Format-adaptive labels + scaffolded placeholders for Step 2.
+interface FmtMeta { titleLabel: string; titlePlaceholder: string; bodyLabel: string; bodyPlaceholder: string; }
+function fmtMeta(format: string, def: { placeholder: string }): FmtMeta {
+  switch (format) {
+    case "Email":
+      return { titleLabel: "Subject line", titlePlaceholder: "e.g. Your July report is ready — 3 things to check",
+        bodyLabel: "Email body", bodyPlaceholder: "Preheader / preview text…\n\nHi [First name],\n\n[Opening hook]\n[The value or offer]\n[One proof point or detail]\n\n[Primary call-to-action]\n\n— [Sender]" };
+    case "Direct mail":
+      return { titleLabel: "Headline / teaser", titlePlaceholder: "e.g. A letter for someone who's helped before",
+        bodyLabel: "Letter copy", bodyPlaceholder: "Dear [Name],\n\n[Personal opening]\n[The story / the need]\n[The ask — be specific about the amount and impact]\n\n[Signature]\n\nP.S. [The P.S. people actually read first]" };
+    case "Social post":
+      return { titleLabel: "Hook / first line", titlePlaceholder: "e.g. We almost didn't ship this…",
+        bodyLabel: "Post copy", bodyPlaceholder: "[Scroll-stopping hook]\n\n[The point in a line or two]\n\n[Call-to-action]\n\n#hashtags" };
+    case "Landing page":
+      return { titleLabel: "Headline", titlePlaceholder: "e.g. Ship your message before it's real",
+        bodyLabel: "Page copy", bodyPlaceholder: "Headline: [the big promise]\nSubhead: [who it's for + why it matters]\n\n[3 key benefits]\n[Social proof]\n\nPrimary CTA: [button text]" };
+    case "Ad / banner":
+      return { titleLabel: "Headline", titlePlaceholder: "e.g. Test it on 1,000 customers. Today.",
+        bodyLabel: "Ad copy", bodyPlaceholder: "Headline: […]\nBody: […]\nCTA: […]\nWhere it runs: [platform / placement]" };
+    case "Pitch deck":
+      return { titleLabel: "Deck title", titlePlaceholder: "e.g. Acme — Series A",
+        bodyLabel: "Narrative / key slides", bodyPlaceholder: "Problem → Solution → Why now → How it works → Traction / proof → The ask. Paste the narrative or your key slides…" };
+    case "One-pager":
+      return { titleLabel: "Title", titlePlaceholder: "e.g. Acme Insights — one-pager",
+        bodyLabel: "One-pager copy", bodyPlaceholder: "Headline, the problem, your solution, proof, and the ask — the whole thing on one page…" };
+    default:
+      return { titleLabel: "Title / name", titlePlaceholder: "e.g. Acme Insights — real-time analytics for ops teams",
+        bodyLabel: "Details", bodyPlaceholder: def.placeholder };
+  }
+}
+
 // A short deterministic path for the no-key demo so the walkthrough UI has
 // something to show without launching a browser.
 const DEMO_HOPS = [
@@ -128,6 +166,8 @@ export default function FocusGroup() {
   const industryLabel = INDUSTRIES.find((i) => i.key === industry)?.label ?? "general";
   const isWalk = kind === "website" && siteMode === "walk";
   const walkCount = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
+  const industryAccent = accentFor(industry);
+  const fm = fmtMeta(format, def);
 
   function changeIndustry(k: string) {
     setIndustry(k);
@@ -365,12 +405,17 @@ export default function FocusGroup() {
 
       {/* 2 · The subject */}
       <section className="card">
-        <h2 className="step">2 · {def.subjectLabel}</h2>
-        <p className="sub">Draft it here or paste from your doc. {def.images ? "Attach prototypes, mockups, or screenshots to have the panel react to the visuals." : ""}</p>
-        <label className="fld" htmlFor="fg-title">Title / name <span className="note" style={{ fontWeight: 400 }}>· optional</span></label>
-        <input id="fg-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Acme Insights — real-time analytics for ops teams" disabled={running} />
-        <label className="fld" htmlFor="fg-body" style={{ marginTop: 12 }}>Details</label>
-        <textarea id="fg-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} placeholder={def.placeholder} disabled={running} />
+        <h2 className="step">2 · {def.subjectLabel}{format ? <span className="fmt-tag" style={{ background: industryAccent }}>{format}</span> : null}</h2>
+        <p className="sub">
+          {format
+            ? `Structured for ${/^[aeiou]/i.test(format) ? "an" : "a"} ${format.toLowerCase()} — fill in the scaffold or paste your own. `
+            : "Draft it here or paste from your doc. "}
+          {def.images ? "Attach prototypes, mockups, or screenshots to have the panel react to the visuals." : ""}
+        </p>
+        <label className="fld" htmlFor="fg-title">{fm.titleLabel} <span className="note" style={{ fontWeight: 400 }}>· optional</span></label>
+        <input id="fg-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={fm.titlePlaceholder} disabled={running} />
+        <label className="fld" htmlFor="fg-body" style={{ marginTop: 12 }}>{fm.bodyLabel}</label>
+        <textarea id="fg-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} placeholder={fm.bodyPlaceholder} disabled={running} />
         {kind === "website" && (
           <div className="sitemode" style={{ marginTop: 14 }}>
             <div className="seg" role="group" aria-label="How the panel reviews the site" style={{ marginBottom: 0 }}>
@@ -458,7 +503,7 @@ export default function FocusGroup() {
           </div>
         </div>
         {/* Live recipe — updates as the terms of the group change */}
-        <div className="recipe" style={{ marginTop: 12 }}>
+        <div className="recipe" style={{ marginTop: 12, borderLeft: `4px solid ${industryAccent}` }}>
           <div className="recipe-lead">
             This is a <b>{plannedSize.toLocaleString()}-person {industryLabel.toLowerCase()}</b> panel
             {format ? <> reviewing {/^[aeiou]/i.test(format) ? "an" : "a"} <b>{format.toLowerCase()}</b></> : null} — across{" "}
@@ -466,7 +511,7 @@ export default function FocusGroup() {
             {plannedSize > LIVE_MAX && <> Live runs a representative {LIVE_MAX}; demo runs the whole panel.</>}
           </div>
           <div className="recipe-chips">
-            <span className="rchip strong">{def.label}</span>
+            <span className="rchip strong" style={{ background: industryAccent, borderColor: industryAccent }}>{def.label}</span>
             {format && <span className="rchip">{format}</span>}
             <span className="rchip">{industryLabel}</span>
             <span className="rchip">{plannedSize.toLocaleString()} agents</span>

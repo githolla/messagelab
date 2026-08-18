@@ -1195,6 +1195,7 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .segpct { font-size: 12px; font-weight: 700; color: var(--ink-2); width: 38px; text-align: right; flex-shrink: 0; }
 
 /* ===== Format chips ===== */
+.fmt-tag { display: inline-block; margin-left: 10px; vertical-align: middle; font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #fff; border-radius: 999px; padding: 3px 10px; }
 .fmtchips { display: flex; flex-wrap: wrap; gap: 8px; }
 .fmtchip { border: 1px solid var(--line); background: var(--card); color: var(--ink-2); border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color .12s, background .12s, color .12s; }
 .fmtchip:hover:not(:disabled) { border-color: var(--primary-line); color: var(--ink); }
