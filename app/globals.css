@@ -1193,6 +1193,45 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .segcount input { width: 58px; height: 34px; border: none; border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center; font: inherit; font-weight: 600; font-size: 14px; background: var(--paper, #fff); color: var(--ink); border-radius: 0; padding: 0; -moz-appearance: textfield; }
 .segcount input::-webkit-outer-spin-button, .segcount input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .segpct { font-size: 12px; font-weight: 700; color: var(--ink-2); width: 38px; text-align: right; flex-shrink: 0; }
+
+/* ===== Format chips ===== */
+.fmtchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fmtchip { border: 1px solid var(--line); background: var(--card); color: var(--ink-2); border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color .12s, background .12s, color .12s; }
+.fmtchip:hover:not(:disabled) { border-color: var(--primary-line); color: var(--ink); }
+.fmtchip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.fmtchip:disabled { opacity: .5; cursor: default; }
+
+/* ===== Live recipe summary ===== */
+.recipe { border: 1px solid var(--primary-line); background: var(--primary-tint); border-radius: var(--radius); padding: 16px 18px; }
+.recipe-lead { font-size: 15px; line-height: 1.55; color: var(--ink); }
+.recipe-lead b { font-weight: 700; }
+.recipe-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.rchip { font-size: 11.5px; font-weight: 650; color: var(--ink-2); background: var(--card); border: 1px solid var(--primary-line); border-radius: 999px; padding: 3px 11px; }
+.rchip.strong { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* ===== Segment persona cards ===== */
+.panelcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 12px; }
+.pseg { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); padding: 14px; transition: box-shadow .15s, border-color .15s; }
+.pseg:hover { box-shadow: var(--shadow-sm); border-color: var(--primary-line); }
+.pseg-top { display: flex; align-items: flex-start; gap: 11px; }
+.pseg-av { width: 40px; height: 40px; border-radius: 11px; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+.pseg-id { flex: 1; min-width: 0; }
+.pseg-name { width: 100%; font-weight: 660; font-size: 14.5px; color: var(--ink); border: 1px solid transparent; border-radius: 7px; padding: 3px 6px; margin: -3px -6px 2px; background: transparent; font-family: inherit; }
+.pseg-name:hover, .pseg-name:focus { border-color: var(--line); background: var(--bg); outline: none; }
+.pseg-how { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.pseg-x { border: 0; background: transparent; color: var(--ink-3); font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 6px; flex-shrink: 0; }
+.pseg-x:hover:not(:disabled) { background: var(--danger-tint); color: var(--danger); }
+.pseg-x:disabled { opacity: .3; cursor: default; }
+.pseg-bar { height: 7px; border-radius: 4px; background: var(--bg-2); overflow: hidden; margin: 14px 0 12px; }
+.pseg-bar > span { display: block; height: 100%; border-radius: 4px; transition: width .2s ease; }
+.pseg-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pseg-pct { font-size: 12px; color: var(--ink-2); text-align: right; }
+.pseg-pct b { color: var(--ink); font-weight: 700; }
+.pseg-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 130px; border: 1.5px dashed var(--line); border-radius: var(--radius); background: transparent; color: var(--ink-2); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+.pseg-add:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: var(--primary-tint); }
+.pseg-add:disabled { opacity: .5; cursor: default; }
+.pseg-add-i { font-size: 22px; line-height: 1; }
+
 .pb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .pb-actions .note { margin-left: auto; }
 @media (max-width: 620px) {

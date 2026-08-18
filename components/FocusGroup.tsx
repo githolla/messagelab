@@ -31,6 +31,17 @@ const WALK_MAX = 6; // live browser sessions are heavy — keep the walking part
 const WALK_STEPS = 5;
 const WALK_CONCURRENCY = 2;
 
+// The form the thing under test takes — reshapes the recipe + what the panel weighs.
+const FORMATS = ["Email", "Direct mail", "Social post", "Landing page", "Ad / banner", "Pitch deck", "One-pager", "Other"] as const;
+
+// Categorical avatar colors for the segment cards (white monogram on top — all dark enough).
+const SEG_COLORS = ["#2b45c4", "#0f766e", "#7c3aed", "#b45309", "#9a3412", "#1d4ed8", "#4d7c0f", "#a21caf", "#0369a1", "#b91c1c"];
+function segColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return SEG_COLORS[h % SEG_COLORS.length];
+}
+
 // A short deterministic path for the no-key demo so the walkthrough UI has
 // something to show without launching a browser.
 const DEMO_HOPS = [
@@ -103,6 +114,7 @@ export default function FocusGroup() {
   const [fetching, setFetching] = useState(false);
   const [siteMode, setSiteMode] = useState<"walk" | "react">("walk");
   const [walkers, setWalkers] = useState(4);
+  const [format, setFormat] = useState<string>("");
   const [segments, setSegments] = useState<PanelSegment[]>(() => autoSegments("general", undefined, DEFAULT_TOTAL));
 
   const [running, setRunning] = useState(false);
@@ -126,6 +138,19 @@ export default function FocusGroup() {
   }
   function setCount(id: string, n: number) {
     setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, count: Math.max(0, Math.min(DEMO_MAX, Math.round(n) || 0)) } : s)));
+  }
+  function renameSeg(id: string, name: string) {
+    setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  }
+  function removeSeg(id: string) {
+    setSegments((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
+  }
+  function addSeg() {
+    setSegments((prev) => {
+      const avg = Math.max(1, Math.round(prev.reduce((t, s) => t + s.count, 0) / (prev.length || 1)));
+      const id = `custom-${Date.now()}-${prev.length}`;
+      return [...prev, { id, name: "New segment", how: "Describe this part of the audience", base: 0.5, count: avg }];
+    });
   }
 
   async function onImages(files: FileList | null) {
@@ -174,7 +199,7 @@ export default function FocusGroup() {
   }
 
   function subjectOf(): FocusSubject {
-    return { kind, industry, productType: kind === "product" ? productType : "", title, body, images: def.images ? images : [] };
+    return { kind, industry, productType: kind === "product" ? productType : "", format, title, body, images: def.images ? images : [] };
   }
 
   // Hand the completed run to the dedicated report page (no DB in v1 — the run
@@ -314,7 +339,7 @@ export default function FocusGroup() {
         </div>
         <div className="grid2" style={{ marginTop: 14 }}>
           <div>
-            <label className="fld" htmlFor="fg-industry">Industry</label>
+            <label className="fld" htmlFor="fg-industry">Industry <span className="note" style={{ fontWeight: 400 }}>· sets who&apos;s in the room</span></label>
             <select id="fg-industry" value={industry} onChange={(e) => changeIndustry(e.target.value)} disabled={running}>
               {INDUSTRIES.map((i) => <option key={i.key} value={i.key}>{i.label}</option>)}
             </select>
@@ -327,6 +352,14 @@ export default function FocusGroup() {
               </select>
             </div>
           )}
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <label className="fld">Format <span className="note" style={{ fontWeight: 400 }}>· what form is it in? (optional — shapes what the room reacts to)</span></label>
+          <div className="fmtchips">
+            {FORMATS.map((f) => (
+              <button key={f} type="button" className={`fmtchip ${format === f ? "on" : ""}`} aria-pressed={format === f} onClick={() => setFormat((c) => (c === f ? "" : f))} disabled={running}>{f}</button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -424,27 +457,54 @@ export default function FocusGroup() {
             ))}
           </div>
         </div>
-        <p className="projn" style={{ marginTop: 4 }}>
-          A <b>{plannedSize.toLocaleString()}-person {industryLabel.toLowerCase()}</b> panel of persona-agents across{" "}
-          {segments.length} segments — each one reacts individually and in character, not as an average.
-          {plannedSize > LIVE_MAX && <> Live runs a representative {LIVE_MAX}; demo runs the whole panel.</>}
-        </p>
-        <div className="segeditor" style={{ marginTop: 12 }}>
-          {segments.map((s) => (
-            <div className="segrow" key={s.id}>
-              <span className="ico">{monogram(s.name)}</span>
-              <div className="segmain">
-                <div className="segname" style={{ padding: "4px 0" }}>{s.name}</div>
-                <div className="seghow" style={{ padding: 0 }}>{s.how}</div>
+        {/* Live recipe — updates as the terms of the group change */}
+        <div className="recipe" style={{ marginTop: 12 }}>
+          <div className="recipe-lead">
+            This is a <b>{plannedSize.toLocaleString()}-person {industryLabel.toLowerCase()}</b> panel
+            {format ? <> reviewing {/^[aeiou]/i.test(format) ? "an" : "a"} <b>{format.toLowerCase()}</b></> : null} — across{" "}
+            <b>{segments.length} segments</b>, each reacting individually and in character, not as an average.
+            {plannedSize > LIVE_MAX && <> Live runs a representative {LIVE_MAX}; demo runs the whole panel.</>}
+          </div>
+          <div className="recipe-chips">
+            <span className="rchip strong">{def.label}</span>
+            {format && <span className="rchip">{format}</span>}
+            <span className="rchip">{industryLabel}</span>
+            <span className="rchip">{plannedSize.toLocaleString()} agents</span>
+            <span className="rchip">{segments.length} segments</span>
+          </div>
+        </div>
+
+        {/* One live card per segment — adjusts as the user changes the group */}
+        <div className="panelcards" style={{ marginTop: 14 }}>
+          {segments.map((s) => {
+            const pct = Math.round((s.count / (plannedSize || 1)) * 100);
+            const color = segColor(s.id);
+            return (
+              <div className="pseg" key={s.id}>
+                <div className="pseg-top">
+                  <span className="pseg-av" style={{ background: color }}>{monogram(s.name || "?")}</span>
+                  <div className="pseg-id">
+                    <input className="pseg-name" value={s.name} onChange={(e) => renameSeg(s.id, e.target.value)} disabled={running} aria-label="Segment name" />
+                    <div className="pseg-how">{s.how}</div>
+                  </div>
+                  <button className="pseg-x" onClick={() => removeSeg(s.id)} disabled={running || segments.length <= 1} aria-label="Remove segment">×</button>
+                </div>
+                <div className="pseg-bar"><span style={{ width: `${pct}%`, background: color }} /></div>
+                <div className="pseg-foot">
+                  <div className="segcount">
+                    <button onClick={() => setCount(s.id, s.count - 1)} disabled={running} aria-label="Fewer">−</button>
+                    <input type="number" min={0} value={s.count} onChange={(e) => setCount(s.id, Number(e.target.value))} disabled={running} />
+                    <button onClick={() => setCount(s.id, s.count + 1)} disabled={running} aria-label="More">+</button>
+                  </div>
+                  <span className="pseg-pct"><b>{pct}%</b> of the room · {s.count} {s.count === 1 ? "agent" : "agents"}</span>
+                </div>
               </div>
-              <div className="segcount">
-                <button onClick={() => setCount(s.id, s.count - 1)} disabled={running} aria-label="Fewer">−</button>
-                <input type="number" min={0} value={s.count} onChange={(e) => setCount(s.id, Number(e.target.value))} disabled={running} />
-                <button onClick={() => setCount(s.id, s.count + 1)} disabled={running} aria-label="More">+</button>
-              </div>
-              <span className="segpct">{Math.round((s.count / (plannedSize || 1)) * 100)}%</span>
-            </div>
-          ))}
+            );
+          })}
+          <button className="pseg-add" onClick={addSeg} disabled={running}>
+            <span className="pseg-add-i">＋</span>
+            Add a segment
+          </button>
         </div>
 
         <div className="runbar" style={{ marginTop: 16 }}>

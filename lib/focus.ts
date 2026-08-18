@@ -123,6 +123,7 @@ export interface FocusSubject {
   kind: FocusKind;
   industry: string;
   productType: string;
+  format?: string; // the form it takes (email, direct mail, social post, landing page…)
   title: string;
   body: string;
   images: string[]; // data URLs

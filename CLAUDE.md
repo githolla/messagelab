@@ -43,6 +43,13 @@ a segment-level results dashboard. "Message Lab" is a working title.
   raised them; segments drill down to their reactions (stacked sentiment bar);
   a print stylesheet expands everything and hides the chrome. Sentiment uses a
   diverging scale with a gray neutral midpoint (`#767c85`).
+  Builder: Step 1 picks the kind + industry + an optional **format** chip
+  (email / direct mail / social post / landing page / ad / deck / one-pager),
+  which flows into `FocusSubject.format` and the model intro. Step 3 renders one
+  live **persona card per segment** (colored avatar, editable name, "how", a
+  share bar in the segment's color, a headcount stepper, "% of the room"), an
+  "Add a segment" card, and a live recipe banner — all re-derive as the user
+  changes industry (`autoSegments`), size preset (`scaleSegments`), or edits.
   For the **website** kind there are two site modes: "React to a screenshot"
   (paste a URL → `/api/screenshot` headless-captures it, or upload one; whole
   panel reacts to that one view) and "Send the panel through the site" — a live

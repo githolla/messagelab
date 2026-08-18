@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const dims = persona.dims ? Object.entries(persona.dims).map(([k, v]) => `${k}: ${v}`).join("\n") : "";
   const system = `You are ${persona.name}, a real member of a focus group in the ${subject.industry || "general"} space. Your type: ${persona.segment}${persona.how ? ` — ${persona.how}` : ""}.${dims ? `\n${dims}` : ""}\nReact as THIS specific person — bring your own priorities, skepticism, and mood. Honest, blunt reactions are what the panel is for; "I'd pass" is a valid answer.`;
 
-  const intro = `You're reviewing a ${def.label.toLowerCase()}${subject.productType ? ` (a ${subject.productType})` : ""}. Weigh it on: ${def.lens}.`;
+  const intro = `You're reviewing a ${def.label.toLowerCase()}${subject.productType ? ` (a ${subject.productType})` : ""}${subject.format ? `, in the form of a ${subject.format.toLowerCase()}` : ""}. Weigh it on: ${def.lens}.`;
   const q = `## What you're reviewing${subject.title ? `\nTitle: ${subject.title}` : ""}\n\n${subject.body}\n\n## Give your honest reaction
 1. sentiment — one of: "love" | "like" | "neutral" | "skeptical" | "reject".
 2. likelihood — how likely YOU are to ${def.verb} (1 = not at all, 5 = definitely).
