@@ -6,6 +6,7 @@
 // reaction to a model read.
 
 import { fnv1a, fnv1aFloat, clamp } from "./util";
+import { wilson } from "./stats";
 
 export type FocusKind = "product" | "website" | "gtm" | "sales" | "social" | "concept" | "brand";
 
@@ -124,6 +125,7 @@ export interface FocusSubject {
   industry: string;
   productType: string;
   format?: string; // the form it takes (email, direct mail, social post, landing page…)
+  goal?: string; // the decision/question the run is meant to answer
   title: string;
   body: string;
   images: string[]; // data URLs
@@ -273,6 +275,9 @@ export interface FocusSummary {
   likelihoodDist: number[]; // index 0..4 → likelihood 1..5
   verdict: FocusVerdict;
   headline: string;
+  readline: string; // one plain sentence fusing verdict + margin + sample
+  tooClose: boolean; // positive/negative Wilson intervals overlap → no true winner
+  positiveCI: { low: number; high: number }; // Wilson band on the positive share
   themes: { resonates: Theme[]; concerns: Theme[]; questions: Theme[]; suggestions: Theme[] };
   bySegment: SegmentBreakdown[];
 }
@@ -308,11 +313,27 @@ export function summarizeFocus(reactions: FocusReaction[], kind: FocusKind): Foc
   const positivePct = Math.round((positive / n) * 100);
   const negativePct = Math.round((negative / n) * 100);
 
+  // Honest confidence: if the positive and negative Wilson intervals overlap,
+  // there is no defensible winner — the room is too close to call.
+  const positiveCI = wilson(positive, n);
+  const negativeCI = wilson(negative, n);
+  const margin = positivePct - negativePct;
+  // Genuinely too close only when the Wilson intervals overlap AND the raw lean
+  // is modest — otherwise a clear lean at small n would be over-hedged away.
+  const ciOverlap = !(positiveCI.low > negativeCI.high || negativeCI.low > positiveCI.high);
+  const tooClose = ciOverlap && Math.abs(margin) <= 15;
+
   const verdict: FocusVerdict =
     avgSentiment >= 4 && positivePct >= 55 ? "greenlight"
       : avgSentiment >= 3.4 ? "promising"
         : avgSentiment >= 2.7 ? "mixed"
           : "rework";
+
+  // A plain read-sentence that never overstates a coin-flip.
+  const readline =
+    tooClose || Math.abs(margin) <= 8
+      ? `The room is split — ${positivePct}% positive, ${negativePct}% negative. Read this as a signal, not a verdict.`
+      : `The room leans ${margin > 0 ? "positive" : "negative"} ${Math.abs(margin) > 25 ? "decisively" : "but not unanimously"} — ${positivePct}% positive vs ${negativePct}% negative across ${n} agents.`;
 
   const def = kindDef(kind);
   const headline =
@@ -347,6 +368,9 @@ export function summarizeFocus(reactions: FocusReaction[], kind: FocusKind): Foc
     likelihoodDist,
     verdict,
     headline,
+    readline,
+    tooClose,
+    positiveCI,
     themes: {
       resonates: themeCount(reactions.map((r) => r.resonates)),
       concerns: themeCount(reactions.map((r) => r.concern)),
@@ -355,4 +379,30 @@ export function summarizeFocus(reactions: FocusReaction[], kind: FocusKind): Foc
     },
     bySegment,
   };
+}
+
+/**
+ * Pick a spread of the most quotable reactions for the "In their words" reel:
+ * strong sentiment + a concrete (not too long) quote + variety across segments.
+ * Deterministic (fnv1a tie-break) so the demo is stable.
+ */
+export function selectReel(reactions: FocusReaction[], max = 6): FocusReaction[] {
+  const scored = reactions
+    .filter((r) => (r.quote || "").trim().length > 8)
+    .map((r) => {
+      const extreme = Math.abs(SENTIMENT_SCORE[r.sentiment] - 3); // love/reject score highest
+      const qlen = (r.quote || "").trim().length;
+      const lenScore = qlen > 12 && qlen < 170 ? 1 : 0;
+      return { r, salience: extreme * 2 + lenScore + fnv1aFloat(r.personaId + "reel") * 0.5 };
+    })
+    .sort((a, b) => b.salience - a.salience);
+  const perSeg = new Map<string, number>();
+  const out: FocusReaction[] = [];
+  for (const { r } of scored) {
+    if ((perSeg.get(r.segment) || 0) >= 2) continue; // spread across segments
+    perSeg.set(r.segment, (perSeg.get(r.segment) || 0) + 1);
+    out.push(r);
+    if (out.length >= max) break;
+  }
+  return out;
 }

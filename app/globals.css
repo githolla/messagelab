@@ -1455,6 +1455,49 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .rc-jump a { font-size: 12.5px; font-weight: 600; color: var(--ink, #0f172a); background: var(--surface-2, #f1f5f9); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; text-decoration: none; }
 .rc-jump a:hover { border-color: var(--accent, #a3e635); }
 
+/* Question-tested / answered block */
+.rc-qa { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); }
+@media (max-width: 620px) { .rc-qa { grid-template-columns: 1fr; } }
+.rc-qa-k { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.rc-qa p { margin: 4px 0 0; font-size: 14.5px; color: var(--ink); line-height: 1.5; }
+
+/* Provenance chip */
+.provchip { display: inline-flex; align-items: center; gap: 7px; margin-top: 14px; font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+.provchip i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+.provchip.thin i { background: #d98324; } .provchip.demo i { background: #b45309; }
+.provchip.strong i { background: var(--primary); } .provchip.ok i { background: var(--series-a); }
+
+/* Clickable stat tiles ("receipts") */
+.fg-stat.clickable { border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; text-align: left; background: transparent; font: inherit; padding: 8px 10px; transition: border-color .12s, background .12s; position: relative; }
+.fg-stat.clickable:hover { border-color: var(--primary-line); background: var(--primary-tint); }
+.fg-stat-see { font-size: 11px; font-weight: 600; color: var(--primary); margin-top: 3px; opacity: 0; transition: opacity .12s; }
+.fg-stat.clickable:hover .fg-stat-see { opacity: 1; }
+.fg-stat-l .ci { font-weight: 600; color: var(--ink-3); }
+
+/* In-their-words highlight reel */
+.reel { margin-top: 18px; }
+.reel-hero { position: relative; padding: 16px 18px 16px 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); cursor: pointer; }
+.reel-hero:hover { border-color: var(--primary-line); }
+.reel-mark { position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 4px; }
+.reel-hero blockquote { margin: 0; font-family: var(--serif); font-style: italic; font-size: 21px; line-height: 1.4; color: var(--ink); }
+.reel-hero cite { display: block; margin-top: 8px; font-style: normal; font-size: 12.5px; color: var(--ink-2); }
+.reel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 10px; margin-top: 10px; }
+.reel-chip { text-align: left; font-size: 12.5px; line-height: 1.45; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; padding: 9px 11px; cursor: pointer; }
+.reel-chip:hover { border-color: var(--primary-line); }
+.reel-chip span { display: block; margin-top: 5px; font-size: 11.5px; color: var(--ink-3); }
+
+/* Room active-filter bar */
+.roomactive { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); margin-bottom: 10px; }
+.roomactive b { color: var(--ink); }
+.roomclear { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.roomclear:hover { border-color: var(--danger-line); color: var(--danger); }
+
+/* Decision callouts */
+.callout { border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13.5px; line-height: 1.5; color: var(--ink); margin-bottom: 12px; }
+.callout.dissent { border: 1px solid var(--primary-line); background: var(--primary-tint); border-left: 4px solid var(--primary); }
+.callout.calm { border: 1px solid var(--good-tint); background: var(--good-tint); border-left: 4px solid var(--good-ink); }
+.segdrill.thin { opacity: .72; }
+
 /* Collapsible report section */
 .rsec { padding: 0; }
 .rsec-sum { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; padding: 16px 20px; user-select: none; }

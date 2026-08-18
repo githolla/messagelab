@@ -153,6 +153,7 @@ export default function FocusGroup() {
   const [siteMode, setSiteMode] = useState<"walk" | "react">("walk");
   const [walkers, setWalkers] = useState(4);
   const [format, setFormat] = useState<string>("");
+  const [goal, setGoal] = useState<string>("");
   const [segments, setSegments] = useState<PanelSegment[]>(() => autoSegments("general", undefined, DEFAULT_TOTAL));
 
   const [running, setRunning] = useState(false);
@@ -239,7 +240,7 @@ export default function FocusGroup() {
   }
 
   function subjectOf(): FocusSubject {
-    return { kind, industry, productType: kind === "product" ? productType : "", format, title, body, images: def.images ? images : [] };
+    return { kind, industry, productType: kind === "product" ? productType : "", format, goal, title, body, images: def.images ? images : [] };
   }
 
   // Hand the completed run to the dedicated report page (no DB in v1 — the run
@@ -248,7 +249,7 @@ export default function FocusGroup() {
     try {
       sessionStorage.setItem(
         "fg-report",
-        JSON.stringify({ reactions: rs, kind, industry, url: url.trim(), isDemo: demo }),
+        JSON.stringify({ reactions: rs, kind, industry, url: url.trim(), isDemo: demo, goal: goal.trim(), format }),
       );
     } catch {
       /* quota/availability — navigation below still no-ops gracefully */
@@ -400,6 +401,10 @@ export default function FocusGroup() {
               <button key={f} type="button" className={`fmtchip ${format === f ? "on" : ""}`} aria-pressed={format === f} onClick={() => setFormat((c) => (c === f ? "" : f))} disabled={running}>{f}</button>
             ))}
           </div>
+        </div>
+        <div className="goalfield" style={{ marginTop: 14 }}>
+          <label className="fld" htmlFor="fg-goal">What are you trying to learn? <span className="note" style={{ fontWeight: 400 }}>· optional — the report answers this directly</span></label>
+          <input id="fg-goal" type="text" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="e.g. Will lapsed donors respond to a matching-gift hook?" disabled={running} />
         </div>
       </section>
 

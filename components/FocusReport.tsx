@@ -6,8 +6,10 @@ import { monogram } from "@/lib/archetypes";
 import {
   kindDef,
   summarizeFocus,
+  selectReel,
   SENTIMENTS,
   SENTIMENT_LABEL,
+  SENTIMENT_SCORE,
   FOCUS_VERDICT_LABEL,
   type FocusKind,
   type FocusReaction,
@@ -38,21 +40,54 @@ export interface FocusReportData {
   industry: string;
   url: string;
   isDemo: boolean;
+  goal?: string;
+  format?: string;
 }
 
-export default function FocusReport({ reactions, kind, industry, url, isDemo }: FocusReportData) {
+type StatFilter = "" | "positive" | "negative" | "act";
+const STAT_LABEL: Record<Exclude<StatFilter, "">, string> = {
+  positive: "positive (love / like)", negative: "negative (skeptical / reject)", act: "would take action (4–5/5)",
+};
+
+export default function FocusReport({ reactions, kind, industry, url, isDemo, goal, format }: FocusReportData) {
   const [openR, setOpenR] = useState<FocusReaction | null>(null);
   const [segFilter, setSegFilter] = useState<string>("all");
+  const [statFilter, setStatFilter] = useState<StatFilter>("");
 
   const def = kindDef(kind);
   const industryLabel = INDUSTRIES.find((i) => i.key === industry)?.label ?? "general";
   const summary = useMemo(() => summarizeFocus(reactions, kind), [reactions, kind]);
   const isWalkReport = useMemo(() => reactions.some((r) => r.journey && r.journey.length > 1), [reactions]);
+  const reel = useMemo(() => selectReel(reactions, 5), [reactions]);
 
-  const filtered = useMemo(
-    () => (segFilter === "all" ? reactions : reactions.filter((r) => r.segment === segFilter)),
-    [reactions, segFilter],
-  );
+  const filtered = useMemo(() => {
+    let rs = reactions;
+    if (statFilter === "positive") rs = rs.filter((r) => r.sentiment === "love" || r.sentiment === "like");
+    else if (statFilter === "negative") rs = rs.filter((r) => r.sentiment === "skeptical" || r.sentiment === "reject");
+    else if (statFilter === "act") rs = rs.filter((r) => r.likelihood >= 4);
+    if (segFilter !== "all") rs = rs.filter((r) => r.segment === segFilter);
+    return rs;
+  }, [reactions, segFilter, statFilter]);
+
+  // "Every number is a receipt" — click a stat to see the agents behind it.
+  function openStat(key: StatFilter) {
+    setStatFilter(key);
+    setSegFilter("all");
+    setTimeout(() => {
+      const el = document.getElementById("sec-room");
+      if (el) { (el as HTMLDetailsElement).open = true; el.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    }, 30);
+  }
+  // Panel mean + most-dissenting segment, for the By-segment callout.
+  const panelMean = summary.avgSentiment;
+  const dissent = useMemo(() => {
+    if (summary.bySegment.length < 2) return null;
+    let top = summary.bySegment[0];
+    for (const s of summary.bySegment) if (Math.abs(s.avgSentiment - panelMean) > Math.abs(top.avgSentiment - panelMean)) top = s;
+    const gap = top.avgSentiment - panelMean;
+    return Math.abs(gap) >= 0.8 ? { seg: top, gap } : null;
+  }, [summary, panelMean]);
+  const thinCut = summary.n / (summary.bySegment.length || 1) / 2;
 
   const segmentDetail = useMemo(
     () =>
@@ -110,20 +145,53 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo }: 
             <button className="btn ghost rc-print" onClick={() => window.print()}>Print / PDF</button>
           </div>
         </div>
-        <div className={`rc-verdict ${summary.verdict}`}>
-          <span className={`fg-badge ${summary.verdict}`}>{FOCUS_VERDICT_LABEL[summary.verdict]}</span>
-          <p className="rc-headline">{summary.headline}</p>
+        <div className={`rc-verdict ${summary.tooClose ? "mixed" : summary.verdict}`}>
+          <span className={`fg-badge ${summary.tooClose ? "mixed" : summary.verdict}`}>{summary.tooClose ? "Too close to call" : FOCUS_VERDICT_LABEL[summary.verdict]}</span>
+          <p className="rc-headline">{summary.readline}</p>
         </div>
+        {goal && goal.trim() && (
+          <div className="rc-qa">
+            <div><span className="rc-qa-k">The question we tested</span><p>{goal.trim()}</p></div>
+            <div><span className="rc-qa-k">What the room said</span><p>{summary.headline}</p></div>
+          </div>
+        )}
         <p className="rc-meta">
-          <b>{summary.n.toLocaleString()} persona-agents</b> · {industryLabel} · {def.label}
+          <b>{summary.n.toLocaleString()} persona-agents</b> · {industryLabel} · {def.label}{format ? ` · ${format}` : ""}
           {isWalkReport && url.trim() ? <> · walkthrough of <span className="rc-url">{url.trim()}</span></> : null}
         </p>
+        <ProvenanceChip n={summary.n} isDemo={isDemo} />
         <div className="fg-stats">
-          <div className="fg-stat"><div className="fg-stat-n">{summary.positivePct}%</div><div className="fg-stat-l">Positive</div></div>
+          <button className="fg-stat clickable" onClick={() => openStat("positive")} title="See the positive agents">
+            <div className="fg-stat-n">{summary.positivePct}%</div>
+            <div className="fg-stat-l">Positive <span className="ci">±{Math.round(((summary.positiveCI.high - summary.positiveCI.low) / 2) * 100)}</span></div>
+            <div className="fg-stat-see">see the {summary.sentimentDist.filter((s) => s.key === "love" || s.key === "like").reduce((t, s) => t + s.count, 0)} →</div>
+          </button>
           <div className="fg-stat"><div className={`fg-stat-n ${sentBand(summary.avgSentiment)}`}>{summary.avgSentiment.toFixed(1)}<span>/5</span></div><div className="fg-stat-l">Avg sentiment</div></div>
-          <div className="fg-stat"><div className={`fg-stat-n ${sentBand(summary.avgLikelihood)}`}>{summary.avgLikelihood.toFixed(1)}<span>/5</span></div><div className="fg-stat-l">{def.actionLabel}</div></div>
+          <button className="fg-stat clickable" onClick={() => openStat("act")} title="See who'd act">
+            <div className={`fg-stat-n ${sentBand(summary.avgLikelihood)}`}>{summary.avgLikelihood.toFixed(1)}<span>/5</span></div>
+            <div className="fg-stat-l">{def.actionLabel}</div>
+            <div className="fg-stat-see">see the {reactions.filter((r) => r.likelihood >= 4).length} →</div>
+          </button>
           <div className="fg-stat"><div className="fg-stat-n">{summary.n}</div><div className="fg-stat-l">In the room</div></div>
         </div>
+        {reel.length > 0 && (
+          <div className="reel">
+            <div className="reel-hero" onClick={() => setOpenR(reel[0])} role="button" tabIndex={0}>
+              <span className="reel-mark" style={{ background: SENT_COLOR[reel[0].sentiment] }} />
+              <blockquote>&ldquo;{reel[0].quote}&rdquo;</blockquote>
+              <cite>{reel[0].personaName} · {reel[0].segment} · {SENTIMENT_LABEL[reel[0].sentiment]}</cite>
+            </div>
+            {reel.length > 1 && (
+              <div className="reel-grid">
+                {reel.slice(1).map((r) => (
+                  <button className="reel-chip" key={r.personaId} onClick={() => setOpenR(r)} style={{ borderLeftColor: SENT_COLOR[r.sentiment] }}>
+                    &ldquo;{r.quote}&rdquo;<span>{r.personaName} · {r.segment}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <nav className="rc-jump">
           <a href="#sec-sentiment">Sentiment</a>
           {isWalkReport && <a href="#sec-walk">The walkthrough</a>}
@@ -135,7 +203,11 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo }: 
 
       {/* Sentiment & likelihood */}
       <details className="rsec card" id="sec-sentiment" open>
-        <summary className="rsec-sum"><span className="rsec-t">Sentiment &amp; likelihood</span><span className="rsec-hint">how the room split</span></summary>
+        <summary className="rsec-sum"><span className="rsec-t">Sentiment &amp; likelihood</span><span className="rsec-hint">{(() => {
+          const rej = summary.sentimentDist.filter((s) => s.key === "reject").reduce((t, s) => t + s.count, 0);
+          const dir = summary.positivePct >= summary.negativePct ? "leans positive" : "leans negative";
+          return rej > 0 ? `${dir} — but ${rej} would reject it outright` : dir;
+        })()}</span></summary>
         <div className="rsec-body">
           <div className="fg-charts">
             <div>
@@ -267,14 +339,21 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo }: 
       {/* By segment — stacked sentiment + drill into each segment's room */}
       {segmentDetail.length > 1 && (
         <details className="rsec card" id="sec-segments" open>
-          <summary className="rsec-sum"><span className="rsec-t">By segment</span><span className="rsec-hint">click a segment to open its reactions</span></summary>
+          <summary className="rsec-sum"><span className="rsec-t">By segment</span><span className="rsec-hint">{dissent ? "one segment breaks with the room" : "unusually unified"}</span></summary>
           <div className="rsec-body">
+            {dissent ? (
+              <div className="callout dissent">
+                <b>{dissent.seg.segment} break{dissent.seg.segment.endsWith("s") ? "" : "s"} with the room</b> — {dissent.seg.positivePct}% positive vs {summary.positivePct}% across the panel ({dissent.gap > 0 ? "warmer" : "colder"} by {Math.abs(dissent.gap).toFixed(1)} pts). Worth a closer look before you decide.
+              </div>
+            ) : (
+              <div className="callout calm">The room is <b>unusually unified</b> — every segment lands within about a point of the panel average.</div>
+            )}
             <p className="sub">Which parts of your audience are most (and least) sold. Each bar is that segment&apos;s sentiment mix.</p>
             <div className="segstack">
               {segmentDetail.map((s) => (
-                <details className="segdrill" key={s.segment}>
+                <details className={`segdrill ${s.n < thinCut ? "thin" : ""}`} key={s.segment}>
                   <summary>
-                    <span className="sd-name">{s.segment} <span className="note">· n={s.n}</span></span>
+                    <span className="sd-name">{s.segment} <span className="note">· n={s.n}{s.n < thinCut ? " · thin" : ""}</span></span>
                     <span className="sd-bar">
                       {s.dist.map((d) => (d.count > 0 ? <span key={d.key} className="sd-seg" style={{ width: `${(d.count / s.n) * 100}%`, background: SENT_COLOR[d.key] }} title={`${SENTIMENT_LABEL[d.key]}: ${d.count}`} /> : null))}
                     </span>
@@ -299,8 +378,14 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo }: 
       <details className="rsec card" id="sec-room" open>
         <summary className="rsec-sum"><span className="rsec-t">The room</span><span className="rsec-hint">{reactions.length} individual reactions — click any card</span></summary>
         <div className="rsec-body">
+          {statFilter && (
+            <div className="roomactive">
+              Showing <b>{filtered.length}</b> {STAT_LABEL[statFilter]} agents
+              <button className="roomclear" onClick={() => setStatFilter("")}>Clear ×</button>
+            </div>
+          )}
           <div className="rfilters seg">
-            <button className={`segchip ${segFilter === "all" ? "on" : ""}`} onClick={() => setSegFilter("all")}>All</button>
+            <button className={`segchip ${segFilter === "all" && !statFilter ? "on" : ""}`} onClick={() => { setSegFilter("all"); setStatFilter(""); }}>All</button>
             {summary.bySegment.map((s) => (
               <button key={s.segment} className={`segchip ${segFilter === s.segment ? "on" : ""}`} onClick={() => setSegFilter((c) => (c === s.segment ? "all" : s.segment))}>
                 {s.segment} <em>{s.n}</em>
@@ -376,5 +461,21 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo }: 
         </div>
       )}
     </div>
+  );
+}
+
+// One provenance chip, used to say plainly "this is a simulated panel" without
+// undermining usefulness. Amber dot on a thin sample, sapphire on a healthy one.
+function ProvenanceChip({ n, isDemo }: { n: number; isDemo: boolean }) {
+  const tone = isDemo ? "demo" : n < 12 ? "thin" : n >= 48 ? "strong" : "ok";
+  const label = isDemo
+    ? "Demo data · illustrative"
+    : n < 12
+      ? "Simulated panel · directional (small sample)"
+      : "Simulated panel · directional signal";
+  return (
+    <span className={`provchip ${tone}`} title="Reactions come from AI persona-agents, not real people — directional signal for testing, not a market prediction.">
+      <i />{label}
+    </span>
   );
 }
