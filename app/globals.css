@@ -162,11 +162,41 @@ footer.app {
   font-family: var(--mono); font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.14em; color: var(--primary); text-align: center; margin-bottom: 12px;
 }
-.lp-panel, .lp-sample, .lp-inds { text-align: center; margin: 0 auto 56px; max-width: 840px; }
-.lp-panel h2, .lp-sample h2, .lp-inds h2 {
+.lp-panel, .lp-sample, .lp-inds, .lp-uses { text-align: center; margin: 0 auto 56px; max-width: 840px; }
+.lp-panel h2, .lp-sample h2, .lp-inds h2, .lp-uses h2 {
   font-family: var(--serif); font-size: 27px; letter-spacing: -0.015em; margin: 0 0 24px; font-weight: 600;
 }
-@media (max-width: 640px) { .lp-panel h2, .lp-sample h2, .lp-inds h2 { font-size: 21px; } }
+@media (max-width: 640px) { .lp-panel h2, .lp-sample h2, .lp-inds h2, .lp-uses h2 { font-size: 21px; } }
+.lp-lede { font-size: 15px; color: var(--ink-2); line-height: 1.65; margin: -8px auto 22px; max-width: 640px; }
+.lp-eyebrow.accent { color: var(--good-ink); }
+
+/* Header CTA (single-tool nav) */
+.navcta { padding: 8px 16px !important; border-radius: var(--radius-sm); background: var(--primary); color: #fff !important; font-size: 13px; font-weight: 650; text-decoration: none; transition: background 0.15s; }
+.navcta:hover { background: var(--primary-2); }
+.navcta.active { box-shadow: inset 0 0 0 2px var(--primary-line); }
+
+/* What you can test — kind tiles */
+.usegrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: left; }
+@media (max-width: 780px) { .usegrid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .usegrid { grid-template-columns: 1fr; } }
+.usecard { display: block; padding: 16px 16px 18px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); text-decoration: none; transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s; }
+.usecard:hover { box-shadow: var(--shadow-md); border-color: var(--primary-line); transform: translateY(-2px); }
+.use-t { font-weight: 660; font-size: 14.5px; color: var(--ink); margin-bottom: 5px; }
+.use-b { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+
+/* Spotlight: live website walkthrough */
+.lp-spot { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 30px; align-items: center; margin: 0 auto 56px; max-width: 960px; padding: 30px; background: var(--primary-tint); border: 1px solid var(--primary-line); border-radius: var(--radius); }
+@media (max-width: 760px) { .lp-spot { grid-template-columns: 1fr; gap: 22px; padding: 22px; } }
+.spot-copy h2 { font-family: var(--serif); font-size: 24px; letter-spacing: -0.015em; margin: 0 0 12px; font-weight: 600; }
+.spot-copy p { font-size: 14.5px; color: var(--ink-2); line-height: 1.62; margin: 0 0 18px; }
+.spot-copy .btn { text-decoration: none; }
+.spot-demo { display: flex; flex-direction: column; gap: 10px; }
+.spot-hop { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--good-ink); border-radius: 10px; padding: 11px 13px; font-size: 12.5px; }
+.spot-hop.bad { border-left-color: var(--danger); }
+.spot-hop span { font-weight: 600; color: var(--ink); }
+.spot-hop i { color: var(--ink-3); font-style: normal; }
+.spot-hop em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good-ink); }
+.spot-hop.bad em { color: var(--danger); }
 
 .lp-botrow { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
 .chip {

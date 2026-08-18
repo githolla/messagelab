@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { Nav } from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "Message Lab — test messages & experiences with simulated audiences",
+  title: "Message Lab — simulated focus groups powered by persona-agents",
   description:
-    "Pre-test two versions of a message against a simulated audience panel, and get an expert UI/UX review of any web page — for any industry.",
+    "Convene a simulated focus group of persona-agents that react in character to your product, landing page, strategy, or concept — and for a live site, walk through it themselves. Get a structured report.",
 };
 
 export default function RootLayout({
@@ -28,15 +28,14 @@ export default function RootLayout({
             <span className="logo">
               Message<span>Lab</span>
             </span>
-            <small>audience &amp; UX testing</small>
+            <small>simulated focus groups</small>
           </a>
           <Nav />
         </header>
         <main>{children}</main>
         <footer className="app">
-          Panel results are simulated audience responses — directional signal for testing, not a
-          prediction of real-world performance. Page reviews are one model&apos;s expert read of a
-          screenshot, not a usability test.
+          Focus group results are simulated persona-agent responses — directional signal for testing,
+          not a prediction of real-world performance. Validate high-stakes decisions with real people.
         </footer>
       </body>
     </html>

@@ -8,11 +8,16 @@ a segment-level results dashboard. "Message Lab" is a working title.
 ## Architecture
 
 - Next.js 15 App Router, TypeScript, no CSS framework (hand-rolled `app/globals.css`).
-- Routes: `/` is a landing page explaining the product + linking the tools;
-  `/test` is the **Focus Group** (default) with the A/B message test as a toggle;
-  `/leads` is Lead Personalization; `/rfp` is the RFP Simulator; `/review` is the
-  UX page review. `components/Nav.tsx` is the primary nav (Focus Group | Lead
-  Personalization | RFP Simulator | UX Page Review) with active states.
+- **The app is Focus-Group-only.** Routes: `/` is a Focus-Group-focused landing
+  page; `/test` is the **Focus Group** (default) with the A/B message test as a
+  toggle; `/test/report` is the results report page. `components/Nav.tsx` is a
+  single "Focus Group" CTA in the header. The former Lead Personalization
+  (`/leads`), RFP Simulator (`/rfp`), and UX Page Review (`/review`) tools —
+  and their API routes — were removed from the product (the user carved off the
+  RFP and webinar bundles into separate projects earlier). Their `lib/*` files
+  (`rfp.ts`, `rfpsim.ts`, `leads.ts`, `leadsim.ts`, `leademail.ts`, `reviewers.ts`,
+  `emailreview.ts`, `emailrewrite.ts`, `cohort.ts`) remain in the tree, unreferenced,
+  as reference/roadmap — safe to delete if truly done with them.
 - Focus Group (`lib/focus.ts`, `app/api/focus/route.ts`, `components/FocusGroup.tsx`;
   `app/test/page.tsx` toggles Focus Group ↔ the A/B `AbTest`): a persona-agent
   panel reviews ONE subject and returns structured feedback. Seven kinds

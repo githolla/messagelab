@@ -2,22 +2,14 @@
 
 import { usePathname } from "next/navigation";
 
-const LINKS = [
-  { href: "/test", label: "Focus Group" },
-  { href: "/leads", label: "Lead Personalization" },
-  { href: "/rfp", label: "RFP Simulator" },
-  { href: "/review", label: "UX Page Review" },
-];
-
 export function Nav() {
   const pathname = usePathname();
+  const onTool = pathname === "/test" || pathname.startsWith("/test/");
   return (
     <nav className="nav">
-      {LINKS.map((l) => (
-        <a key={l.href} href={l.href} className={pathname === l.href ? "active" : ""}>
-          {l.label}
-        </a>
-      ))}
+      <a href="/test" className={`navcta ${onTool ? "active" : ""}`}>
+        Focus Group
+      </a>
     </nav>
   );
 }

@@ -11,7 +11,6 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/api/focus-walk": ["./node_modules/@sparticuz/chromium/bin/**"],
     "/api/screenshot": ["./node_modules/@sparticuz/chromium/bin/**"],
-    "/api/review": ["./node_modules/@sparticuz/chromium/bin/**"],
   },
 };
 export default nextConfig;

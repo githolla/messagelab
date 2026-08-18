@@ -1,46 +1,53 @@
 import { INDUSTRIES } from "@/lib/industries";
-import { ANALYSTS, panelFor, monogram } from "@/lib/archetypes";
+import { panelFor, monogram } from "@/lib/archetypes";
+import { FOCUS_KINDS } from "@/lib/focus";
 
 export default function Home() {
-  const industryCount = INDUSTRIES.length;
-  const sampleBots = panelFor("ecommerce"); // concrete example panel for the hero strip
+  const industryCount = INDUSTRIES.filter((i) => i.key !== "general").length;
+  const samplePanel = panelFor("ecommerce"); // a concrete example panel for the hero strip
 
   return (
     <>
       {/* Hero */}
       <section className="lp-hero">
-        <div className="badge">Simulated audience testing · {industryCount} industries</div>
+        <div className="badge">Simulated focus groups · powered by persona-agents</div>
         <h1>
-          Know how your message lands —{" "}
-          <span>before you hit send.</span>
+          Put it in front of the room —{" "}
+          <span>before it&apos;s real.</span>
         </h1>
         <p>
-          Message Lab tests your emails, letters, and landing pages against a panel of
-          industry-specific customer bots, then hands you a decision: which version wins, who
-          bounces, and where to focus.
+          Message Lab convenes a simulated focus group of intelligent persona-agents that react
+          in character to whatever you&apos;re working on — a product, a landing page, a strategy, a
+          concept. Each one has its own point of view, so you get a real spread of opinion, not an
+          average. You leave with a structured report: the verdict, the reasons, and what to fix.
         </p>
         <div className="herocta">
           <a className="btn primary" href="/test">
-            Run an A/B message test →
+            Open the Focus Group →
           </a>
-          <a className="btn ghost" href="/review">
-            Review a live page
+          <a className="btn ghost" href="#how">
+            See how it works
           </a>
         </div>
         <div className="herostats">
           <span><b>{industryCount}</b> industries</span>
-          <span><b>~20</b> reactions / run</span>
-          <span><b>5</b> analyst lenses</span>
-          <span><b>~2 min</b> to a verdict</span>
+          <span><b>7</b> things you can test</span>
+          <span><b>1000s</b> of persona-agents</span>
+          <span><b>~2 min</b> to a report</span>
         </div>
       </section>
 
       {/* Meet the panel */}
       <section className="lp-panel">
-        <div className="lp-eyebrow">Meet your panel</div>
-        <h2>Audience archetypes react — specialist analysts interpret.</h2>
+        <div className="lp-eyebrow">Meet the room</div>
+        <h2>A panel of persona-agents — each reacts as itself.</h2>
+        <p className="lp-lede">
+          Pick an industry and the panel fills with audience archetypes that fit it. Dial the size,
+          rename or add segments, then send them your subject. Every agent answers individually — the
+          same persona-agent engine, grounded in the MatrAIx research, that the whole app runs on.
+        </p>
         <div className="lp-botrow">
-          {sampleBots.map((a) => (
+          {samplePanel.map((a) => (
             <span className="chip" key={a.name}>
               <span className="e">{monogram(a.name)}</span>
               {a.name}
@@ -48,113 +55,97 @@ export default function Home() {
           ))}
           <span className="chip muted">+ {industryCount} industries&apos; panels</span>
         </div>
-        <div className="lp-botrow">
-          {ANALYSTS.map((a) => (
-            <span className="chip analyst" key={a.key}>
-              <span className="e">{monogram(a.label)}</span>
-              {a.label}
-            </span>
+      </section>
+
+      {/* What you can test */}
+      <section className="lp-uses">
+        <div className="lp-eyebrow">One tool, many questions</div>
+        <h2>Test anything the room can have an opinion on.</h2>
+        <div className="usegrid">
+          {FOCUS_KINDS.map((k) => (
+            <a className="usecard" href="/test" key={k.key}>
+              <div className="use-t">{k.label}</div>
+              <div className="use-b">{k.blurb}</div>
+            </a>
           ))}
         </div>
       </section>
 
-      {/* Tools */}
-      <section className="tools">
-        <a className="toolcard" href="/test">
-          <div className="ti">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 3h12M9 3v6.5L4.5 17a2.5 2.5 0 0 0 2.2 3.7h10.6A2.5 2.5 0 0 0 19.5 17L15 9.5V3" />
-              <path d="M7.5 14h9" />
-            </svg>
-          </div>
-          <h2>Focus Group</h2>
+      {/* Spotlight: live website walkthrough */}
+      <section className="lp-spot">
+        <div className="spot-copy">
+          <div className="lp-eyebrow accent">The standout</div>
+          <h2>For a live site, the panel walks it themselves.</h2>
           <p>
-            Put anything in front of a simulated panel of persona-agents — a product or prototype, a
-            website, a go-to-market / sales / social strategy, a concept. Pick the audience and size and
-            get sentiment, likelihood, the themes they raise, and the full room. (Includes the A/B message
-            test.)
+            Paste a URL and each persona-agent drives its own browser through your site — clicking,
+            scrolling, following links, in character — until it converts or gives up. You see the exact
+            path each one took, where they dropped off, and their honest reaction to the real experience.
           </p>
-          <span className="tlink">Open the focus group →</span>
-        </a>
-        <a className="toolcard" href="/leads">
-          <div className="ti">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18M3 12h18M3 18h11" />
-              <circle cx="19" cy="18" r="2.4" />
-            </svg>
-          </div>
-          <h2>Lead Personalization</h2>
-          <p>
-            Turn a webinar attendee list into a prioritized work queue. For each lead, a simulated
-            cohort of similar prospects decides the follow-up most likely to work — insight,
-            resource, conversation, meeting, or wait — then drafts the email to review and approve.
-          </p>
-          <span className="tlink">Open the workflow →</span>
-        </a>
-        <a className="toolcard" href="/rfp">
-          <div className="ti">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-              <path d="M14 3v5h5M9 13l2 2 4-4" />
-            </svg>
-          </div>
-          <h2>RFP Simulator</h2>
-          <p>
-            Responding to an RFP? Paste the requirements and your draft proposal, and a simulated
-            buying committee — economic buyer, technical evaluator, procurement, champion, security —
-            scores your win likelihood, where you&apos;d lose points, and what to fix before you submit.
-          </p>
-          <span className="tlink">Open the simulator →</span>
-        </a>
-        <a className="toolcard" href="/review">
-          <div className="ti">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="10.5" cy="10.5" r="6.5" />
-              <path d="M20 20l-4.7-4.7" />
-            </svg>
-          </div>
-          <h2>UX Page Review</h2>
-          <p>
-            Paste any URL. The app screenshots it and Claude returns an expert UI/UX and usability
-            review — hierarchy, clarity, navigation, the primary CTA, trust, and accessibility —
-            scored, with severity-ranked fixes, tuned to your industry.
-          </p>
-          <span className="tlink">Open the review →</span>
-        </a>
+          <a className="btn primary" href="/test">
+            Send a panel through your site →
+          </a>
+        </div>
+        <div className="spot-demo">
+          <div className="spot-hop"><span>Home</span><i>→</i><span>Pricing</span><i>→</i><span>Sign up</span><em>converts</em></div>
+          <div className="spot-hop bad"><span>Home</span><i>→</i><span>Features</span><i>→</i><span>FAQ</span><em>drops off</em></div>
+          <div className="spot-hop"><span>Home</span><i>→</i><span>About</span><i>→</i><span>Contact</span><em>on the fence</em></div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="how" id="how">
+        <h2 className="howh">How it works</h2>
+        <ol className="steps">
+          <li>
+            <span className="sn">1</span>
+            <div>
+              <strong>Pick what you&apos;re testing and who&apos;s in the room.</strong> Choose the
+              subject — product, site, strategy, concept — an industry, and a panel size. The audience
+              auto-fills as editable segments.
+            </div>
+          </li>
+          <li>
+            <span className="sn">2</span>
+            <div>
+              <strong>The panel reacts — or walks your site.</strong> Each persona-agent responds in
+              character with sentiment, likelihood to act, what resonates, and concerns. For a live
+              site, they browse it themselves.
+            </div>
+          </li>
+          <li>
+            <span className="sn">3</span>
+            <div>
+              <strong>Read the report.</strong> A verdict up top, the reasons behind it, the themes the
+              room raised, a breakdown by segment, and every individual reaction — on its own page,
+              ready to print or share.
+            </div>
+          </li>
+        </ol>
       </section>
 
       {/* Sample output */}
       <section className="lp-sample">
         <div className="lp-eyebrow">What you get</div>
-        <h2>A recommendation, not a wall of charts.</h2>
+        <h2>A decision, not a wall of charts.</h2>
         <div className="lp-preview card">
-          <div className="vlabel">Recommendation</div>
+          <div className="vlabel">Focus group verdict</div>
           <div className="vhead">
-            <span className="vbadge ship_b">Ship Version B</span>
+            <span className="vbadge ship_b">Promising</span>
             <div className="vheadline">
-              &ldquo;1 in 7&rdquo; converts more of the panel (15 vs 11).
+              62% positive — but two concerns are holding the room back.
             </div>
           </div>
           <p className="vsummary">
-            The data-led version wins on intent to act, especially with skeptical and
-            first-time segments. The story-led version resonates emotionally but leaves the
-            specifics too vague to move cautious readers.
+            The value lands quickly and the skeptics warm up once they see proof. The pricing page and a
+            vague call-to-action are where cautious segments hesitate — fix those and the greenlight is
+            within reach.
           </p>
           <ul className="actionlist" style={{ marginTop: 14 }}>
-            <li>
-              <span className="pri high">high</span>Lead with the concrete number in the subject
-              line — it drove the win.
-            </li>
-            <li>
-              <span className="pri medium">medium</span>Add one proof point for the skeptical
-              segment before the ask.
-            </li>
-            <li>
-              <span className="pri low">low</span>Tighten the opening; several bots mentioned
-              skimming.
-            </li>
+            <li><span className="pri high">high</span>Lead with the concrete proof point — it moved the skeptics.</li>
+            <li><span className="pri medium">medium</span>Clarify the primary CTA; several agents got stuck deciding.</li>
+            <li><span className="pri low">low</span>Tighten the opening; a few said they nearly bounced.</li>
           </ul>
-          <div className="lp-preview-tag">Illustrative — your run uses your copy and industry.</div>
+          <div className="lp-preview-tag">Illustrative — your run uses your subject and audience.</div>
         </div>
       </section>
 
@@ -164,57 +155,25 @@ export default function Home() {
         <h2>{industryCount} industries, each with its own audience.</h2>
         <div className="lp-indchips">
           {INDUSTRIES.filter((i) => i.key !== "general").map((i) => (
-            <span className="ichip" key={i.key}>
-              {i.label}
-            </span>
+            <span className="ichip" key={i.key}>{i.label}</span>
           ))}
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="how">
-        <h2 className="howh">How it works</h2>
-        <ol className="steps">
-          <li>
-            <span className="sn">1</span>
-            <div>
-              <strong>Pick your industry.</strong> Message Lab loads the audience bots that fit —
-              a bargain hunter and brand loyalist for retail, a rate watcher and first-time buyer
-              for mortgage.
-            </div>
-          </li>
-          <li>
-            <span className="sn">2</span>
-            <div>
-              <strong>Bring your message.</strong> Paste two versions to A/B, auto-craft them from a
-              message type, or drop in a live URL to review.
-            </div>
-          </li>
-          <li>
-            <span className="sn">3</span>
-            <div>
-              <strong>Get a decision.</strong> A verdict up top, the reasons behind it, and the
-              specific changes to make — the analyst bots do the interpreting.
-            </div>
-          </li>
-        </ol>
-      </section>
-
+      {/* CTA */}
       <section className="lp-cta">
-        <h2>Test your next message in about two minutes.</h2>
+        <h2>Convene your focus group in about two minutes.</h2>
         <div className="herocta">
           <a className="btn primary" href="/test">
-            Run an A/B message test →
-          </a>
-          <a className="btn ghost" href="/review">
-            Review a live page
+            Open the Focus Group →
           </a>
         </div>
       </section>
 
       <p className="caveat homecaveat">
-        Results are simulated audience responses — directional signal for testing, not a prediction
-        of real-world performance. Validate high-stakes decisions with real people.
+        Reactions are simulated persona-agent responses — model-dependent and hypothesis-generating.
+        Use them to sharpen the work and surface objections early, not to predict the market. Validate
+        high-stakes decisions with real people.
       </p>
     </>
   );
