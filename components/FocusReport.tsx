@@ -102,6 +102,15 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
     [summary, reactions],
   );
 
+  const themeCat: Record<string, keyof Pick<FocusReaction, "resonates" | "concern" | "question" | "suggestion">> = {
+    resonates: "resonates", concerns: "concern", questions: "question", suggestions: "suggestion",
+  };
+  function reactionsForTheme(catKey: string, text: string): FocusReaction[] {
+    const field = themeCat[catKey];
+    const key = text.trim().toLowerCase();
+    return reactions.filter((r) => (r[field] || "").trim().toLowerCase() === key);
+  }
+
   const walkStats = useMemo(() => {
     if (!isWalkReport) return null;
     const withJ = reactions.filter((r) => r.journey && r.journey.length > 1);
@@ -122,17 +131,31 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
     const wouldAct = withJ.filter((r) => r.likelihood >= 4).length;
     const wavered = withJ.filter((r) => r.likelihood === 3).length;
     const left = withJ.length - wouldAct - wavered;
-    return { n: withJ.length, avgSteps, pages, maxPage: Math.max(1, ...pages.map((p) => p.count)), wouldAct, wavered, left, real: withJ.filter((r) => !r.error).length };
+    // Biggest-leak hop: where agents who didn't convert last were before giving up.
+    const leakMap = new Map<string, number>();
+    for (const r of withJ.filter((x) => x.likelihood <= 3)) {
+      const hops = r.journey!.filter((s) => (s.action === "start" || s.action === "click") && s.target);
+      const last = hops[hops.length - 1]?.target?.trim();
+      if (last) leakMap.set(last, (leakMap.get(last) || 0) + 1);
+    }
+    const leakTop = [...leakMap.entries()].sort((a, b) => b[1] - a[1])[0];
+    const leak = leakTop && leakTop[1] >= 2 ? { label: leakTop[0], count: leakTop[1] } : null;
+    return { n: withJ.length, avgSteps, pages, maxPage: Math.max(1, ...pages.map((p) => p.count)), wouldAct, wavered, left, leak, real: withJ.filter((r) => !r.error).length };
   }, [reactions, isWalkReport]);
 
-  const themeCat: Record<string, keyof Pick<FocusReaction, "resonates" | "concern" | "question" | "suggestion">> = {
-    resonates: "resonates", concerns: "concern", questions: "question", suggestions: "suggestion",
-  };
-  function reactionsForTheme(catKey: string, text: string): FocusReaction[] {
-    const field = themeCat[catKey];
-    const key = text.trim().toLowerCase();
-    return reactions.filter((r) => (r[field] || "").trim().toLowerCase() === key);
-  }
+  // "What to fix first" — rank concern clusters by reach × intensity.
+  const actionItems = useMemo(() => {
+    return summary.themes.concerns
+      .map((t) => {
+        const who = reactionsForTheme("concerns", t.text);
+        const intensity = who.length ? who.reduce((s, r) => s + (6 - SENTIMENT_SCORE[r.sentiment]), 0) / who.length : 0;
+        const rep = who.find((r) => (r.suggestion || "").trim()) || who[0];
+        return { text: t.text, count: t.count, intensity, score: t.count * intensity, fix: rep?.suggestion || "", rep };
+      })
+      .filter((a) => a.count > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }, [summary, reactions]);
 
   return (
     <div className="report">
@@ -267,6 +290,19 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
               </div>
             </div>
           </div>
+          {/* One dot per agent — the distribution as clickable provenance */}
+          <div className="swarm">
+            <div className="sb-h">Every agent · click any to open</div>
+            <div className="swarm-grid">
+              {[...reactions]
+                .sort((a, b) => SENTIMENT_SCORE[b.sentiment] - SENTIMENT_SCORE[a.sentiment])
+                .slice(0, DISPLAY_MAX)
+                .map((r) => (
+                  <button key={r.personaId} className="swarm-dot" style={{ background: SENT_COLOR[r.sentiment] }} title={`${r.personaName} · ${SENTIMENT_LABEL[r.sentiment]} · ${r.likelihood}/5`} onClick={() => setOpenR(r)} />
+                ))}
+              {reactions.length > DISPLAY_MAX && <span className="swarm-more">+{reactions.length - DISPLAY_MAX} more</span>}
+            </div>
+          </div>
         </div>
       </details>
 
@@ -305,14 +341,20 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
               <div>
                 <div className="sb-h">Most-visited pages &amp; elements</div>
                 <div className="pagebars">
-                  {walkStats.pages.map((p) => (
-                    <div className="pagerow" key={p.label} title={`${p.label}: visited ${p.count}×`}>
-                      <span className="pagelbl">{p.label}</span>
-                      <span className="pagebar"><span style={{ width: `${(p.count / walkStats.maxPage) * 100}%` }} /></span>
-                      <span className="pagenum">{p.count}</span>
-                    </div>
-                  ))}
+                  {walkStats.pages.map((p) => {
+                    const isLeak = walkStats.leak?.label === p.label;
+                    return (
+                      <div className={`pagerow ${isLeak ? "leak" : ""}`} key={p.label} title={`${p.label}: visited ${p.count}×${isLeak ? ` · ${walkStats.leak!.count} stalled here` : ""}`}>
+                        <span className="pagelbl">{p.label}</span>
+                        <span className="pagebar"><span style={{ width: `${(p.count / walkStats.maxPage) * 100}%` }} /></span>
+                        <span className="pagenum">{p.count}</span>
+                      </div>
+                    );
+                  })}
                 </div>
+                {walkStats.leak && (
+                  <p className="leaknote">⚠ Biggest leak: <b>{walkStats.leak.count} of {walkStats.n}</b> stalled or gave up at <b>{walkStats.leak.label}</b>.</p>
+                )}
               </div>
             </div>
             <p className="note" style={{ marginTop: 10 }}>Open any persona in the room below to replay their full click-by-click path.</p>
@@ -440,6 +482,32 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
           {filtered.length > DISPLAY_MAX && <p className="note">Showing {DISPLAY_MAX} of {filtered.length} — the stats above use the full room.</p>}
         </div>
       </details>
+
+      {/* What to fix first — end on a decision, not a chart */}
+      {actionItems.length > 0 && (
+        <section className="card fixboard">
+          <h2 className="step">What to fix first</h2>
+          <p className="sub">The concerns holding the room back, ranked by how many raised them and how strongly.</p>
+          <ol className="fixlist">
+            {actionItems.map((a, i) => (
+              <li key={i}>
+                <span className="fix-rank">{i + 1}</span>
+                <span className="fix-heat" style={{ background: `color-mix(in srgb, var(--danger) ${Math.round((a.intensity / 5) * 100)}%, var(--line))` }} title={`intensity ${a.intensity.toFixed(1)}/5`} />
+                <div className="fix-main">
+                  <div className="fix-text">{a.text}</div>
+                  {a.fix && <div className="fix-do"><b>Try:</b> {a.fix}</div>}
+                  {a.rep && (
+                    <button className="fix-quote" onClick={() => setOpenR(a.rep!)}>
+                      &ldquo;{a.rep.quote}&rdquo; <span>— {a.rep.personaName}, {a.rep.segment}</span>
+                    </button>
+                  )}
+                </div>
+                <span className="fix-reach">{a.count} raised</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       <p className="caveat" style={{ maxWidth: 1080, margin: "0 auto 40px" }}>
         Each reaction comes from an individual persona-agent conditioned on its segment — the same
