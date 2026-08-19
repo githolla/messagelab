@@ -1505,8 +1505,14 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .walklist .wl-th { grid-column: 1 / -1; grid-row: 2; font-size: 12.5px; color: var(--muted, #475569); }
 
 /* ===== Structured report ===== */
-.reporthead { margin-bottom: 14px; }
+.reporthead { margin-bottom: 14px; display: flex; align-items: center; gap: 12px; }
 .reporthead .btn { padding: 6px 14px; font-size: 13px; }
+.shared-tag { font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--primary-tint); border: 1px solid var(--primary-line); border-radius: 999px; padding: 4px 12px; }
+.sharebar { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--primary-line); background: var(--primary-tint); border-radius: var(--radius-sm); }
+.share-k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); white-space: nowrap; }
+.sharebar input { flex: 1; min-width: 0; font-size: 12.5px; font-family: var(--mono); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; color: var(--ink); }
+.sharebar .btn { flex-shrink: 0; padding: 6px 14px; font-size: 12.5px; }
+@media (max-width: 560px) { .sharebar { flex-wrap: wrap; } .sharebar input { flex-basis: 100%; order: 3; } }
 .report { display: flex; flex-direction: column; gap: 16px; }
 
 /* Cover */

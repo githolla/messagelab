@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { INDUSTRIES } from "@/lib/industries";
 import { monogram } from "@/lib/archetypes";
+import { encodeShare } from "@/lib/share";
 import {
   kindDef,
   summarizeFocus,
@@ -59,6 +60,9 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
   const [cmpA, setCmpA] = useState("");
   const [cmpB, setCmpB] = useState("");
   const [promptCopied, setPromptCopied] = useState(-1);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const def = kindDef(kind);
   const industryLabel = INDUSTRIES.find((i) => i.key === industry)?.label ?? "general";
@@ -194,6 +198,26 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
     navigator.clipboard?.writeText(promptFor(a)).then(() => { setPromptCopied(i); setTimeout(() => setPromptCopied((c) => (c === i ? -1 : c)), 2000); }).catch(() => {});
   }
 
+  async function makeShareLink() {
+    if (shareBusy) return;
+    setShareBusy(true);
+    setShareCopied(false);
+    try {
+      const token = await encodeShare({ reactions, kind, industry, url, isDemo, goal, format });
+      const link = `${window.location.origin}/test/report#r=${token}`;
+      setShareUrl(link);
+      try {
+        await navigator.clipboard?.writeText(link);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2500);
+      } catch {
+        /* clipboard blocked — the link is shown for manual copy */
+      }
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
   function copyBrief() {
     const L: string[] = [];
     L.push(`# Focus group brief${goal?.trim() ? `: ${goal.trim()}` : ""}`);
@@ -241,10 +265,18 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
           <span className="rc-eyebrow">Focus group report</span>
           <div className="rc-actions">
             {isDemo && <span className="demotag">Demo</span>}
+            <button className="btn primary rc-print" onClick={makeShareLink} disabled={shareBusy}>{shareBusy ? "Building…" : shareCopied ? "Link copied ✓" : "Share"}</button>
             <button className="btn ghost rc-print" onClick={copyBrief}>{copied ? "Copied ✓" : "Copy brief"}</button>
             <button className="btn ghost rc-print" onClick={() => window.print()}>Print / PDF</button>
           </div>
         </div>
+        {shareUrl && (
+          <div className="sharebar">
+            <span className="share-k">Shareable link</span>
+            <input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} />
+            <button className="btn ghost" onClick={() => { navigator.clipboard?.writeText(shareUrl).then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2500); }).catch(() => {}); }}>{shareCopied ? "Copied ✓" : "Copy"}</button>
+          </div>
+        )}
         <div className={`rc-verdict ${summary.tooClose ? "mixed" : summary.verdict}`}>
           <span className={`fg-badge ${summary.tooClose ? "mixed" : summary.verdict}`}>{summary.tooClose ? "Too close to call" : FOCUS_VERDICT_LABEL[summary.verdict]}</span>
           <p className="rc-headline">{summary.readline}</p>

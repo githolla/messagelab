@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import FocusReport, { type FocusReportData } from "@/components/FocusReport";
 import FocusRounds, { type FocusRoundsData } from "@/components/FocusRounds";
+import { decodeShare } from "@/lib/share";
 
 const KEY = "fg-report";
 
@@ -13,9 +14,19 @@ type Payload = (FocusRoundsData & { round0?: unknown }) | (FocusReportData & { r
 
 export default function ReportPage() {
   const [data, setData] = useState<Payload | null>(null);
+  const [shared, setShared] = useState<FocusReportData | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // A shared link carries the whole run in the hash (#r=...) — prefer it.
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const m = hash.match(/^#r=(.+)$/);
+    if (m) {
+      decodeShare<FocusReportData>(m[1])
+        .then((d) => { if (d?.reactions?.length) setShared(d); })
+        .finally(() => setLoaded(true));
+      return;
+    }
     try {
       const raw = sessionStorage.getItem(KEY);
       if (raw) setData(JSON.parse(raw) as Payload);
@@ -31,10 +42,13 @@ export default function ReportPage() {
   return (
     <>
       <div className="reporthead">
-        <Link href="/test" className="btn ghost">← New focus group</Link>
+        <Link href="/test" className="btn ghost">{shared ? "Run your own focus group →" : "← New focus group"}</Link>
+        {shared && <span className="shared-tag">Shared report · read-only</span>}
       </div>
       {!loaded ? (
         <section className="card"><p className="sub">Loading the report…</p></section>
+      ) : shared ? (
+        <FocusReport {...shared} />
       ) : rounds && rounds.round0?.reactions?.length ? (
         <FocusRounds {...rounds} />
       ) : legacy && legacy.reactions?.length ? (
