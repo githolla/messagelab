@@ -58,6 +58,7 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
   const [compareOn, setCompareOn] = useState(false);
   const [cmpA, setCmpA] = useState("");
   const [cmpB, setCmpB] = useState("");
+  const [promptCopied, setPromptCopied] = useState(-1);
 
   const def = kindDef(kind);
   const industryLabel = INDUSTRIES.find((i) => i.key === industry)?.label ?? "general";
@@ -167,6 +168,31 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
   }, [summary, reactions]);
+
+  const isSite = isWalkReport || kind === "website";
+  // Turn a ranked concern into a ready-to-use implementation prompt.
+  function promptFor(a: { text: string; fix: string; count: number }): string {
+    const where = isSite ? `the page${url.trim() ? ` at ${url.trim()}` : ""}` : `this ${def.label.toLowerCase()}${format ? ` (${format.toLowerCase()})` : ""}`;
+    const change = a.fix ? a.fix.replace(/\.$/, "") : "clarify and strengthen this part";
+    if (isSite) {
+      return [
+        `Improve ${where} to fix an issue ${a.count} reviewers raised: "${a.text}".`,
+        ``,
+        `Make this change: ${change}.`,
+        `Constraints: keep the brand voice, work on mobile, don't break the primary call-to-action, and preserve anything that's already working.`,
+        `Then briefly explain what you changed and why it resolves the concern.`,
+      ].join("\n");
+    }
+    return [
+      `Revise ${where} to fix an objection ${a.count} reviewers raised: "${a.text}".`,
+      ``,
+      `Apply this suggestion: ${change}.`,
+      `Keep the same intent, voice, and offer. Return the revised copy, then note what you changed.`,
+    ].join("\n");
+  }
+  function copyPrompt(i: number, a: { text: string; fix: string; count: number }) {
+    navigator.clipboard?.writeText(promptFor(a)).then(() => { setPromptCopied(i); setTimeout(() => setPromptCopied((c) => (c === i ? -1 : c)), 2000); }).catch(() => {});
+  }
 
   function copyBrief() {
     const L: string[] = [];
@@ -600,7 +626,7 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
       {actionItems.length > 0 && (
         <section className="card fixboard">
           <h2 className="step">What to fix first</h2>
-          <p className="sub">The concerns holding the room back, ranked by how many raised them and how strongly.</p>
+          <p className="sub">{isSite ? "Ranked by how many raised them and how strongly — each with a ready-to-use prompt to hand a designer, developer, or AI builder." : "The concerns holding the room back, ranked by how many raised them and how strongly — each with a prompt to make the change."}</p>
           <ol className="fixlist">
             {actionItems.map((a, i) => (
               <li key={i}>
@@ -614,6 +640,13 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
                       &ldquo;{a.rep.quote}&rdquo; <span>— {a.rep.personaName}, {a.rep.segment}</span>
                     </button>
                   )}
+                  <details className="fix-prompt">
+                    <summary>
+                      {isSite ? "Prompt to make this change" : "Prompt to revise this"}
+                      <button className="fix-copy" onClick={(e) => { e.preventDefault(); copyPrompt(i, a); }}>{promptCopied === i ? "Copied ✓" : "Copy"}</button>
+                    </summary>
+                    <pre className="fix-prompt-body">{promptFor(a)}</pre>
+                  </details>
                 </div>
                 <span className="fix-reach">{a.count} raised</span>
               </li>
