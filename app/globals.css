@@ -1480,6 +1480,14 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .proto-x { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; }
 
 .urlfetch { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2, #f8fafc); }
+
+/* The group's clarifying questions under the subject brief. */
+.clarify-cta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.clarify-panel { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2, #f8fafc); }
+.clarify-h { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.clarify-q { margin-top: 10px; }
+.clarify-q .fld { font-weight: 500; }
+.clarify-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .urlrow { display: flex; gap: 8px; align-items: stretch; }
 .urlrow input { flex: 1; min-width: 0; }
 .urlrow .btn { white-space: nowrap; flex-shrink: 0; }

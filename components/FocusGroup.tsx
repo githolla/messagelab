@@ -162,6 +162,10 @@ export default function FocusGroup() {
   const [planText, setPlanText] = useState<string>("");
   const [planning, setPlanning] = useState(false);
   const [planNote, setPlanNote] = useState<string>("");
+  const [clarifyQs, setClarifyQs] = useState<string[]>([]);
+  const [clarifyAs, setClarifyAs] = useState<string[]>([]);
+  const [clarifying, setClarifying] = useState(false);
+  const [clarifyNote, setClarifyNote] = useState<string>("");
   const [segments, setSegments] = useState<PanelSegment[]>(() => autoSegments("general", undefined, DEFAULT_TOTAL));
 
   const [running, setRunning] = useState(false);
@@ -303,6 +307,41 @@ export default function FocusGroup() {
     } finally {
       setPlanning(false);
     }
+  }
+
+  // The group asks a few short questions about the subject; answers fold back
+  // into the brief so every persona-agent reacts with the missing context.
+  async function askClarify() {
+    if (!body.trim() || clarifying) return;
+    setClarifying(true);
+    setClarifyNote("");
+    try {
+      const resp = await fetch("/api/focus-clarify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind, title, body, goal }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      const qs = (data.questions as string[]) || [];
+      setClarifyQs(qs);
+      setClarifyAs(qs.map(() => ""));
+    } catch (e) {
+      setClarifyNote(e instanceof Error ? e.message : "Couldn't get questions — the room will work with what's there.");
+    } finally {
+      setClarifying(false);
+    }
+  }
+  function applyClarify() {
+    const pairs = clarifyQs.map((q, i) => ({ q, a: (clarifyAs[i] || "").trim() })).filter((p) => p.a);
+    if (pairs.length) {
+      setBody((b) => `${b.trim()}\n\nA few things the group asked:\n${pairs.map((p) => `${p.q} ${p.a}`).join("\n")}`);
+      setClarifyNote(`Added ${pairs.length} answer${pairs.length === 1 ? "" : "s"} to the brief.`);
+    } else {
+      setClarifyNote("");
+    }
+    setClarifyQs([]);
+    setClarifyAs([]);
   }
 
   function subjectOf(): FocusSubject {
@@ -448,7 +487,8 @@ export default function FocusGroup() {
         <h1>Focus Group</h1>
         <p>
           Put anything in front of a simulated focus group — a new product or prototype, a website, a
-          go-to-market, sales, or social strategy, a concept or campaign. It&apos;s a panel of intelligent
+          go-to-market, sales, or social strategy, a concept or campaign, or literally anything else,
+          down to &ldquo;I want to eat steak tonight.&rdquo; It&apos;s a panel of intelligent
           persona-agents that each react in character — and for a live website, they&apos;ll each
           <em> walk through the site themselves</em>, click by click, and report back. You get an overview,
           sentiment &amp; likelihood stats, the themes they raise, and the full room.
@@ -465,7 +505,7 @@ export default function FocusGroup() {
             value={planText}
             onChange={(e) => setPlanText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); designStudy(); } }}
-            placeholder="What decision are you trying to make? e.g. Will a matching-gift email win back lapsed donors?"
+            placeholder="Anything at all — “Will a matching-gift email win back lapsed donors?” or “I want to eat steak tonight”"
             disabled={planning || running}
           />
           <button className="btn primary" onClick={designStudy} disabled={planning || running || !planText.trim()}>
@@ -530,6 +570,40 @@ export default function FocusGroup() {
         <input id="fg-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={fm.titlePlaceholder} disabled={running} />
         <label className="fld" htmlFor="fg-body" style={{ marginTop: 12 }}>{fm.bodyLabel}</label>
         <textarea id="fg-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} placeholder={fm.bodyPlaceholder} disabled={running} />
+
+        {/* Clarify — the group asks a few questions; answers fold into the brief */}
+        <div className="clarify" style={{ marginTop: 12 }}>
+          {clarifyQs.length === 0 ? (
+            <div className="clarify-cta">
+              <button className="btn ghost" onClick={askClarify} disabled={running || clarifying || !body.trim()}>
+                {clarifying ? "The group is thinking…" : "Let the group ask a few questions →"}
+              </button>
+              <span className="note">Optional — the room asks what it needs to know, your answers sharpen its feedback.</span>
+            </div>
+          ) : (
+            <div className="clarify-panel">
+              <div className="clarify-h">Before it reacts, the group wants to know <span className="note" style={{ fontWeight: 400 }}>· answer any, skip the rest</span></div>
+              {clarifyQs.map((q, i) => (
+                <div className="clarify-q" key={i}>
+                  <label className="fld" htmlFor={`fg-cq-${i}`}>{q}</label>
+                  <input
+                    id={`fg-cq-${i}`}
+                    type="text"
+                    value={clarifyAs[i] || ""}
+                    onChange={(e) => setClarifyAs((prev) => prev.map((a, j) => (j === i ? e.target.value : a)))}
+                    placeholder="A few words is plenty…"
+                    disabled={running}
+                  />
+                </div>
+              ))}
+              <div className="clarify-actions">
+                <button className="btn primary" onClick={applyClarify} disabled={running || clarifyAs.every((a) => !a.trim())}>Add answers to the brief</button>
+                <button className="btn ghost" onClick={() => { setClarifyQs([]); setClarifyAs([]); setClarifyNote(""); }} disabled={running}>Skip</button>
+              </div>
+            </div>
+          )}
+          {clarifyNote && <p className="note" style={{ marginTop: 6 }}>{clarifyNote}</p>}
+        </div>
         {kind === "website" && (
           <div className="sitemode" style={{ marginTop: 14 }}>
             <div className="seg" role="group" aria-label="How the panel reviews the site" style={{ marginBottom: 0 }}>

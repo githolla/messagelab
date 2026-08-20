@@ -42,7 +42,10 @@ export async function POST(req: NextRequest) {
   const dims = persona.dims ? Object.entries(persona.dims).map(([k, v]) => `${k}: ${v}`).join("\n") : "";
   const system = `You are ${persona.name}, a real member of a focus group in the ${subject.industry || "general"} space. Your type: ${persona.segment}${persona.how ? ` — ${persona.how}` : ""}.${dims ? `\n${dims}` : ""}\nReact as THIS specific person — bring your own priorities, skepticism, and mood. Honest, blunt reactions are what the panel is for; "I'd pass" is a valid answer.`;
 
-  const intro = `You're reviewing a ${def.label.toLowerCase()}${subject.productType ? ` (a ${subject.productType})` : ""}${subject.format ? `, in the form of a ${subject.format.toLowerCase()}` : ""}. Weigh it on: ${def.lens}.${subject.goal?.trim() ? ` The team is specifically trying to learn: "${subject.goal.trim()}" — keep that question front of mind as you react.` : ""}`;
+  const intro =
+    subject.kind === "anything"
+      ? `Someone is putting a plan, idea, or decision of theirs in front of the room for an honest take — it can be about anything, business or personal. Weigh it on: ${def.lens}.${subject.goal?.trim() ? ` They specifically want to know: "${subject.goal.trim()}" — keep that question front of mind as you react.` : ""}`
+      : `You're reviewing a ${def.label.toLowerCase()}${subject.productType ? ` (a ${subject.productType})` : ""}${subject.format ? `, in the form of a ${subject.format.toLowerCase()}` : ""}. Weigh it on: ${def.lens}.${subject.goal?.trim() ? ` The team is specifically trying to learn: "${subject.goal.trim()}" — keep that question front of mind as you react.` : ""}`;
   const social = isSocialSubject(subject.kind, subject.format);
   const socialQ = social
     ? `\n8. like — would YOU tap like on this post? (true/false)\n9. comment — would you actually leave a comment? (true/false)\n10. share — would you share/repost it to your own feed? (true/false)`

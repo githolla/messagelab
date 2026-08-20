@@ -8,7 +8,7 @@
 import { fnv1a, fnv1aFloat, clamp } from "./util";
 import { wilson } from "./stats";
 
-export type FocusKind = "product" | "website" | "gtm" | "sales" | "social" | "concept" | "brand";
+export type FocusKind = "product" | "website" | "gtm" | "sales" | "social" | "concept" | "brand" | "anything";
 
 export interface FocusKindDef {
   key: FocusKind;
@@ -99,6 +99,17 @@ export const FOCUS_KINDS: FocusKindDef[] = [
     verb: "connect with it",
     actionLabel: "Would connect",
     lens: "distinctiveness, memorability, emotional fit, and whether it feels credible",
+  },
+  {
+    key: "anything",
+    label: "Anything at all",
+    blurb: "Any idea, plan, dilemma, or decision — big or small, business or personal.",
+    subjectLabel: "What should the room react to?",
+    placeholder: "Anything — “I want to eat steak tonight”, a plan, a purchase, an idea, a dilemma…",
+    images: true,
+    verb: "go for it",
+    actionLabel: "Would go for it",
+    lens: "whether it's a good idea, the tradeoffs, what they would do in this situation, and what would make it better",
   },
 ];
 
@@ -224,6 +235,41 @@ const QUOTE_NEG = [
   "I'd pass right now; the value isn't clear enough.",
 ];
 
+// Everyday-language banks for the open "anything" kind — the business banks
+// above read wrong against "I want to eat steak tonight".
+const ANY_RESONATES = [
+  "it's a clear, simple plan — I get exactly what you're going for",
+  "it sounds genuinely enjoyable and worth doing",
+  "the timing feels right for it",
+  "it's low-risk — easy to try and easy to walk back",
+  "you clearly want this, and that counts for a lot",
+  "it's practical — nothing about it feels overcomplicated",
+];
+const ANY_CONCERNS = [
+  "the cost might be more than it's worth",
+  "I'm not sure you've weighed the alternatives",
+  "it could take more time or effort than you think",
+  "the details are fuzzy — the plan needs a bit more shape",
+  "will you still feel good about it afterward?",
+  "it might not live up to what you're imagining",
+];
+const ANY_QUESTIONS = [
+  "What's the budget for this?",
+  "Is anyone else involved or affected?",
+  "What's the alternative if you skip it?",
+  "Have you done this before — how did it go?",
+  "What would make it a clear win for you?",
+  "Why tonight / why now?",
+];
+const ANY_SUGGESTIONS = [
+  "decide the one detail that matters most and lock it in",
+  "set a rough budget before you commit",
+  "keep it simple — don't overplan it",
+  "check the practical details first so nothing derails it",
+  "bring someone along — it's better shared",
+  "sleep on it if you're not sure; it'll keep",
+];
+
 function pick(bank: string[], seed: string): string {
   return bank[fnv1a(seed) % bank.length];
 }
@@ -242,6 +288,7 @@ export function focusDemo(
     score > 0.8 ? "love" : score > 0.6 ? "like" : score > 0.42 ? "neutral" : score > 0.26 ? "skeptical" : "reject";
   const likelihood = clamp(Math.round(score * 4 + 1), 1, 5);
   const quoteBank = score > 0.6 ? QUOTE_POS : score > 0.42 ? QUOTE_NEU : QUOTE_NEG;
+  const open = subject.kind === "anything";
   const out: FocusReaction = {
     personaId: reaction.id,
     personaName: reaction.name,
@@ -249,10 +296,10 @@ export function focusDemo(
     segmentHow: reaction.how,
     sentiment,
     likelihood,
-    resonates: pick(RESONATES, reaction.id + "r"),
-    concern: pick(CONCERNS, reaction.id + "c"),
-    question: pick(QUESTIONS, reaction.id + "q"),
-    suggestion: pick(SUGGESTIONS, reaction.id + "s"),
+    resonates: pick(open ? ANY_RESONATES : RESONATES, reaction.id + "r"),
+    concern: pick(open ? ANY_CONCERNS : CONCERNS, reaction.id + "c"),
+    question: pick(open ? ANY_QUESTIONS : QUESTIONS, reaction.id + "q"),
+    suggestion: pick(open ? ANY_SUGGESTIONS : SUGGESTIONS, reaction.id + "s"),
     quote: pick(quoteBank, reaction.id + "u"),
   };
   // Social engagement funnels off sentiment: likes are common, comments rarer,

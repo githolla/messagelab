@@ -23,13 +23,16 @@ export interface StudyPlan {
 function heuristicPlan(goal: string): StudyPlan {
   const g = goal.toLowerCase();
   const has = (...w: string[]) => w.some((x) => g.includes(x));
-  let kind: FocusKind = "product";
+  // Default to the open kind — anything without a clear business shape goes to
+  // the room as-is ("I want to eat steak tonight" is a valid subject).
+  let kind: FocusKind = "anything";
   if (has("landing", "website", "home page", "homepage", "web page", "site")) kind = "website";
   else if (has("go-to-market", "go to market", "gtm", "launch", "positioning", "channel")) kind = "gtm";
   else if (has("sales", "pitch", "deal", "close", "proposal")) kind = "sales";
   else if (has("social", "instagram", "tiktok", "linkedin", "post", "reel")) kind = "social";
   else if (has("brand", "logo", "identity", "creative")) kind = "brand";
   else if (has("concept", "tagline", "positioning statement", "name")) kind = "concept";
+  else if (has("product", "feature", "app", "prototype", "mvp", "tool", "device")) kind = "product";
 
   let format = "";
   if (has("email", "newsletter")) format = "Email";
@@ -49,7 +52,9 @@ function heuristicPlan(goal: string): StudyPlan {
     industry: IND_KEYS.includes(ind) ? ind : "general",
     format,
     title: "",
-    body: `We're testing something to answer: ${goal.trim()}. Describe what the room should react to here…`,
+    body: kind === "anything"
+      ? goal.trim()
+      : `We're testing something to answer: ${goal.trim()}. Describe what the room should react to here…`,
     goal: goal.trim(),
   };
 }
@@ -77,6 +82,8 @@ Pick the best setup and draft a first-pass subject to put in front of a persona-
 kind — one of: ${KIND_KEYS.join(" | ")}
 industry — one of these keys: ${IND_KEYS.join(" | ")}
 format — one of: ${FORMATS.filter(Boolean).join(" | ")} (or "" if none fits)
+
+Anything is fair game. If it's a personal or everyday thing rather than a business asset (e.g. "I want to eat steak tonight", "should I move cities"), use kind "anything", industry "general", format "", and make the body a clear plain-language statement of the plan or idea for the room to react to.
 
 Respond with ONLY this JSON (no fences):
 { "kind": "...", "industry": "...", "format": "...", "title": "short name for the thing being tested", "body": "a concrete 2-4 sentence first draft of the subject the panel will react to, aimed at answering the question" }`;

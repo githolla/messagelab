@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
   const def = kindDef(body.kind);
   const system =
     "You are a sharp copy/product editor. You revise a tested asset to win over more of a focus-group panel WITHOUT losing its core intent, voice, or offer. You address the panel's real objections and apply their best suggestions. Return ONLY JSON.";
-  const prompt = `Here is ${def.label.toLowerCase()}${body.format ? ` (a ${body.format.toLowerCase()})` : ""} that a simulated panel just reviewed.${body.goal ? `\nGoal of the test: ${body.goal}` : ""}
+  const subjectNoun = body.kind === "anything" ? "a plan / idea someone shared" : def.label.toLowerCase();
+  const prompt = `Here is ${subjectNoun}${body.format ? ` (a ${body.format.toLowerCase()})` : ""} that a simulated panel just reviewed.${body.goal ? `\nGoal of the test: ${body.goal}` : ""}
 
 TITLE: ${body.subject.title || "(none)"}
 BODY:
