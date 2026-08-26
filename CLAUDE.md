@@ -115,6 +115,21 @@ a segment-level results dashboard. "Message Lab" is a working title.
   an optional Draft A vs Draft B side-by-side diff. Years are not quantities
   (1900–2100 excluded); submission mechanics aren't coverage requirements.
   Judge-side (pools, metrics, calibration) is deliberately not built yet.
+  **Committee Room** (`lib/gate/room.ts`, `components/CommitteeRoom.tsx`,
+  `app/api/gate-room/route.ts`, step 4 on `/gate`): the LIVE half — the 22
+  family-A committee personas each read ONLY their visibility scope of the
+  parsed proposal (CFO → cost sections; A18 reluctant conscript → first
+  2200 chars + price; screen-out roles A04/05/06/11/16/22 can veto), shaped
+  by exactly one family-B lens + one family-C buyer state (dropdowns,
+  default B23/C39), plus an optional family-G meta wave (9 agents, G100
+  excluded — it's the deterministic gate itself). Gate findings are passed
+  to every persona as `gateBriefing`. Client fans out `/api/gate-room`
+  (concurrency 4, per-persona deterministic `demoReaction` fallback keyed
+  on fnv1a(doc)+gate penalty). Results: verdict (select→no_award, vetoes
+  cap at contender), stance stacked bar, veto callout, "questions you'll
+  face", per-persona `<details>` cards (quote/strength/concern/scoresheet
+  line + what they read). The gate is instant BY DESIGN (zero model calls);
+  the room is the part that takes ~1-2 min live.
   **Evaluator roster** (`lib/gate/roster.json` source-of-truth + typed
   `roster.ts`, `components/RosterBrowser.tsx`, `/gate/evaluators`): all 100
   evaluators (families A committee personas / B subsector lenses / C

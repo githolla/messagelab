@@ -9,6 +9,7 @@ import type { GateContext, GateFinding, GateRun } from "@/lib/gate/model";
 import { GATE_CHECKS } from "@/lib/gate/model";
 import { runGate, diffGate, type GateDiffRow } from "@/lib/gate/run";
 import { SAMPLE_RFP, SAMPLE_DRAFT, SAMPLE_REBUILD, SAMPLE_CONTEXT_JSON } from "@/lib/gate/sample";
+import CommitteeRoom from "@/components/CommitteeRoom";
 
 const VERDICT_LABEL: Record<GateFinding["verdict"], string> = {
   deficiency: "Deficiency", weakness: "Weakness", pass: "Pass", skipped: "Skipped",
@@ -192,9 +193,10 @@ export default function GateTool() {
       </section>
 
       <section className="card">
-        <div className="runbar" style={{ marginTop: 0 }}>
+        <h2 className="step">3 · Run the gate <span className="note" style={{ fontWeight: 400 }}>· the mechanical pass — instant by design, zero model calls</span></h2>
+        <div className="runbar" style={{ marginTop: 10 }}>
           <button className="btn primary" onClick={run} disabled={!draftA.trim()}>Run the gate</button>
-          <span className="note">{running} of {GATE_CHECKS.length} checks run on pasted text · D68 (PDF accessibility) needs the artifact itself · instant &amp; free</span>
+          <span className="note">{running} of {GATE_CHECKS.length} checks run on pasted text · D68 (PDF accessibility) needs the artifact itself · results are immediate because no model is called</span>
         </div>
         {error && <p className="error">{error}</p>}
       </section>
@@ -214,6 +216,8 @@ export default function GateTool() {
           </section>
         </>
       )}
+
+      <CommitteeRoom proposal={draftA} rfp={rfp} ctx={parseContext(ctxJson).ctx} gate={runA} />
     </>
   );
 }

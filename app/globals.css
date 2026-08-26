@@ -1876,3 +1876,44 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .rtag.block { background: #fbeeee; border-color: #e6c3c3; color: #b23b3b; font-weight: 700; }
 .rtag.live { background: #e7f3e9; border-color: #bfdec5; color: #2f7a3a; font-weight: 700; }
 .rtag.hold { background: #fdf3e7; border-color: #ecd3b3; color: #8a4d0f; font-weight: 700; }
+
+/* ---- Committee Room (the live roster simulation) ----------------------- */
+.crhero { border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.crhero-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.crverdict { font-size: 13px; font-weight: 800; letter-spacing: 0.03em; padding: 5px 13px; border-radius: 999px; color: #fff; background: #767c85; }
+.crverdict.v-select, .crverdict.v-front_runner { background: #2f7a3a; }
+.crverdict.v-contender { background: #b45309; }
+.crverdict.v-long_shot { background: #db7f22; }
+.crverdict.v-no_award { background: #b23b3b; }
+.crscore { font-size: 24px; font-weight: 800; }
+.crscore span { font-size: 12px; font-weight: 500; color: var(--ink-2); margin-left: 3px; }
+.crdemo { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8a4d0f; background: #fdf3e7; border: 1px solid #ecd3b3; border-radius: 999px; padding: 2px 9px; }
+.crhead { margin: 10px 0 0; font-size: 14.5px; line-height: 1.55; }
+.crstack { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin-top: 12px; }
+.crstack span { display: block; height: 100%; }
+.crlegend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+.crlegend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; }
+
+.crveto { margin-top: 12px; border: 1px solid #e6c3c3; background: #fbeeee; color: #7f2d2d; border-radius: 10px; padding: 10px 14px; font-size: 13px; line-height: 1.55; }
+
+.crqs { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.crqs h3 { margin: 0 0 6px; font-size: 13.5px; }
+.crqs ol { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; }
+
+.crgroup { margin: 18px 0 8px; font-size: 14px; }
+.crlist { display: flex; flex-direction: column; gap: 6px; }
+.crcard { border: 1px solid var(--line); border-radius: 9px; }
+.crcard summary { display: flex; align-items: center; gap: 9px; padding: 9px 12px; cursor: pointer; list-style: none; flex-wrap: wrap; }
+.crcard summary::-webkit-details-marker { display: none; }
+.crcard-id { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; color: var(--ink-2); }
+.crcard-name { font-size: 13.5px; font-weight: 600; flex: 1; min-width: 160px; }
+.crcard-right { display: flex; align-items: center; gap: 8px; }
+.crcard-veto { font-size: 10px; font-weight: 800; letter-spacing: 0.07em; color: #b23b3b; }
+.crcard-stance { font-size: 10.5px; font-weight: 700; color: #fff; padding: 2px 9px; border-radius: 999px; }
+.crcard-score { font-family: ui-monospace, monospace; font-size: 13px; font-weight: 700; }
+.crcard-body { padding: 0 14px 12px; }
+.crcard-quote { margin: 2px 0 6px; font-size: 14px; line-height: 1.5; font-style: italic; }
+.crcard-scope { margin: 0 0 8px; font-size: 11.5px; color: var(--muted, #64748b); }
+.crcard-dl { margin: 0; display: grid; grid-template-columns: 90px 1fr; gap: 4px 10px; font-size: 12.5px; }
+.crcard-dl dt { color: var(--ink-2); font-weight: 600; }
+.crcard-dl dd { margin: 0; line-height: 1.5; }

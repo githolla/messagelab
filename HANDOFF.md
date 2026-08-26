@@ -19,6 +19,9 @@ or server-side identically.
 | `components/RosterBrowser.tsx` | The "every persona spelled out" browser UI (React) | ~140 |
 | `components/GateTool.tsx` | Reference scorecard + diff UI (React) | ~230 |
 | `lib/gate/sample.ts` | Defect-seeded demo docs + context (optional, for demos/tests) | ~150 |
+| `lib/gate/room.ts` | The live Committee Room: per-persona visibility scopes, veto roles, demo reads, room aggregation | ~250 |
+| `components/CommitteeRoom.tsx` | Convene-the-committee UI: lens + buyer-state pickers, live fan-out, stance chart, per-persona cards | ~250 |
+| `app/api/gate-room/route.ts` | One committee persona reads their slice in character (needs an Anthropic client — swap in your own model call) | ~110 |
 
 The only imports are between these files. `roster.json` needs
 `"resolveJsonModule": true` in tsconfig. The two React components import only
