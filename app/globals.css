@@ -1851,3 +1851,28 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 .gtot b { font-size: 17px; }
 .gtot b.bad { color: #b23b3b; }
 .gtot b.good { color: #2f7a3a; }
+
+/* ---- Evaluator roster browser ----------------------------------------- */
+.rjudge-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+.rjudge-grid > div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.rjudge-grid b { display: block; font-size: 14.5px; }
+.rjudge-grid span { font-size: 12px; color: var(--ink-2); }
+
+.rfilter { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.rfilter input[type="search"] { flex: 1; min-width: 220px; }
+
+.rfam-head { padding-left: 12px; }
+.rfam-key { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px; color: #fff; font-size: 13px; font-weight: 800; margin-right: 6px; vertical-align: -4px; }
+
+.rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin-top: 14px; }
+.rcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+.rcard-top { display: flex; align-items: center; gap: 8px; }
+.rcard-id { flex-shrink: 0; color: #fff; font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px; }
+.rcard-name { margin: 0; font-size: 14.5px; line-height: 1.25; }
+.rcard-brief { margin: 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.rcard-emits { margin: 0; font-size: 12.5px; line-height: 1.5; }
+.rcard-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; }
+.rtag { font-size: 10.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2, #f8fafc); color: var(--ink-2); }
+.rtag.block { background: #fbeeee; border-color: #e6c3c3; color: #b23b3b; font-weight: 700; }
+.rtag.live { background: #e7f3e9; border-color: #bfdec5; color: #2f7a3a; font-weight: 700; }
+.rtag.hold { background: #fdf3e7; border-color: #ecd3b3; color: #8a4d0f; font-weight: 700; }

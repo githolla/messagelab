@@ -115,6 +115,17 @@ a segment-level results dashboard. "Message Lab" is a working title.
   an optional Draft A vs Draft B side-by-side diff. Years are not quantities
   (1900–2100 excluded); submission mechanics aren't coverage requirements.
   Judge-side (pools, metrics, calibration) is deliberately not built yet.
+  **Evaluator roster** (`lib/gate/roster.json` source-of-truth + typed
+  `roster.ts`, `components/RosterBrowser.tsx`, `/gate/evaluators`): all 100
+  evaluators (families A committee personas / B subsector lenses / C
+  buyer-state adversaries / D deterministic critics / E auditors / F
+  verifiers / G meta) spelled out as searchable, family-grouped cards —
+  brief, emits, role, cost tier, blocking, executed-by, plus a "running in
+  the Gate" tag mapped via `gateStatus()`. NOT a voting panel: scoring is a
+  3–5 disjoint-family judge pool (config in the JSON). `HANDOFF.md` at the
+  repo root is the portable integration guide for building the gate + roster
+  into the separate proposal-generator app (files to copy, API surface,
+  GateContext schema, precision rules, checklist).
 - RFP Simulator (`lib/rfp.ts`, `lib/rfpsim.ts`, `app/api/rfp-eval/route.ts`,
   `app/rfp/page.tsx`): sales-side "will this proposal win?" — paste the RFP + your
   draft response + deal context, and an editable buying committee (Economic Buyer,

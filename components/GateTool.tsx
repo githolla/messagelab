@@ -152,7 +152,8 @@ export default function GateTool() {
           arithmetic, compliance gaps, names and titles, reference relevance. A placeholder is present or it
           is not; a table sums or it does not. <b>Zero model calls, no API key.</b> Judges catch blatant
           errors and miss thin ones — code does not fill gaps in the author&apos;s favor. Anything blocking
-          means the draft does not ship.
+          means the draft does not ship. These checks are families D and F of a 100-evaluator roster —{" "}
+          <a href="/gate/evaluators">meet all 100 evaluators →</a>
         </p>
       </div>
 
