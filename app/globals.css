@@ -1796,3 +1796,58 @@ details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink-2); fon
 
 .fg-pick { font-size: 12px; font-weight: 700; margin-left: auto; white-space: nowrap; }
 .pm-k.good { color: #3f7a2e; } .pm-k.bad { color: #b23b3b; }
+
+/* ---- The Deterministic Gate ------------------------------------------- */
+.nav { gap: 8px; }
+
+.gscore-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.gship { font-size: 12px; font-weight: 750; letter-spacing: 0.04em; padding: 5px 12px; border-radius: 999px; }
+.gship.ok { background: #e7f3e9; color: #2f7a3a; border: 1px solid #bfdec5; }
+.gship.no { background: #fbeeee; color: #b23b3b; border: 1px solid #e6c3c3; }
+
+.gtally { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.gtally .gt { flex: 1; min-width: 90px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; text-align: center; }
+.gtally .gt b { display: block; font-size: 22px; line-height: 1.1; }
+.gtally .gt span { font-size: 11.5px; color: var(--ink-2); }
+.gtally .gt.bad b { color: #b23b3b; }
+.gtally .gt.good b { color: #2f7a3a; }
+
+.gfinds { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.gfind { border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 10px 12px; }
+.gfind.deficiency { border-left-color: #b23b3b; background: #fdf7f7; }
+.gfind.weakness { border-left-color: #db7f22; }
+.gfind.pass { border-left-color: #bfdec5; opacity: 0.82; }
+.gfind.skipped { border-left-color: var(--line); opacity: 0.62; }
+.gfind-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.gfind-id { font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.gfind-verdict { font-size: 10.5px; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; }
+.gfind-verdict.deficiency { background: #b23b3b; color: #fff; }
+.gfind-verdict.weakness { background: #f4e2cd; color: #8a4d0f; }
+.gfind-verdict.pass { background: #e7f3e9; color: #2f7a3a; }
+.gfind-verdict.skipped { background: var(--bg-2, #f1f5f9); color: var(--ink-2); }
+.gfind-block { font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; color: #b23b3b; }
+.gfind-sum { font-size: 13.5px; font-weight: 550; }
+.gfind-ex { list-style: none; margin: 8px 0 0; padding: 0 0 0 8px; display: flex; flex-direction: column; gap: 3px; }
+.gfind-ex li { font-size: 12.5px; color: var(--ink-2); }
+.gfind-sec { font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted, #64748b); }
+.gfind-more { border: 0; background: none; color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 0 0; }
+
+.gate-cmp { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 550; cursor: pointer; }
+
+.gdiff-wrap { overflow-x: auto; margin-top: 10px; }
+.gdiff { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.gdiff th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.gdiff td { padding: 5px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.gdiff .gd-id { font-family: ui-monospace, monospace; font-weight: 700; color: var(--ink-2); }
+.gdiff .gd-name { white-space: normal; min-width: 200px; }
+.gdiff .gd-deficiency { color: #b23b3b; font-weight: 700; }
+.gdiff .gd-weakness { color: #8a4d0f; }
+.gdiff .gd-pass { color: #2f7a3a; }
+.gdiff .gd-skipped { color: var(--muted, #94a3b8); }
+
+.gtot { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.gtot > div { display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; font-size: 13.5px; align-items: baseline; }
+.gtot span { color: var(--ink-2); }
+.gtot b { font-size: 17px; }
+.gtot b.bad { color: #b23b3b; }
+.gtot b.good { color: #2f7a3a; }

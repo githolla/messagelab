@@ -8,10 +8,11 @@ a segment-level results dashboard. "Message Lab" is a working title.
 ## Architecture
 
 - Next.js 15 App Router, TypeScript, no CSS framework (hand-rolled `app/globals.css`).
-- **The app is Focus-Group-only.** Routes: `/` is a Focus-Group-focused landing
-  page; `/test` is the **Focus Group** (default) with the A/B message test as a
-  toggle; `/test/report` is the results report page. `components/Nav.tsx` is a
-  single "Focus Group" CTA in the header. The former Lead Personalization
+- **Two tools: the Focus Group and the Deterministic Gate.** Routes: `/` is a
+  Focus-Group-focused landing page; `/test` is the **Focus Group** (default)
+  with the A/B message test as a toggle; `/test/report` is the results report
+  page; `/gate` is the **Deterministic Gate** (proposal checks, below).
+  `components/Nav.tsx` has "Focus Group" + "Proposal Gate" CTAs in the header. The former Lead Personalization
   (`/leads`), RFP Simulator (`/rfp`), and UX Page Review (`/review`) tools —
   and their API routes — were removed from the product (the user carved off the
   RFP and webinar bundles into separate projects earlier). Their `lib/*` files
@@ -90,6 +91,30 @@ a segment-level results dashboard. "Message Lab" is a working title.
   click-by-click trail (action + target + in-character thought) in the modal.
   Client fans out at `WALK_CONCURRENCY` 2; a failed walk falls back to a
   deterministic `focusDemo` + synthesized demo journey so the room stays full.
+- **The Deterministic Gate** (`lib/gate/*`, `app/gate/page.tsx`,
+  `components/GateTool.tsx`, "Proposal Gate" in the nav): thirty model-free
+  proposal checks (families D49–D68 structural + F81–F90 evidence from the
+  Nine-67 evaluator roster) run entirely client-side — zero model calls, no
+  API key. `lib/gate/model.ts` (types + check registry), `parse.ts`
+  (marked-text loader: headings, paragraphs, sentences, pipe/tab tables),
+  `checks.ts` (D49–D67: compliance gaps w/ bullet-run lead-in state,
+  prescribed columns, bare features [first-person subject + deliverable noun
+  required], unsourced claims, placeholders, arithmetic [rate columns don't
+  sum], money consistency [ranges excluded, two-section rule], dates, named
+  people [title within 260 chars], terminology mirror, effort index),
+  `evidence.ts` (F81–F90: provenance/currency vs a source registry, model
+  reconciliation vs published aggregates, proof-match on 7 dims,
+  reference relevance vs stated RFP preferences — references offered are read
+  from the doc's own References section plus the registry), `run.ts`
+  (runGate/diffGate), `sample.ts` (fictional tribal-college RFP + defect-seeded
+  draft + rebuild that deliberately keeps 2 blocking findings). Checks needing
+  context (people, sources, case-study dims…) report `skipped`, never a silent
+  pass; D68 (PDF accessibility) always skips — needs the artifact. Verdicts:
+  deficiency (blocking on gate checks — "DO NOT SHIP") / weakness / pass /
+  skipped; the UI shows a tally, per-check findings with evidence quotes, and
+  an optional Draft A vs Draft B side-by-side diff. Years are not quantities
+  (1900–2100 excluded); submission mechanics aren't coverage requirements.
+  Judge-side (pools, metrics, calibration) is deliberately not built yet.
 - RFP Simulator (`lib/rfp.ts`, `lib/rfpsim.ts`, `app/api/rfp-eval/route.ts`,
   `app/rfp/page.tsx`): sales-side "will this proposal win?" — paste the RFP + your
   draft response + deal context, and an editable buying committee (Economic Buyer,
