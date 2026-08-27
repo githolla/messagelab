@@ -17,11 +17,13 @@ or server-side identically.
 | `lib/gate/roster.json` | The full 100-evaluator roster (source of truth, v1.0.0) | data |
 | `lib/gate/roster.ts` | Typed accessor: families, judge pool, labels, lookups | ~150 |
 | `components/RosterBrowser.tsx` | The "every persona spelled out" browser UI (React) | ~140 |
-| `components/GateTool.tsx` | Reference scorecard + diff UI (React) | ~230 |
+| `components/GateTool.tsx` | Reference shell: inputs, context editor, diff table; hosts GateReview + CommitteeRoom | ~200 |
 | `lib/gate/sample.ts` | Defect-seeded demo docs + context (optional, for demos/tests) | ~150 |
 | `lib/gate/room.ts` | The live Committee Room: per-persona visibility scopes, veto roles, demo reads, room aggregation | ~250 |
 | `components/CommitteeRoom.tsx` | Convene-the-committee UI: lens + buyer-state pickers, live fan-out, stance chart, per-persona cards | ~250 |
 | `app/api/gate-room/route.ts` | One committee persona reads their slice in character (needs an Anthropic client — swap in your own model call) | ~110 |
+| `lib/gate/highlight.ts` | Maps finding evidence back to character spans in the proposal (whitespace-insensitive quote search; phrase findings mark every occurrence) | ~130 |
+| `components/GateReview.tsx` | The review workspace UI: fix queue left, proposal right with findings highlighted in place, two-way click-to-jump | ~230 |
 
 The only imports are between these files. `roster.json` needs
 `"resolveJsonModule": true` in tsconfig. The two React components import only
@@ -125,7 +127,37 @@ Things the roster's own notes insist the UI must not misrepresent:
 engine ("running in the Gate") — reimplement or drop it if the generator wires
 its own subset.
 
-## 7 · What is deliberately NOT in this package
+## 7 · The refinement loop — how users run this after a proposal is built
+
+The workflow the generator should reproduce (reference implementation: steps
+1–4 on `/gate`; the full operating playbook with exit rules lives in "The
+Refinement Loop" doc):
+
+**Build → Gate → Fix → Committee → Refine → ↺ → Ship.**
+
+1. **Gate on every save** (instant, free). Exit: `tally.blocking === 0`.
+2. **Fix in the review workspace** — `GateReview` shows the fix queue left and
+   the proposal right with each finding highlighted at its exact span
+   (`lib/gate/highlight.ts`); click either side to jump to the other. In the
+   generator, wire the highlights to the editor itself instead of a read-only
+   pane — same span data.
+3. **Convene the committee** (~31 calls, 1–2 min): verdict, stances, vetoes,
+   and "questions you'll face". Exit: no vetoes, committee avg ≥ your bar
+   (suggest 4.0), deciding personas not opposed.
+4. **Refine against the room** — the question list is the revision brief; run
+   new-vs-old through `diffGate` to prove the round moved something. Stop on
+   plateau: two rounds without gain.
+
+**Forecasting discipline:** uncalibrated scores are *relative* signal (draft B
+vs A, round over round, positive share ± Wilson CI) — refine on deltas
+immediately, but do not quote absolute win/response percentages until the
+score→outcome curve is fitted: backtest the RFP archive against actual
+win/loss, freeze a ~20-section human-labelled anchor set, log every live
+pursuit's outcome, recalibrate on model changes. Store each pursuit's final
+gate tally + committee scores with its outcome — that log IS the calibration
+dataset.
+
+## 8 · What is deliberately NOT in this package
 
 The judge side: model pools, the criterion generator, metrics
 (n_eff, kappa, theta_ratio), calibration (Rogan–Gladen, PPI). The contracts
@@ -135,13 +167,18 @@ evidence, wire **one judge end to end and read its output by hand before
 adding a second** — and start the frozen human-labelled anchor set the same
 week. The deterministic half is the reliable half; ship it first.
 
-## 8 · Integration checklist
+## 9 · Integration checklist
 
 1. Copy the files in §1; `npm run tsc` — no deps to install.
-2. Feed `runGate` on every save; render `findings` grouped by verdict.
+2. Feed `runGate` on every save; render results as the review workspace
+   (`GateReview` + `locateFindings` spans), not a flat list.
 3. Block the export/send action on `tally.blocking > 0`, with the findings
    shown next to the disabled button (the reason, not just the refusal).
 4. Populate `GateContext` from the generator's own data, not hand-typed JSON.
 5. Mount `RosterBrowser` wherever users ask "who is evaluating this?"
-6. Keep D68 visible as *skipped* until you run it on the rendered PDF —
+6. Wire the Committee Room (`lib/gate/room.ts` + your model client) as the
+   post-gate live simulation, and keep every round's scores.
+7. Log final scores + outcome per pursuit from day one (§7 — the
+   calibration dataset).
+8. Keep D68 visible as *skipped* until you run it on the rendered PDF —
    a skipped check the user can see is honest; a hidden one is a hole.
