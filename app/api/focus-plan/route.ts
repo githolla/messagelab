@@ -17,6 +17,8 @@ export interface StudyPlan {
   title: string;
   body: string;
   goal: string;
+  context: string; // background the room should know, split out of the ask
+  focusAreas: string[]; // specific lenses the room is asked to weigh
 }
 
 // Deterministic keyword plan when there's no API key — good enough to unblock.
@@ -56,6 +58,8 @@ function heuristicPlan(goal: string): StudyPlan {
       ? goal.trim()
       : `We're testing something to answer: ${goal.trim()}. Describe what the room should react to here…`,
     goal: goal.trim(),
+    context: "",
+    focusAreas: [],
   };
 }
 
@@ -85,8 +89,13 @@ format — one of: ${FORMATS.filter(Boolean).join(" | ")} (or "" if none fits)
 
 Anything is fair game. If it's a personal or everyday thing rather than a business asset (e.g. "I want to eat steak tonight", "should I move cities"), use kind "anything", industry "general", format "", and make the body a clear plain-language statement of the plan or idea for the room to react to.
 
+Also split the ask apart:
+- goal — the single decision/question the run should answer, as one clean sentence.
+- context — background the room should know that ISN'T the subject itself (their situation, constraints, admitted weaknesses — e.g. "our social proof is thin right now"). "" if none.
+- focusAreas — up to 4 short specific lenses the room should weigh (e.g. "credibility without testimonials", "appeal to AI agents browsing the site"). [] if none.
+
 Respond with ONLY this JSON (no fences):
-{ "kind": "...", "industry": "...", "format": "...", "title": "short name for the thing being tested", "body": "a concrete 2-4 sentence first draft of the subject the panel will react to, aimed at answering the question" }`;
+{ "kind": "...", "industry": "...", "format": "...", "title": "short name for the thing being tested", "body": "a concrete 2-4 sentence first draft of the subject the panel will react to, aimed at answering the question", "goal": "...", "context": "...", "focusAreas": ["..."] }`;
 
   let text: string;
   try {
@@ -104,7 +113,13 @@ Respond with ONLY this JSON (no fences):
     const format = FORMATS.includes(p.format as string) ? (p.format as string) : "";
     const title = typeof p.title === "string" ? p.title.trim().slice(0, 140) : "";
     const body = typeof p.body === "string" && p.body.trim() ? p.body.trim().slice(0, 2000) : heuristicPlan(goal).body;
-    return NextResponse.json({ plan: { kind, industry, format, title, body, goal }, source: "model" });
+    const planGoal = typeof p.goal === "string" && p.goal.trim() ? p.goal.trim().slice(0, 300) : goal;
+    const context = typeof p.context === "string" ? p.context.trim().slice(0, 1000) : "";
+    const focusAreas = (Array.isArray(p.focusAreas) ? p.focusAreas : [])
+      .filter((a): a is string => typeof a === "string" && a.trim().length > 0)
+      .map((a) => a.trim().slice(0, 120))
+      .slice(0, 5);
+    return NextResponse.json({ plan: { kind, industry, format, title, body, goal: planGoal, context, focusAreas }, source: "model" });
   } catch {
     return NextResponse.json({ plan: heuristicPlan(goal), source: "heuristic-parse" });
   }

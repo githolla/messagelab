@@ -42,10 +42,19 @@ export async function POST(req: NextRequest) {
   const dims = persona.dims ? Object.entries(persona.dims).map(([k, v]) => `${k}: ${v}`).join("\n") : "";
   const system = `You are ${persona.name}, a real member of a focus group in the ${subject.industry || "general"} space. Your type: ${persona.segment}${persona.how ? ` — ${persona.how}` : ""}.${dims ? `\n${dims}` : ""}\nReact as THIS specific person — bring your own priorities, skepticism, and mood. Honest, blunt reactions are what the panel is for; "I'd pass" is a valid answer.`;
 
-  const intro =
+  const baseIntro =
     subject.kind === "anything"
       ? `Someone is putting a plan, idea, or decision of theirs in front of the room for an honest take — it can be about anything, business or personal. Weigh it on: ${def.lens}.${subject.goal?.trim() ? ` They specifically want to know: "${subject.goal.trim()}" — keep that question front of mind as you react.` : ""}`
       : `You're reviewing a ${def.label.toLowerCase()}${subject.productType ? ` (a ${subject.productType})` : ""}${subject.format ? `, in the form of a ${subject.format.toLowerCase()}` : ""}. Weigh it on: ${def.lens}.${subject.goal?.trim() ? ` The team is specifically trying to learn: "${subject.goal.trim()}" — keep that question front of mind as you react.` : ""}`;
+  // The room brief: background the team shared, and the lenses they asked the
+  // room to weigh. Focus areas steer concern/suggestion without changing the schema.
+  const areas = (subject.focusAreas || []).map((a) => (a || "").trim()).filter(Boolean).slice(0, 8);
+  const brief =
+    (subject.context?.trim() ? `\n\n## Background the team shared (their real situation — react to the subject in this light)\n${subject.context.trim().slice(0, 1500)}` : "") +
+    (areas.length
+      ? `\n\n## The team asked the room to weigh these specifically\n${areas.map((a) => `- ${a}`).join("\n")}\nWhere they're relevant to you, aim your concern and suggestion at these — that's the feedback the team can act on.`
+      : "");
+  const intro = baseIntro + brief;
   const social = isSocialSubject(subject.kind, subject.format);
   const socialQ = social
     ? `\n8. like — would YOU tap like on this post? (true/false)\n9. comment — would you actually leave a comment? (true/false)\n10. share — would you share/repost it to your own feed? (true/false)`

@@ -8,6 +8,7 @@ import {
   FOCUS_KINDS,
   kindDef,
   PRODUCT_TYPES,
+  MAX_FOCUS_AREAS,
   focusDemo,
   type FocusKind,
   type FocusSubject,
@@ -159,6 +160,9 @@ export default function FocusGroup() {
   const [walkers, setWalkers] = useState(4);
   const [format, setFormat] = useState<string>("");
   const [goal, setGoal] = useState<string>("");
+  const [context, setContext] = useState<string>("");
+  const [focusAreas, setFocusAreas] = useState<string[]>([]);
+  const [areaText, setAreaText] = useState<string>("");
   const [planText, setPlanText] = useState<string>("");
   const [planning, setPlanning] = useState(false);
   const [planNote, setPlanNote] = useState<string>("");
@@ -294,13 +298,15 @@ export default function FocusGroup() {
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-      const p = data.plan as { kind: FocusKind; industry: string; format: string; title: string; body: string; goal: string };
+      const p = data.plan as { kind: FocusKind; industry: string; format: string; title: string; body: string; goal: string; context?: string; focusAreas?: string[] };
       setKind(p.kind);
       changeIndustry(p.industry);
       setFormat(p.format || "");
       setTitle(p.title || "");
       setBody(p.body || "");
       setGoal(p.goal || q);
+      setContext(p.context || "");
+      setFocusAreas((p.focusAreas || []).slice(0, MAX_FOCUS_AREAS));
       setPlanNote(data.source === "model" ? "Drafted your study below — edit anything, then run." : "Drafted a starting point below (no API key — a rough draft). Edit it, then run.");
     } catch (e) {
       setPlanNote(e instanceof Error ? e.message : "Couldn't design the study — set it up below instead.");
@@ -344,8 +350,20 @@ export default function FocusGroup() {
     setClarifyAs([]);
   }
 
+  function addFocusArea() {
+    const t = areaText.trim();
+    if (!t || focusAreas.length >= MAX_FOCUS_AREAS) return;
+    if (!focusAreas.some((a) => a.toLowerCase() === t.toLowerCase())) setFocusAreas((p) => [...p, t.slice(0, 120)]);
+    setAreaText("");
+  }
+
   function subjectOf(): FocusSubject {
-    return { kind, industry, productType: kind === "product" ? productType : "", format, goal, title, body, images: def.images ? images : [] };
+    return {
+      kind, industry, productType: kind === "product" ? productType : "", format, goal,
+      context: context.trim() || undefined,
+      focusAreas: focusAreas.length ? focusAreas : undefined,
+      title, body, images: def.images ? images : [],
+    };
   }
 
   // Hand the completed run to the dedicated report page (no DB in v1 — the run
@@ -469,7 +487,7 @@ export default function FocusGroup() {
     } else if (realCount < panel.length) {
       setError(`${panel.length - realCount} of ${panel.length} walks fell back to a simulated journey (${firstErr}). The rest are real.`);
     }
-    const walkSubject: FocusSubject = { kind: "website", industry, productType: "", format, goal, title, body: url.trim(), images: [] };
+    const walkSubject: FocusSubject = { kind: "website", industry, productType: "", format, goal, context: context.trim() || undefined, focusAreas: focusAreas.length ? focusAreas : undefined, title, body: url.trim(), images: [] };
     finish(rs, realCount === 0, panel, walkSubject);
   }
 
@@ -477,7 +495,7 @@ export default function FocusGroup() {
     setError(null);
     const n = Math.max(WALK_MIN, Math.min(WALK_MAX, walkers));
     const panel = buildPanel(scaleSegments(segments, n)).slice(0, n);
-    const subject: FocusSubject = { kind: "website", industry, productType: "", format, goal, title, body: body || `A ${industryLabel} website`, images: [] };
+    const subject: FocusSubject = { kind: "website", industry, productType: "", format, goal, context: context.trim() || undefined, focusAreas: focusAreas.length ? focusAreas : undefined, title, body: body || `A ${industryLabel} website`, images: [] };
     finish(panel.map((p) => { const r = focusDemo(p, subject); return { ...r, journey: demoJourney(p.id, r.sentiment) }; }), true, panel, subject);
   }
 
@@ -553,7 +571,43 @@ export default function FocusGroup() {
         </div>
         <div className="goalfield" style={{ marginTop: 14 }}>
           <label className="fld" htmlFor="fg-goal">What are you trying to learn? <span className="note" style={{ fontWeight: 400 }}>· optional — the report answers this directly</span></label>
-          <input id="fg-goal" type="text" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="e.g. Will lapsed donors respond to a matching-gift hook?" disabled={running} />
+          <input id="fg-goal" type="text" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="e.g. How do we make the site attractive without strong social proof yet?" disabled={running} />
+        </div>
+
+        {/* Brief the room — background + the lenses to weigh */}
+        <div className="roombrief" style={{ marginTop: 14 }}>
+          <label className="fld" htmlFor="fg-context">Brief the room <span className="note" style={{ fontWeight: 400 }}>· optional — background every persona is told before reacting</span></label>
+          <textarea
+            id="fg-context"
+            rows={3}
+            value={context}
+            onChange={(e) => setContext(e.target.value)}
+            placeholder="Your real situation — constraints, known weaknesses, what's true right now. e.g. We're early: our social proof is thin — few testimonials, no big-name logos yet. The site has to earn trust other ways."
+            disabled={running}
+          />
+          <label className="fld" htmlFor="fg-area" style={{ marginTop: 10 }}>Focus the room on <span className="note" style={{ fontWeight: 400 }}>· up to {MAX_FOCUS_AREAS} — every persona weighs these specifically</span></label>
+          <div className="arearow">
+            <input
+              id="fg-area"
+              type="text"
+              value={areaText}
+              onChange={(e) => setAreaText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addFocusArea(); } }}
+              placeholder="e.g. credibility without testimonials · appeal to AI agents browsing the site"
+              disabled={running || focusAreas.length >= MAX_FOCUS_AREAS}
+            />
+            <button className="btn ghost" onClick={addFocusArea} disabled={running || !areaText.trim() || focusAreas.length >= MAX_FOCUS_AREAS}>Add</button>
+          </div>
+          {focusAreas.length > 0 && (
+            <div className="fmtchips" style={{ marginTop: 8 }}>
+              {focusAreas.map((a) => (
+                <span className="fmtchip on areachip" key={a}>
+                  {a}
+                  <button className="areachip-x" onClick={() => setFocusAreas((p) => p.filter((x) => x !== a))} disabled={running} aria-label={`Remove ${a}`}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

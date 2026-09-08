@@ -137,10 +137,14 @@ export interface FocusSubject {
   productType: string;
   format?: string; // the form it takes (email, direct mail, social post, landing page…)
   goal?: string; // the decision/question the run is meant to answer
+  context?: string; // background the room should know (situation, constraints, known weaknesses)
+  focusAreas?: string[]; // specific lenses the room is asked to weigh (max ~5)
   title: string;
   body: string;
   images: string[]; // data URLs
 }
+
+export const MAX_FOCUS_AREAS = 5;
 
 export type Sentiment = "love" | "like" | "neutral" | "skeptical" | "reject";
 export const SENTIMENTS: Sentiment[] = ["love", "like", "neutral", "skeptical", "reject"];

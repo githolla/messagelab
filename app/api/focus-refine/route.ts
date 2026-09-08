@@ -9,6 +9,8 @@ interface RefineBody {
   kind: FocusKind;
   format?: string;
   goal?: string;
+  context?: string; // background the room was briefed with
+  focusAreas?: string[]; // lenses the room was asked to weigh
   subject: { title?: string; body?: string };
   concerns?: string[];
   suggestions?: string[];
@@ -39,8 +41,9 @@ export async function POST(req: NextRequest) {
   const def = kindDef(body.kind);
   const system =
     "You are a sharp copy/product editor. You revise a tested asset to win over more of a focus-group panel WITHOUT losing its core intent, voice, or offer. You address the panel's real objections and apply their best suggestions. Return ONLY JSON.";
+  const areas = (body.focusAreas || []).filter(Boolean).slice(0, 5);
   const subjectNoun = body.kind === "anything" ? "a plan / idea someone shared" : def.label.toLowerCase();
-  const prompt = `Here is ${subjectNoun}${body.format ? ` (a ${body.format.toLowerCase()})` : ""} that a simulated panel just reviewed.${body.goal ? `\nGoal of the test: ${body.goal}` : ""}
+  const prompt = `Here is ${subjectNoun}${body.format ? ` (a ${body.format.toLowerCase()})` : ""} that a simulated panel just reviewed.${body.goal ? `\nGoal of the test: ${body.goal}` : ""}${body.context?.trim() ? `\nThe team's situation (the revision must work within this): ${body.context.trim().slice(0, 800)}` : ""}${areas.length ? `\nThe panel was asked to weigh: ${areas.join("; ")} — the revision should visibly strengthen these.` : ""}
 
 TITLE: ${body.subject.title || "(none)"}
 BODY:

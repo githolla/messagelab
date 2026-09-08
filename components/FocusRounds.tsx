@@ -61,7 +61,7 @@ export default function FocusRounds({ round0, subject, panel, kind, industry, ur
       const resp = await fetch("/api/focus-refine", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind, format, goal, subject: { title: cur.title, body: cur.body }, concerns, suggestions }),
+        body: JSON.stringify({ kind, format, goal, context: subject.context, focusAreas: subject.focusAreas, subject: { title: cur.title, body: cur.body }, concerns, suggestions }),
       });
       const data = await resp.json();
       if (resp.ok && data.draft) { draft = data.draft; source = data.source; }
@@ -147,7 +147,7 @@ export default function FocusRounds({ round0, subject, panel, kind, industry, ur
         </section>
       )}
 
-      <FocusReport reactions={view.reactions} kind={kind} industry={industry} url={url} isDemo={isDemo} goal={goal} format={format} />
+      <FocusReport reactions={view.reactions} kind={kind} industry={industry} url={url} isDemo={isDemo} goal={goal} format={format} context={subject.context} focusAreas={subject.focusAreas} />
     </>
   );
 }

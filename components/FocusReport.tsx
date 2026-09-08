@@ -44,6 +44,8 @@ export interface FocusReportData {
   isDemo: boolean;
   goal?: string;
   format?: string;
+  context?: string; // background the room was briefed with
+  focusAreas?: string[]; // lenses the room was asked to weigh
 }
 
 type StatFilter = "" | "positive" | "negative" | "act";
@@ -51,7 +53,8 @@ const STAT_LABEL: Record<Exclude<StatFilter, "">, string> = {
   positive: "positive (love / like)", negative: "negative (skeptical / reject)", act: "would take action (4–5/5)",
 };
 
-export default function FocusReport({ reactions, kind, industry, url, isDemo, goal, format }: FocusReportData) {
+export default function FocusReport({ reactions, kind, industry, url, isDemo, goal, format, context, focusAreas }: FocusReportData) {
+  const briefAreas = (focusAreas || []).filter((a) => a && a.trim());
   const [openR, setOpenR] = useState<FocusReaction | null>(null);
   const [segFilter, setSegFilter] = useState<string>("all");
   const [statFilter, setStatFilter] = useState<StatFilter>("");
@@ -203,7 +206,7 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
     setShareBusy(true);
     setShareCopied(false);
     try {
-      const token = await encodeShare({ reactions, kind, industry, url, isDemo, goal, format });
+      const token = await encodeShare({ reactions, kind, industry, url, isDemo, goal, format, context, focusAreas });
       const link = `${window.location.origin}/test/report#r=${token}`;
       setShareUrl(link);
       try {
@@ -226,6 +229,8 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
     L.push(`**Verdict:** ${summary.tooClose ? "Too close to call" : FOCUS_VERDICT_LABEL[summary.verdict]} — ${summary.readline}`);
     L.push(`**Confidence:** positive ${summary.positivePct}% (95% CI ${Math.round(summary.positiveCI.low * 100)}–${Math.round(summary.positiveCI.high * 100)}%) · agreement ${Math.round(summary.agreement * 100)}% (${summary.agreementLabel}).`);
     if (goal?.trim()) L.push(`**Question tested:** ${goal.trim()}`);
+    if (context?.trim()) L.push(`**What the room was told:** ${context.trim()}`);
+    if (briefAreas.length) L.push(`**The room weighed:** ${briefAreas.join(" · ")}`);
     L.push("");
     L.push(`## What resonated`);
     summary.themes.resonates.slice(0, 4).forEach((t) => L.push(`- ${t.text}${t.count > 1 ? ` (${t.count})` : ""}`));
@@ -285,6 +290,17 @@ export default function FocusReport({ reactions, kind, industry, url, isDemo, go
           <div className="rc-qa">
             <div><span className="rc-qa-k">The question we tested</span><p>{goal.trim()}</p></div>
             <div><span className="rc-qa-k">What the room said</span><p>{summary.headline}</p></div>
+          </div>
+        )}
+        {(context?.trim() || briefAreas.length > 0) && (
+          <div className="rc-brief">
+            {context?.trim() && <div><span className="rc-qa-k">What the room was told</span><p>{context.trim()}</p></div>}
+            {briefAreas.length > 0 && (
+              <div>
+                <span className="rc-qa-k">The room weighed</span>
+                <div className="rc-brief-chips">{briefAreas.map((a, i) => <span className="rc-brief-chip" key={i}>{a}</span>)}</div>
+              </div>
+            )}
           </div>
         )}
         <p className="rc-meta">
